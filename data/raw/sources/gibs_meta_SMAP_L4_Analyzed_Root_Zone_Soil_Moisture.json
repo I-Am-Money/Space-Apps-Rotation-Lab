@@ -1,0 +1,18 @@
+{
+  "title": "Root Zone Soil Moisture 9 km (L4, 12z Instantaneous)",
+  "subtitle": "SMAP / Model Value-Added",
+  "ongoing": true,
+  "measurement": "Soil Moisture",
+  "retentionPeriod": -1,
+  "conceptIds": [
+    {
+      "type": "STD",
+      "value": "C3480440639-NSIDC_CPRD",
+      "shortName": "SPL4SMAU",
+      "title": "SMAP L4 Global 3-hourly 9 km EASE-Grid Surface and Root Zone Soil Moisture Analysis Update V008",
+      "version": "008",
+      "dataCenter": "NSIDC_CPRD"
+    }
+  ],
+  "layerPeriod": "Daily"
+}

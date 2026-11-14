@@ -1,0 +1,66 @@
+# Prices and yield potentials for RotationLab (India). Rupees per quintal (100 kg).
+# Accessed 2026-11-14. Every value carries a source; badge placeholder = not verified / not found.
+msp:
+  marketing_season: "Kharif Marketing Season 2026-27"
+  announced: "2026-05-13"
+  source: "PIB, Cabinet approves MSP for Kharif Crops for Marketing Season 2026-27, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1 (table read from the cached page data/raw/msp_kharif_2026_27_pib_PRID2260617.html)"
+  badge: observed
+  rice:
+    variety: "Paddy (Common)"
+    msp_rs_per_quintal: 2441
+    msp_prev_season_rs_per_quintal: 2369   # 2025-26, same table
+    cost_a2fl_rs_per_quintal_allindia: 1627
+    margin_pct: 50
+  jowar:
+    variety: "Jowar (Hybrid); Maldandi is listed separately at 4073"
+    msp_rs_per_quintal: 4023
+    msp_prev_season_rs_per_quintal: 3699
+    cost_a2fl_rs_per_quintal_allindia: 2682
+    margin_pct: 50
+  bajra:
+    variety: "Bajra"
+    msp_rs_per_quintal: 2900
+    msp_prev_season_rs_per_quintal: 2775
+    cost_a2fl_rs_per_quintal_allindia: 1858
+    margin_pct: 56
+  pigeonpea:
+    variety: "Tur (Arhar)"
+    msp_rs_per_quintal: 8450
+    msp_prev_season_rs_per_quintal: 8000
+    cost_a2fl_rs_per_quintal_allindia: 5496
+    margin_pct: 54
+  cost_note: >
+    PIB "Cost" column is the all-India weighted average cost of production per quintal
+    (all paid-out costs plus imputed family labour, i.e. A2+FL), projected for 2026-27.
+    It is per quintal, not per acre, and is not state-specific.
+
+# Operating cost per acre: NOT found in a verifiable state-level (Telangana/AP) form.
+# CACP cost-of-cultivation state tables were not reachable. Team to fill from CACP
+# "Cost of Cultivation / Production" reports (cacp.da.gov.in), Cost A2+FL, Telangana or AP.
+operating_cost_rs_per_acre:
+  rice:      {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+  jowar:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+  bajra:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+  pigeonpea: {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+
+# Potential yield Ym = 90th percentile of linearly detrended district yields (kg/ha),
+# computed by engine/fetch_icrisat.py for the DEV district (Rangareddy, dev_placeholder).
+# Rice and bajra come from the fallback panel (1990-2015). Jowar and pigeonpea need the
+# primary ICRISAT DLD files (not reachable from the build environment): null = placeholder.
+potential_yield_kg_ha:
+  district: Rangareddy
+  dev_placeholder: true
+  rice:      {value: 2875.2, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Rangareddy 1990-2015 (26 yrs); mixes irrigated and rainfed"}
+  bajra:     {value: 1146.0, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Rangareddy 1990-2015 (24 yrs)"}
+  jowar:     {value: null, badge: placeholder, source: "needs ICRISAT DLD sorghum file (see docs/INDIA_DATA.md manual steps)"}
+  pigeonpea: {value: null, badge: placeholder, source: "needs ICRISAT DLD pigeonpea file (see docs/INDIA_DATA.md manual steps)"}
+
+# Costs of information (EVPI cards). No source: team estimates only.
+soil_test_cost_rs:
+  value: null
+  badge: placeholder
+  source: "TEAM_TO_FILL (quote from local soil testing lab / Soil Health Card scheme)"
+borewell_or_tank_capacity_measurement_cost_rs:
+  value: null
+  badge: placeholder
+  source: "TEAM_TO_FILL (quote from a local borewell yield test / tank survey)"

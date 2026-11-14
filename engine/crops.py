@@ -1,0 +1,105 @@
+"""Crop parameters and assumption lookup. Reads config/assumptions.yaml (nothing hard-coded here)."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+ASSUMPTIONS_PATH = ROOT / "config" / "assumptions.yaml"
+PRICES_PATH = ROOT / "config" / "prices_india.yaml"
+CROP_IDS = ("rice", "jowar", "bajra", "pigeonpea")
+MILLETS = ("jowar", "bajra")
+
+
+@lru_cache(maxsize=1)
+def load_assumptions() -> dict:
+    """Flat dict: dotted name -> leaf dict(value, range, unit, source, badge)."""
+    raw = yaml.safe_load(ASSUMPTIONS_PATH.read_text())
+    flat = {}
+
+    def walk(node, prefix):
+        for k, v in node.items():
+            name = f"{prefix}.{k}" if prefix else k
+            if isinstance(v, dict) and "value" in v:
+                flat[name] = v
+            elif isinstance(v, dict):
+                walk(v, name)
+
+    walk(raw, "")
+    return flat
+
+
+def A(params: dict | None, name: str):
+    """Assumption value with optional override: params[dotted name] wins, then params[leaf name]."""
+    if params:
+        if name in params:
+            return params[name]
+        leaf = name.rsplit(".", 1)[-1]
+        if leaf in params and not name.startswith("crops."):
+            return params[leaf]
+    return load_assumptions()[name]["value"]
+
+
+@dataclass
+class CropParams:
+    id: str
+    kc_ini: float
+    kc_mid: float
+    kc_end: float
+    stages_days: tuple
+    root_depth_m: float
+    p: float
+    ky: float
+    sowing_doy: int
+    ym_kg_ha: float
+    badges: dict = field(default_factory=dict)
+
+    @property
+    def season_days(self) -> int:
+        return int(sum(self.stages_days))
+
+    def kc_curve(self) -> np.ndarray:
+        """FAO-56 piecewise Kc over the season (ch.6 Fig. 34): flat ini, linear dev, flat mid, linear late."""
+        ini, dev, mid, late = self.stages_days
+        kc = np.empty(self.season_days)
+        kc[:ini] = self.kc_ini
+        kc[ini:ini + dev] = np.linspace(self.kc_ini, self.kc_mid, dev + 1)[1:]
+        kc[ini + dev:ini + dev + mid] = self.kc_mid
+        kc[ini + dev + mid:] = np.linspace(self.kc_mid, self.kc_end, late + 1)[1:]
+        return kc
+
+
+def _ym_from_prices(crop: str):
+    if not PRICES_PATH.exists():
+        return None
+    d = yaml.safe_load(PRICES_PATH.read_text()) or {}
+    y = d.get("potential_yield_kg_ha")
+    if not isinstance(y, dict) or crop not in y:
+        return None
+    v = y[crop]
+    if isinstance(v, dict):
+        v = v.get("value")
+    return None if v is None else float(v)
+
+
+def load_crops(params: dict | None = None) -> dict[str, CropParams]:
+    out = {}
+    for c in CROP_IDS:
+        g = lambda k: A(params, f"crops.{c}.{k}")
+        ym = _ym_from_prices(c)
+        ym_badge = "observed"
+        if ym is None:
+            ym, ym_badge = float(A(params, f"ym_kg_ha.{c}")), "placeholder"
+        if params and f"ym_kg_ha.{c}" in params:
+            ym = float(params[f"ym_kg_ha.{c}"])
+        badges = {k: load_assumptions()[f"crops.{c}.{k}"]["badge"] for k in
+                  ("kc_ini", "kc_mid", "kc_end", "stages_days", "root_depth_m", "p", "ky", "sowing_doy")}
+        badges["ym_kg_ha"] = ym_badge
+        out[c] = CropParams(c, float(g("kc_ini")), float(g("kc_mid")), float(g("kc_end")),
+                            tuple(int(x) for x in g("stages_days")), float(g("root_depth_m")),
+                            float(g("p")), float(g("ky")), int(g("sowing_doy")), ym, badges)
+    return out

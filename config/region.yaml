@@ -1,0 +1,14 @@
+district: TEAM_TO_FILL          # swap to the real district; then update lat/lon below
+icrisat_district: TEAM_TO_FILL  # pre-2014 ICRISAT district name
+country: India
+lat: 17.5
+lon: 78.5
+dev_placeholder: true           # DEV point (central Telangana). NOT the farm. Replace with district centroid.
+elevation_m: 494.59             # from NASA POWER response geometry (MERRA-2 grid-cell elevation) for 17.5, 78.5
+elevation_source: "NASA POWER daily point API v2.10.3, geometry.coordinates[2]"
+weather_source: "NASA POWER daily, community AG, 1981-2025"
+notes: >
+  NASA POWER is a gridded product (about 0.5 degree, roughly 50 km; MERRA-2 / CERES-SYN1deg
+  inputs). The UI must say "regional estimate", never "your field". Elevation is the grid
+  cell value, not the farm's. When the district is chosen, delete data/raw/power_17.5_78.5.json
+  use is automatic: load_weather(lat, lon) caches a new file per point.

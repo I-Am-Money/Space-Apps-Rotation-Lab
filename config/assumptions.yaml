@@ -1,0 +1,94 @@
+# RotationLab physics assumptions. Every leaf has value, range, unit, source, badge.
+# Sources marked with a URL were read directly from the primary document on 2026-11-14.
+# "team to verify" = could not be read in a primary document; value is flagged, not trusted.
+# Badges: observed | modeled | local | assumption | placeholder.
+#
+# Primary documents read:
+#  [F56-T11] FAO-56 (Allen et al. 1998) ch.6 Table 11 "Lengths of crop development stages"   https://www.fao.org/4/x0490e/x0490e0b.htm
+#  [F56-T12] FAO-56 ch.6 Table 12 "Single (time-averaged) crop coefficients, Kc"              https://www.fao.org/4/x0490e/x0490e0b.htm
+#            NOTE: on the FAO web copy the Kc ini cells for Millet and Sorghum are blank, so Kc ini is not readable there.
+#  [F56-T22] FAO-56 ch.8 Table 22 "Ranges of maximum effective rooting depth (Zr) and p"      https://www.fao.org/4/x0490e/x0490e0e.htm
+#  [F66-T1]  FAO I&D Paper 66 (Steduto et al. 2012) Table 1 "Seasonal Ky values from FAO I&D Paper No. 33", printed p.7
+#            https://www.fao.org/4/i2800e/i2800e02.pdf (PDF page 3). Lists sorghum 0.9; does NOT list rice, millet, pigeon pea.
+#            The original FAO-33 text was not obtainable online in this session.
+#  [NEH9-1]  USDA NRCS National Engineering Handbook Part 630 ch.9 Table 9-1, p.9-2 (July 2004)
+#            https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf
+
+crops:
+  rice:
+    kc_ini:   {value: 1.05, range: [1.05, 1.05], unit: "-", source: "FAO-56 Table 12, row Rice: 1.05 / 1.20 / 0.90-0.60 (ini/mid/end). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid:   {value: 1.20, range: [1.20, 1.20], unit: "-", source: "FAO-56 Table 12, row Rice. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_end:   {value: 0.75, range: [0.60, 0.90], unit: "-", source: "FAO-56 Table 12 gives the range 0.90-0.60 for Rice; the value is our midpoint choice (team to verify the point).", badge: assumption}
+    stages_days: {value: [30, 30, 60, 30], range: [[30, 30], [30, 30], [60, 80], [30, 40]], unit: days, source: "FAO-56 Table 11, row Rice: 30/30/60/30 = 150 (plant Dec; May, tropics/Mediterranean); second row 30/30/80/40 = 180 (May, tropics) gives the range. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.5, range: [0.5, 1.0], unit: m, source: "FAO-56 Table 22, Rice Zr 0.5-1.0 m. Lower end chosen (puddled paddy, hardpan). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p:        {value: 0.20, range: [0.20, 0.20], unit: "-", source: "FAO-56 Table 22, Rice p = 0.20 (footnote 4: 'of saturation'). Not used by the paddy model (soil kept saturated). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    ky:       {value: 1.09, range: [0.9, 1.3], unit: "-", source: "team to verify. FAO-33 whole-season Ky for rice is not listed in FAO-66 Table 1 and FAO-33 could not be read; value is flagged.", badge: placeholder}
+    sowing_doy: {value: 182, range: [166, 196], unit: day-of-year, source: "team to verify (assumed 1 July transplant, kharif).", badge: assumption}
+  jowar:
+    kc_ini:   {value: 0.30, range: [0.15, 0.60], unit: "-", source: "team to verify. FAO-56 Table 12 Kc ini cell for Sorghum is blank on the FAO web copy.", badge: placeholder}
+    kc_mid:   {value: 1.05, range: [1.00, 1.10], unit: "-", source: "FAO-56 Table 12, Sorghum - grain: Kc mid 1.00-1.10 (midpoint chosen). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_end:   {value: 0.55, range: [0.55, 0.55], unit: "-", source: "FAO-56 Table 12, Sorghum - grain: Kc end 0.55. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    stages_days: {value: [20, 35, 40, 30], range: [[20, 20], [35, 35], [40, 45], [30, 30]], unit: days, source: "FAO-56 Table 11, Sorghum: 20/35/40/30 = 130 (May/June, USA, Pakistan, Mediterranean); 20/35/45/30 = 140 (Mar/Apr, arid) gives the range. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.0, range: [1.0, 2.0], unit: m, source: "FAO-56 Table 22, Sorghum-grain Zr 1.0-2.0 m (larger values for unlayered soils, footnote 1). Lower end chosen for shallow Deccan soils (team to verify the point). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p:        {value: 0.55, range: [0.55, 0.55], unit: "-", source: "FAO-56 Table 22, Sorghum-grain p = 0.55 (for ETc about 5 mm/day). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    ky:       {value: 0.9, range: [0.9, 0.9], unit: "-", source: "FAO-33 seasonal Ky as reproduced in FAO I&D Paper 66, Table 1, p.7: Sorghum 0.9. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    sowing_doy: {value: 175, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~24 June, kharif).", badge: assumption}
+  bajra:
+    kc_ini:   {value: 0.30, range: [0.15, 0.60], unit: "-", source: "team to verify. FAO-56 Table 12 Kc ini cell for Millet is blank on the FAO web copy.", badge: placeholder}
+    kc_mid:   {value: 1.00, range: [1.00, 1.00], unit: "-", source: "FAO-56 Table 12, row Millet: Kc mid 1.00. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_end:   {value: 0.30, range: [0.30, 0.30], unit: "-", source: "FAO-56 Table 12, row Millet: Kc end 0.30. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    stages_days: {value: [15, 25, 40, 25], range: [[15, 20], [25, 30], [40, 55], [25, 35]], unit: days, source: "FAO-56 Table 11, Millet: 15/25/40/25 = 105 (June, Pakistan); 20/30/55/35 = 140 (April, central USA) gives the range. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.0, range: [1.0, 2.0], unit: m, source: "FAO-56 Table 22, Millet Zr 1.0-2.0 m. Lower end chosen for shallow Deccan soils (team to verify the point). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p:        {value: 0.55, range: [0.55, 0.55], unit: "-", source: "FAO-56 Table 22, Millet p = 0.55. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    ky:       {value: 0.9, range: [0.7, 1.1], unit: "-", source: "team to verify. Millet is not in FAO-66 Table 1 (FAO-33 values); sorghum value 0.9 used as a flagged stand-in.", badge: placeholder}
+    sowing_doy: {value: 180, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~29 June, kharif).", badge: assumption}
+  pigeonpea:
+    kc_ini:   {value: 0.40, range: [0.30, 0.50], unit: "-", source: "team to verify. Pigeon pea is not in FAO-56 Table 12; 0.4 is the FAO-56 'Beans, dry and Pulses' Kc ini, used as a flagged stand-in.", badge: placeholder}
+    kc_mid:   {value: 1.15, range: [1.00, 1.15], unit: "-", source: "team to verify. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' Kc mid 1.15 (Chick pea 1.00 gives the low end).", badge: placeholder}
+    kc_end:   {value: 0.35, range: [0.30, 0.35], unit: "-", source: "team to verify. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' / Chick pea Kc end 0.35.", badge: placeholder}
+    stages_days: {value: [25, 35, 70, 40], range: [[20, 30], [30, 45], [50, 90], [30, 50]], unit: days, source: "team to verify. No pigeon pea row in FAO-56 Table 11; 170-day total is a flagged guess for medium-duration kharif tur.", badge: placeholder}
+    root_depth_m: {value: 1.0, range: [0.6, 1.5], unit: m, source: "team to verify. Not in FAO-56 Table 22 (Beans/pulses 0.6-0.9, Chick pea 0.6-1.0 are the nearest rows).", badge: placeholder}
+    p:        {value: 0.50, range: [0.45, 0.55], unit: "-", source: "team to verify. Not in FAO-56 Table 22; Chick pea p = 0.50 and Beans/Pulses 0.45 are the nearest rows.", badge: placeholder}
+    ky:       {value: 0.9, range: [0.7, 1.2], unit: "-", source: "team to verify. Pigeon pea is not in FAO-66 Table 1.", badge: placeholder}
+    sowing_doy: {value: 175, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~24 June, kharif).", badge: assumption}
+
+# Potential (water-unlimited) yield. Read from config/prices_india.yaml potential_yield_kg_ha when present;
+# these are only the fallback placeholders.
+ym_kg_ha:
+  rice:      {value: 5000, range: [3500, 6500], unit: kg/ha, source: "PLACEHOLDER; replaced by ICRISAT-derived value in config/prices_india.yaml when present.", badge: placeholder}
+  jowar:     {value: 2500, range: [1500, 4000], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
+  bajra:     {value: 2200, range: [1200, 3500], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
+  pigeonpea: {value: 1200, range: [700, 1800], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
+
+hydrology:
+  cn_crop_group_A: {value: 67, range: [64, 72], unit: "-", source: "NRCS NEH 630 ch.9 Table 9-1 (p.9-2), Row crops, straight row, Good hydrologic condition, group A = 67 (Poor 72, SR+CR Good 64). https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf", badge: assumption}
+  cn_crop_group_B: {value: 78, range: [75, 81], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group B = 78 (Poor 81, SR+CR Good 75). Same URL.", badge: assumption}
+  cn_crop_group_C: {value: 85, range: [82, 88], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group C = 85 (Poor 88, SR+CR Good 82). Same URL.", badge: assumption}
+  cn_crop_group_D: {value: 89, range: [85, 91], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group D = 89 (Poor 91, SR+CR Good 85). Same URL.", badge: assumption}
+  cn_fallow_group_A: {value: 77, range: [74, 77], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group A = 77 (Crop residue Good 74). Same URL.", badge: assumption}
+  cn_fallow_group_B: {value: 86, range: [83, 86], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group B = 86 (CR Good 83). Same URL.", badge: assumption}
+  cn_fallow_group_C: {value: 91, range: [88, 91], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group C = 91 (CR Good 88). Same URL.", badge: assumption}
+  cn_fallow_group_D: {value: 94, range: [90, 94], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group D = 94 (CR Good 90). Same URL.", badge: assumption}
+  hydrologic_group: {value: B, range: [A, D], unit: "group", source: "team to verify. Replace with the soil survey value for the district (india-data soil file).", badge: placeholder}
+  ia_ratio: {value: 0.2, range: [0.05, 0.2], unit: "-", source: "team to verify. Standard SCS initial abstraction ratio 0.2 (NEH-4); not read in this session.", badge: assumption}
+  init_depletion_frac: {value: 0.5, range: [0.0, 1.0], unit: "fraction of column TAW", source: "team to verify. Spin-up state on 1 Jan of plan year 1 (dry season, so half depleted).", badge: assumption}
+
+fallow:
+  kc: {value: 0.30, range: [0.15, 0.50], unit: "-", source: "team to verify. Bare/fallow soil Kc between seasons; not read from FAO-56 ch.7 in this session.", badge: placeholder}
+  evap_depth_m: {value: 0.12, range: [0.10, 0.15], unit: m, source: "team to verify. Depth of the surface layer that evaporates (FAO-56 ch.7 Ze); not read in this session.", badge: placeholder}
+  depletion_fraction: {value: 0.5, range: [0.3, 0.7], unit: "-", source: "team to verify. Fraction of evaporation-layer water that evaporates at full rate.", badge: placeholder}
+
+rotation:
+  rice_after_rice:        {value: 0.95, range: [0.90, 1.00], unit: "yield multiplier", source: "team to verify. Spec change sec.3: small penalty; magnitude not sourced.", badge: assumption}
+  millet_after_millet:    {value: 0.95, range: [0.90, 1.00], unit: "yield multiplier", source: "team to verify. Spec change sec.3: small penalty (jowar/bajra after jowar/bajra); magnitude not sourced.", badge: assumption}
+  pigeonpea_after_pigeonpea: {value: 0.92, range: [0.85, 1.00], unit: "yield multiplier", source: "team to verify. Not in the spec; added because a 4^4 candidate set contains P,P,P,P. Magnitude not sourced.", badge: placeholder}
+  rice_after_pigeonpea:   {value: 1.05, range: [1.00, 1.15], unit: "yield multiplier", source: "team to verify. Spec change sec.3: boost after pigeon pea; magnitude not sourced.", badge: assumption}
+  millet_after_pigeonpea: {value: 1.08, range: [1.00, 1.20], unit: "yield multiplier", source: "team to verify. Spec change sec.3: boost after pigeon pea; magnitude not sourced.", badge: assumption}
+  n_credit_after_pigeonpea: {value: 30, range: [0, 60], unit: "kg N/ha", source: "team to verify. Nitrogen credit to the following rice/millet crop; magnitude not sourced.", badge: assumption}
+
+rice_irrigation:
+  percolation_seepage_mm_day: {value: 4.0, range: [1.0, 8.0], unit: mm/day, source: "team to verify. Soil dependent; no source read in this session.", badge: assumption}
+  puddling_water_mm: {value: 200, range: [100, 300], unit: mm, source: "team to verify. One-time land preparation and puddling water at season start.", badge: assumption}
+  base_available_irrigation_mm: {value: 900, range: [300, 1500], unit: mm per season, source: "team to verify. Farmer input (borewell/tank); simplified recharge proxy, team to verify.", badge: assumption}
+  recharge_exponent_k: {value: 0.5, range: [0.0, 1.0], unit: "-", source: "simplified recharge proxy, team to verify. available = base * (season_rain/median_season_rain)^k.", badge: assumption}
+  bund_height_mm: {value: 100, range: [50, 150], unit: mm, source: "team to verify. Maximum ponded depth; excess spills as runoff.", badge: assumption}

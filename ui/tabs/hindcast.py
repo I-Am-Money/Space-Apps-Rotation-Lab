@@ -1,0 +1,82 @@
+import html
+from pathlib import Path
+
+import pandas as pd
+import streamlit as st
+
+from ui import charts, data
+from ui.components import badge, md, section, tab_head
+from ui.data import CROP_LABEL, humanize, plan_label
+
+LIMITS_FILE = Path(__file__).resolve().parents[2] / "LIMITATIONS.md"
+
+SOURCES = [
+    ("NASA POWER, daily weather", "https://power.larc.nasa.gov/docs/", "Opened in a browser: the project is the Prediction Of Worldwide Energy Resources."),
+    ("NASA GIBS, imagery services", "https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api", "Opened in a browser: provides global satellite imagery through web map services."),
+    ("NASA SMAP mission", "https://smap.jpl.nasa.gov/", "Opened in a browser."),
+    ("NASA Earth Observatory, NDVI", "https://science.nasa.gov/earth/earth-observatory/measuring-vegetation-ndvi-evi/", "Opened in a browser: NDVI is the most common satellite measure of the density of plant growth."),
+    ("FAO Paper 56, evapotranspiration", "https://www.fao.org/4/x0490e/x0490e04.htm", "Opened in a browser: evapotranspiration is water lost from soil by evaporation plus from the crop by transpiration."),
+    ("ICRISAT District Level Database", "https://data.icrisat.org/dld/", "Link taken from the project brief. The site did not load when checked, so this entry is unverified."),
+]
+
+
+def render():
+    p = data.params()
+    h = data.hindcast(p)
+    b = "placeholder" if data.is_mock() else "modeled"
+    tab_head("How Good Is This?", "A check of the model against what the district actually harvested, plus every assumption and limit in one place.")
+    if h.get("note"):
+        md(f'<div class="rl-callout"><p>{html.escape(humanize(h["note"]))} {badge(b)}</p></div>')
+    pc = {c: d for c, d in h.get("per_crop", {}).items() if "pearson_r" in d}
+    if not h.get("available") or not pc:
+        md(f'<p>{badge("placeholder")} District yield data is not loaded, so the comparison is skipped. Nothing has been made up.</p>')
+    else:
+        crop = st.radio("Crop", list(pc), format_func=CROP_LABEL.get, horizontal=True, key="hc_crop")
+        d = pc[crop]
+        c1, c2 = st.columns([1.5, 1], gap="large")
+        with c1:
+            section("Model against district yields", b, "Each dot is a year, with the long-run trend removed from both. On the dotted line the model matches the district.")
+            charts.show(charts.hindcast_scatter(d, crop), "hc")
+            if h.get("farm_records"):
+                md(f'{badge("local")} Your farm records were provided and are listed below.')
+                st.dataframe(pd.DataFrame(h["farm_records"]["rows"]), hide_index=True, use_container_width=True)
+            else:
+                md('<p class="rl-note">No farm records were provided, so only district data is shown.</p>')
+        with c2:
+            section("Scores", b)
+            r, ho = d.get("pearson_r"), d.get("heldout_r")
+            rows = [("Correlation, all years", f"{r:.2f}" if r is not None else "n/a", ""),
+                    ("Correlation, latest years held out", f"{ho:.2f}" if ho is not None else "n/a", ""),
+                    ("Average error", f"{d['mae_kg_ha']:,.0f}", "kg per ha")]
+            for l, v, u in rows:
+                md(f'<div class="rl-stat" style="padding-left:0;border-bottom:1px solid var(--line)"><div class="l">{l}</div><div class="v">{v}<span class="u">{u}</span></div><div class="b">{badge(b)}</div></div>')
+            md(f'<p class="rl-note">{html.escape(d.get("text", ""))}</p>')
+            if d.get("weak_reason"):
+                md(f'<p class="rl-note"><strong>Why the match is weak:</strong> {html.escape(d["weak_reason"])}</p>')
+
+    section("Does the model beat simple baselines?", b)
+    bt = pd.DataFrame(h.get("baseline", []))
+    if not bt.empty:
+        bt["id"] = bt["id"].map(lambda i: plan_label(i) if "-" in str(i) else i)
+        bt = bt.rename(columns=dict(strategy="Strategy", id="Rotation", mean_profit="Average profit (Rs per acre)", worst10_profit="Worst 10% (Rs per acre)",
+                                    water_stress_mm="Water stress (mm)", irrigation_mm="Irrigation (mm)"))
+        st.dataframe(bt, hide_index=True, use_container_width=True)
+
+    section("Every assumption", None, "Each row says where its value comes from. Rows marked team to verify have no confirmed source yet.")
+    a = data.assumptions().copy()
+    a["value"] = a["value"].astype(str); a["range"] = a["range"].astype(str).replace({"None": ""})
+    st.dataframe(a.rename(columns=str.title), hide_index=True, use_container_width=True)
+
+    section("Limitations")
+    try:
+        txt = LIMITS_FILE.read_text()
+    except Exception:
+        txt = ""
+    if txt:
+        with st.expander("Read the full limitations", expanded=True):
+            st.markdown("\n".join(l for i, l in enumerate(txt.splitlines()) if not (i == 0 and l.startswith("# "))))
+    else:
+        md(f'<p>{badge("placeholder")} LIMITATIONS.md is not written yet. It will appear here.</p>')
+
+    section("Data sources")
+    md('<ul class="rl-src">' + "".join(f'<li><a href="{u}" target="_blank" rel="noopener">{html.escape(n)}</a><div class="st">{html.escape(s)}</div></li>' for n, u, s in SOURCES) + "</ul>")

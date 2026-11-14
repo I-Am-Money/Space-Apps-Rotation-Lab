@@ -1,0 +1,32 @@
+{
+  "title": "Vegetation Index (L3, 16-Day)",
+  "subtitle": "Terra / MODIS",
+  "ongoing": true,
+  "measurement": "Vegetation Indices",
+  "retentionPeriod": -1,
+  "daynight": [
+    "day"
+  ],
+  "conceptIds": [
+    {
+      "type": "STD",
+      "value": "C194001241-LPDAAC_ECS",
+      "shortName": "MOD13Q1",
+      "title": "MODIS/Terra Vegetation Indices 16-Day L3 Global 250m SIN Grid V006",
+      "version": "006",
+      "dataCenter": "LPDAAC_ECS"
+    },
+    {
+      "type": "STD",
+      "value": "C1621383370-LPDAAC_ECS",
+      "shortName": "MOD13Q1",
+      "title": "MODIS/Terra Vegetation Indices 16-Day L3 Global 250m SIN Grid V061",
+      "version": "061",
+      "dataCenter": "LPDAAC_ECS"
+    }
+  ],
+  "layerPeriod": "16-Day",
+  "transAntiMeridian": false,
+  "resolutionAtNadir": "250m",
+  "latency": 4320
+}
