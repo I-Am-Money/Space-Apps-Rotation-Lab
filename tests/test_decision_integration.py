@@ -24,14 +24,14 @@ def test_real_scenarios_derived_counts():
 def test_real_recommend_invariants():
     r = api.recommend({"lam": 0.0, "w": 0.0})
     m = r["metrics"]
-    assert len(m) == 256 and r["top"]["mean_profit"] == m.mean_profit.max()
+    assert len(m) == len(opt.ALL_PLANS) and r["top"]["mean_profit"] == m.mean_profit.max()
     r1 = api.recommend({"lam": 1.0, "w": 0.0})
     assert r1["top"]["worst10_profit"] == r1["metrics"].worst10_profit.max()
 
 
 def test_real_millet_uses_less_irrigation_than_rice():
     m = api.recommend({})["metrics"].set_index("id")
-    assert m.loc["jowar-jowar-jowar-jowar", "irrigation_mm"] <= m.loc["rice-rice-rice-rice", "irrigation_mm"]
+    assert m.loc["-".join([opt.MILLETS[0]] * 4), "irrigation_mm"] <= m.loc["rice-rice-rice-rice", "irrigation_mm"]
 
 
 def test_real_compare_and_tipping_run():
@@ -59,3 +59,27 @@ def test_real_prices_use_yaml_msp_with_badges():
 def test_real_batch_matches_per_plan_and_is_fast():
     import time
     t = time.time(); api.recommend({"irrigation_mm": 777.0}); assert time.time() - t < 5
+
+
+def test_real_canal_stress_test_and_baseline_deltas():
+    c = api.compare(["A", "B", "C"], {"water_source": "canal"})
+    names = [r["test"] for r in c["rotations"]["B"]["stress_tests"]]
+    assert "low canal release year" in names
+    assert c["baseline_id"] == "A"
+    assert c["rotations"]["A"]["delta_vs_baseline"]["d_mean_profit"] == 0
+    c2 = api.compare(["A"], {"water_source": "borewell"})
+    assert "low canal release year" not in [r["test"] for r in c2["rotations"]["A"]["stress_tests"]]
+
+
+def test_real_hindcast_status_labels():
+    h = api.hindcast()
+    for c, v in h["per_crop"].items():
+        assert v["status"] in ("validated against district yields", "no validation data")
+
+
+def test_real_selection_candidate_set():
+    opt.configure()
+    assert opt.MILLETS and set(opt.CROPS) == {"rice", "pigeonpea", *opt.MILLETS}
+    assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4
+    m = opt.MILLETS[0]
+    assert opt.REF["B"] == ["rice", m, "rice", m] and opt.REF["C"] == ["rice", "pigeonpea", m, "rice"]

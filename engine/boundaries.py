@@ -63,13 +63,18 @@ def _first_crossover(winners, Jm, ms):
 def rainfall_crossover(scenset, awc, irr, params, scale, cands, n_boot=200, seed=42, m_grid=M_GRID):
     lam, w, pm = params["lam"], params["w"], params.get("price_mult", 1.0)
     P, St = [], []
-    for m in m_grid:
-        p, s = _stack(cands, scenset.derive(rain_mult=m), awc, irr, pm)
+    scs = [scenset.derive(rain_mult=m) for m in m_grid]
+    opt.prefetch_multi(cands, scs, awc, irr)               # one batched simulation for the whole sweep
+    for sc_ in scs:
+        p, s = _stack(cands, sc_, awc, irr, pm)
         P.append(p); St.append(s)
     P, St = np.stack(P), np.stack(St)                      # [M,R,S]
     Jm = _J(P, St, lam, w, scale)                          # [M,R]
     win = Jm.argmax(1)
     names = [opt.plan_id(p) for p in cands]
+    iA = names.index(opt.plan_id(opt.REF[opt.BASELINE_ID]))
+    mp = P.mean(-1)
+    delta_win = [float(mp[i, win[i]] - mp[i, iA]) for i in range(len(m_grid))]
     cross = _first_crossover(win, Jm, m_grid)
     rng = np.random.default_rng(seed)
     S = P.shape[-1]
@@ -95,7 +100,8 @@ def rainfall_crossover(scenset, awc, irr, params, scale, cands, n_boot=200, seed
     else:
         text = f"The same rotation ({names[int(win[0])]}) wins across the whole rainfall range {m_grid[0]:.2f}x to {m_grid[-1]:.2f}x. {FRAME}."
     return {"rain_mult": m_grid.tolist(), "winner": [names[i] for i in win], "J": Jm.tolist(), "candidates": names,
-            "mean_profit": P.mean(-1).tolist(), "crossovers": crossovers, "band": band, "text": text,
+            "mean_profit": mp.tolist(), "baseline_id": opt.BASELINE_ID,
+            "baseline_mean_profit": mp[:, iA].tolist(), "delta_vs_baseline": delta_win, "crossovers": crossovers, "band": band, "text": text,
             "badge": "modeled", "n_candidates": len(cands)}
 
 
@@ -107,11 +113,16 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
     lam, w, pm = params["lam"], params["w"], params.get("price_mult", 1.0)
     names = [opt.plan_id(p) for p in cands]
     win = [[None] * len(rain_levels) for _ in irr_levels]
-    for j, m in enumerate(rain_levels):
-        sc = scenset.derive(rain_mult=m)
-        for i, irr in enumerate(irr_levels):
-            p, s = _stack(cands, sc, awc, irr, pm)
-            win[i][j] = names[int(_J(p, s, lam, w, scale).argmax())]
+    dlt = [[None] * len(rain_levels) for _ in irr_levels]
+    iA = names.index(opt.plan_id(opt.REF[opt.BASELINE_ID]))
+    scs = [scenset.derive(rain_mult=m) for m in rain_levels]
+    for i, irr in enumerate(irr_levels):
+        opt.prefetch_multi(cands, scs, awc, irr)           # one batched call per irrigation level
+        for j, sc_ in enumerate(scs):
+            p, s = _stack(cands, sc_, awc, irr, pm)
+            k = int(_J(p, s, lam, w, scale).argmax())
+            win[i][j] = names[k]
+            dlt[i][j] = float(p[k].mean() - p[iA].mean())
     # water level at which the winner turns rice-heavy (>= 50% rice years), per rainfall column
     thr = []
     for j in range(len(rain_levels)):
@@ -122,7 +133,7 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
         thr.append(t)
     j1 = int(np.argmin(np.abs(np.asarray(rain_levels) - 1.0)))
     if thr[j1] is None:
-        text = (f"At normal rainfall ({rain_levels[j1]:.2f}x) no tested irrigation level up to {irr_levels[-1]:.0f} mm makes a rice-majority rotation win; millet-heavy plans win.")
+        text = (f"At normal rainfall ({rain_levels[j1]:.2f}x) no tested irrigation level up to {irr_levels[-1]:.0f} mm makes a rice-majority rotation win; non-rice-majority plans (millets or pigeon pea) win.")
     elif thr[j1] <= irr_levels[0]:
         text = f"At normal rainfall rice-majority rotations already win at {irr_levels[0]:.0f} mm available irrigation."
     else:
@@ -130,23 +141,30 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
                 f"below that the model shifts land from rice to millets or pigeon pea.")
     text += f" Winners compared among {len(cands)} candidate rotations. {FRAME}."
     return {"rain_mult": list(map(float, rain_levels)), "irrigation_mm": list(map(float, irr_levels)),
-            "winner": win, "rice_shift_threshold_mm": thr, "text": text, "badge": "modeled"}
+            "winner": win, "baseline_id": opt.BASELINE_ID, "delta_mean_profit_vs_baseline": dlt, "rice_shift_threshold_mm": thr, "text": text, "badge": "modeled"}
 
 
 def late_monsoon_curve(scenset, awc, irr, params, scale, plans, days=LATE_DAYS):
     lam, w, pm = params["lam"], params["w"], params.get("price_mult", 1.0)
     out = {"days": list(days), "rotations": {}}
     P, St = [], []
-    for n in days:
-        p, s = _stack(plans, scenset.derive(shift_days=n), awc, irr, pm)
+    scs = [scenset.derive(shift_days=n) for n in days]
+    opt.prefetch_multi(plans, scs, awc, irr)
+    for sc_ in scs:
+        p, s = _stack(plans, sc_, awc, irr, pm)
         P.append(p); St.append(s)
     P, St = np.stack(P), np.stack(St)
     Jm = _J(P, St, lam, w, scale)
+    names0 = [opt.plan_id(p) for p in plans]
+    bid = opt.plan_id(opt.REF[opt.BASELINE_ID])
+    iA = names0.index(bid) if bid in names0 else None
+    out["baseline_id"] = opt.BASELINE_ID
     for r, pl in enumerate(plans):
         k = max(1, int(np.ceil(0.1 * P.shape[-1])))
         out["rotations"][opt.plan_id(pl)] = {"mean_profit": P[:, r].mean(-1).tolist(),
             "worst10_profit": np.sort(P[:, r], -1)[..., :k].mean(-1).tolist(), "water_stress_mm": St[:, r].mean(-1).tolist(),
-            "J": Jm[:, r].tolist()}
+            "J": Jm[:, r].tolist(),
+            "delta_mean_profit_vs_baseline": None if iA is None else (P[:, r].mean(-1) - P[:, iA].mean(-1)).tolist()}
     names = [opt.plan_id(p) for p in plans]
     out["winner"] = [names[i] for i in Jm.argmax(1)]
     first, last = names[int(Jm[0].argmax())], names[int(Jm[-1].argmax())]
@@ -194,3 +212,47 @@ def evpi_text_irr(e):
             f"(uniform over {len(e['values'])} values from {min(e['values']):.0f} to {max(e['values']):.0f} mm). "
             f"Measurement cost {e['test_cost']:,.0f} Rs/acre ({e['test_cost_badge']}): "
             + ("above it, so measuring could pay." if e["worth_measuring"] else "not above it, so measuring is unlikely to pay for itself."))
+
+
+UL_LEVELS = np.array([0.5, 0.7, 0.85, 1.0, 1.1, 1.2, 1.3])
+UL_N_SCEN = 150
+
+
+def _short(pid):
+    return pid.replace("pigeonpea", "pigeon pea")
+
+
+def upstream_local_grid(scenset, awc, irr, params, scale, cands, levels=UL_LEVELS, n_scen=UL_N_SCEN):
+    """Upstream rain multiplier (x, canal proxy) vs local rain multiplier (y, wells + crop rain); cell = winning
+    rotation among the candidates. One batched simulation for all cells (first n_scen bootstrap plans)."""
+    if "upstream_season_rain" not in scenset.scen:
+        return {"available": False, "reason": "no upstream rain data (engine.fetch_upstream not available)", "badge": "modeled"}
+    lam, w, pm = params["lam"], params["w"], params.get("price_mult", 1.0)
+    ss = scenset.subset(n_scen) if scenset.n > n_scen else scenset
+    names = [opt.plan_id(p) for p in cands]
+    iA = names.index(opt.plan_id(opt.REF[opt.BASELINE_ID]))
+    scs = [[ss.derive(rain_mult=loc, upstream_mult=up) for up in levels] for loc in levels]
+    opt.prefetch_multi(cands, [c for row in scs for c in row], awc, irr)
+    win, dlt = [], []
+    for i in range(len(levels)):
+        wr, dr = [], []
+        for j in range(len(levels)):
+            p, st = _stack(cands, scs[i][j], awc, irr, pm)
+            k = int(_J(p, st, lam, w, scale).argmax())
+            wr.append(names[k]); dr.append(float(p[k].mean() - p[iA].mean()))
+        win.append(wr); dlt.append(dr)
+    L = [float(x) for x in levels]
+    i1 = int(np.argmin(np.abs(levels - 1.0)))
+    base = win[i1][i1]
+    cells = [c for r in win for c in r]
+    n_rice = sum(1 for c in cells if _rice_share(c) >= 0.5)
+    low_up, low_loc = win[i1][0], win[0][i1]
+    def move(x, what):
+        return f"stays {_short(base)}" if x == base else f"changes to {_short(x)}"
+    text = (f"At normal upstream and local rain ({levels[i1]:.2f}x each) the winner is {_short(base)}. "
+            f"With upstream rain at {levels[0]:.2f}x and local rain normal it {move(low_up, 'u')}; "
+            f"with local rain at {levels[0]:.2f}x and upstream normal it {move(low_loc, 'l')}. "
+            f"Rice-majority rotations win in {n_rice} of {len(cells)} cells; {len(set(cells))} different rotations win somewhere. "
+            f"Upstream rain stands in for canal releases (a proxy, not a reservoir model). {FRAME}.")
+    return {"available": True, "upstream_mult": L, "local_mult": L, "winner": win, "baseline_id": opt.BASELINE_ID,
+            "delta_mean_profit_vs_baseline": dlt, "text": text, "n_scenarios": ss.n, "n_candidates": len(cands), "badge": "modeled"}

@@ -15,10 +15,11 @@ HA_PER_ACRE = 0.404686
 ACRE_PER_HA = 1.0 / HA_PER_ACRE
 M3_PER_MM_ACRE = 4.04686     # 1 mm over 1 acre = 4.04686 m3
 PRICES_PATH = ROOT / "config" / "prices_india.yaml"
-CROPS = ("rice", "jowar", "bajra", "pigeonpea")
+CROPS = ("rice", "jowar", "bajra", "ragi", "pigeonpea")
 
 ALIASES = {"rice": ("rice", "paddy", "paddy_common"), "jowar": ("jowar", "sorghum", "sorghum_hybrid", "jowar_hybrid"),
            "bajra": ("bajra", "pearl_millet", "pearlmillet", "millet"),
+           "ragi": ("ragi", "finger_millet", "mandua"),
            "pigeonpea": ("pigeonpea", "pigeon_pea", "tur", "arhar", "redgram")}
 PRICE_KEYS = ("msp_rs_per_quintal", "price_rs_per_quintal", "msp", "prices_rs_per_quintal", "prices")
 OPCOST_KEYS = ("operating_cost_rs_per_acre", "operating_cost", "cost_of_cultivation_rs_per_acre")
@@ -96,14 +97,18 @@ def _load_prices(path) -> dict:
     op = _crop_dict(_find(raw, OPCOST_KEYS))
     out = {"price_rs_per_quintal": {}, "operating_cost_rs_per_acre": {}}
     for c in CROPS:
+        if c not in PLACEHOLDER["price_rs_per_quintal"] and c not in price:
+            continue          # e.g. ragi: only usable if the YAML provides it (no invented fallback)
         if c in price:
             out["price_rs_per_quintal"][c], badges[f"price_{c}"] = price[c], "observed"
         else:
             out["price_rs_per_quintal"][c], badges[f"price_{c}"] = PLACEHOLDER["price_rs_per_quintal"][c], "placeholder"
         if c in op:
             out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = op[c], "assumption"
+        elif c not in PLACEHOLDER["operating_cost_rs_per_acre"] and c not in price:
+            continue
         else:
-            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = PLACEHOLDER["operating_cost_rs_per_acre"][c], "placeholder"
+            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = PLACEHOLDER["operating_cost_rs_per_acre"].get(c, PLACEHOLDER["operating_cost_rs_per_acre"]["bajra"]), "placeholder"
     for k, alts in {"n_cost_rs_per_kg": ("n_cost_rs_per_kg", "nitrogen_cost_rs_per_kg"),
                     "irrigation_cost_rs_per_m3": ("irrigation_cost_rs_per_m3",),
                     "soil_test_cost_rs": ("soil_test_cost_rs",),

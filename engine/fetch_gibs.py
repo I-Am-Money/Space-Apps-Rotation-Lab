@@ -26,8 +26,21 @@ CANDIDATES = {
     "soil_moisture": ["SMAP_L4_Analyzed_Root_Zone_Soil_Moisture", "SMAP_L4_Analyzed_Surface_Soil_Moisture"],
     "ndvi": ["MODIS_Terra_L3_NDVI_16Day", "MODIS_Terra_L3_NDVI_Monthly"],
 }
-# India overview tile (z5, lon 78.5 lat 17.5 -> col 22,row 14 in GoogleMapsCompatible)
-TEST_TILE = (5, 14, 22)
+import math
+import yaml
+
+REGION = yaml.safe_load((ROOT / "config" / "region.yaml").read_text())
+CENTER = (REGION["lat"], REGION["lon"])  # district centroid; map default centre
+
+
+def lonlat_to_tile(lat, lon, z):
+    n = 2 ** z
+    x = int((lon + 180.0) / 360.0 * n)
+    y = int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)
+    return z, y, x
+
+
+TEST_TILE = lonlat_to_tile(*CENTER, 5)  # overview tile covering the centroid
 
 
 def get_capabilities(force=False) -> str:
@@ -111,7 +124,8 @@ def check_tile(layer: str, date, layers=None, tile=TEST_TILE) -> dict:
 
 def main():
     layers = parse_layers()
-    out = {"capabilities_url": CAPS_URL, "retrieved": dt.date.today().isoformat(),
+    out = {"center": {"lat": CENTER[0], "lon": CENTER[1], "default_zoom": 8, "source": "config/region.yaml"},
+           "test_tile_zyx": list(TEST_TILE), "capabilities_url": CAPS_URL, "retrieved": dt.date.today().isoformat(),
            "capabilities_default_time_note": "layer dates below come from the capabilities XML",
            "layers": {}}
     for key, cands in CANDIDATES.items():

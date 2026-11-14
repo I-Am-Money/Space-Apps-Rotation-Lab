@@ -145,14 +145,19 @@ def compare(rotation_ids, params=None):
         res = [float(np.clip(ykg[:, y].mean() / 5200 if plan[y] == "rice" else ykg[:, y].mean() / 2400, 0, 1)) for y in range(4)]
         rots[rid] = dict(plan=plan, profit=profit.sum(1), yield_kg_ha=ykg, yield_mean=ykg.mean(0), profit_year_mean=profit.mean(0),
                          **{k: m[k] for k in ("mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J")},
+                         irrigation_canal_mm=float(used.sum(1).mean()) * 0.6, irrigation_well_mm=float(used.sum(1).mean()) * 0.4,
                          residue_index=res, residue_index_note="proxy (mock)",
                          historical_blocks=dict(labels=LABELS, profit=profit.sum(1)), stress_tests=[], badges=dict(profit="placeholder", water="placeholder", yield_="placeholder"))
         weak = int(np.argmin(_RAIN[:, 1]))
-        for name, label in (("driest monsoon in year 2", "driest monsoon in year 2 (source year MOCK)"),
+        for name, label in (("low canal release year", "low canal release year (source year MOCK)"),
+                            ("driest monsoon in year 2", "driest monsoon in year 2 (source year MOCK)"),
                             ("hottest summer in year 3", "hottest summer in year 3 (source year MOCK)")):
             rots[rid]["stress_tests"].append(dict(test=name, label=label, source_year=0, description="mock", profit=float(profit[weak].sum()) * (0.9 if "hot" in name else 1.0),
                                                   yield_kg_ha=list(ykg[weak]), water_stress_mm=float(stress[weak].sum()), irrigation_mm=float(used[weak].sum())))
-    return dict(params=params, badges=dict(profit="placeholder", water="placeholder"), n_scenarios=S, scenario_note="MOCK", fixed_prices_note="MOCK", rotations=rots)
+    if "A" in rots:
+        for rid, r in rots.items():
+            r["delta_vs_baseline"] = {k: float(r[k] - rots["A"][k]) for k in ("mean_profit", "worst10_profit", "total_water_mm", "irrigation_mm", "water_stress_mm")}
+    return dict(baseline_id="A", params=params, badges=dict(profit="placeholder", water="placeholder"), n_scenarios=S, scenario_note="MOCK", fixed_prices_note="MOCK", rotations=rots)
 
 
 def recommend(params=None):
@@ -212,7 +217,10 @@ def tipping_points(params=None):
               winner=names[:1] * 4, text="MOCK late-monsoon text.", badge="placeholder")
     ev = lambda lbl: dict(value=0.0, test_cost=0.0, test_cost_badge="placeholder", worth_measuring=False, label=lbl, badge="placeholder",
                           text="MOCK: value of information is not computed in mock mode.")
+    ups = [0.6, 0.8, 1.0, 1.2]
+    gul = [[names[int(np.argmax([_metrics(c, params, rm=0.5 * u + 0.5 * l)["mean_profit"] for c in cands]))] for u in ups] for l in ups]
     return dict(params=params, badges={}, n_scenarios=S, frame="MOCK", rainfall_crossover=xo,
+                grid_upstream_local=dict(upstream_mult=ups, local_mult=ups, winner=gul, text="MOCK upstream versus local rain text.", badge="placeholder"),
                 grid=dict(rain_mult=rms, irrigation_mm=[float(v) for v in irrs], winner=win, rice_shift_threshold_mm=thr, text=gtext, badge="placeholder"),
                 late_monsoon=lm, evpi_awc=ev("soil water capacity"), evpi_irrigation=dict(ev("available irrigation water"),
                 text="Is it worth measuring your borewell or tank capacity before deciding? MOCK: not computed."))
@@ -239,3 +247,17 @@ def assumptions_table():
     rows = [("rice water need (mock)", 1100, "900-1400", "mm", "placeholder, team to verify", "placeholder"),
             ("irrigation recharge exponent k (mock)", 0.5, "0.2-1.0", "", "placeholder, team to verify", "placeholder")]
     return pd.DataFrame(rows, columns=["name", "value", "range", "unit", "source", "badge"])
+
+
+def land_split(alt_id, params=None, acres=None):
+    """MOCK: linear mix of the all-rice baseline and the alternative, for 0..acres acres in rice (not engine output)."""
+    if acres is None:
+        import yaml
+        from pathlib import Path
+        acres = float(yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "farm.yaml").read_text())["farm"]["acres"])
+    a = _metrics(REF["A"], params); b = _metrics(_plan(alt_id, params), params)
+    xs = list(range(0, int(acres) + 1))
+    mix = lambda k: [(x * a[k] + (acres - x) * b[k]) for x in xs]
+    irr = [(x * a["irrigation_mm"] + (acres - x) * b["irrigation_mm"]) * 4.0469 for x in xs]
+    return dict(alt_id=alt_id, baseline_id="A", acres_total=acres, acres_rice=xs, total_profit_mean=mix("mean_profit"),
+                total_profit_worst10=mix("worst10_profit"), total_irrigation_m3=irr, badge="placeholder")

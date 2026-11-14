@@ -5,7 +5,8 @@ import streamlit as st
 from engine import explain
 from ui import charts, data
 from ui.data import plan_label
-from ui.components import badge, fmt_rs, md, ribbon, section, stat, stats, tab_head
+from ui.tabs import _farm
+from ui.components import delta_html, srcline, badge, fmt_rs, md, ribbon, section, stat, stats, tab_head
 
 
 def explain_inputs(rec, tp, p):
@@ -36,7 +37,10 @@ def render():
         md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Not much</span><span>A lot</span></div>')
 
     p = data.params()
-    rec = data.recommend(p)
+    with st.spinner(data.MSG["recommend"]):
+        rec = data.recommend(p)
+    mdf = rec["metrics"]
+    base = mdf[mdf.id == "rice-rice-rice-rice"].iloc[0]
     t = rec["top"]
     b = "placeholder" if data.is_mock() else "modeled"
     ex = explain.explain(explain_inputs(rec, None, p))
@@ -45,12 +49,14 @@ def render():
        f'<h4>{html.escape(plan_label(t["plan"]))}</h4>{ribbon(t["plan"])}<p style="margin:.7rem 0 .3rem">{html.escape(ex["text"])}</p>'
        f'<p style="margin:0;font-size:.82rem;opacity:.8">{src} Modeled estimate, for planning only.</p></div>')
     stats([
-        stat("Average over 4 years", fmt_rs(t["mean_profit"]), "per acre", b),
-        stat("Worst 10% of seasons", fmt_rs(t["worst10_profit"]), "per acre", b),
-        stat("Water shortfall", f'{t["water_stress_mm"]:,.0f}', "mm", b),
+        stat("Average over 4 years", fmt_rs(t["mean_profit"]), "per acre", b, delta_html(t["mean_profit"] - base.mean_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["mean_profit"])),
+        stat("Worst 10% of seasons", fmt_rs(t["worst10_profit"]), "per acre", b, delta_html(t["worst10_profit"] - base.worst10_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["worst10_profit"])),
+        stat("Water shortfall", f'{t["water_stress_mm"]:,.0f}', "mm", b, delta_html(t["water_stress_mm"] - base.water_stress_mm, "{:,.0f} mm", good_when_up=False) + " against our farm today"),
     ])
 
     section("Every possible rotation, plotted", b,
             "Each dot is one of the 256 ways to fill four years. Higher and further right is better. Darker blue means more water stress.")
     charts.show(charts.pareto(rec["metrics"], t["id"]), "pareto")
-    md('<p class="rl-note">The diamond is the recommended rotation. The dotted line joins the rotations where you cannot raise the average without lowering the bad-year result.</p>')
+    _farm.land_split_panel(t["id"], data.plan_label(t["plan"]), "pri", p)
+    srcline(f"Model output for all {len(mdf)} rotations over {rec['n_scenarios']:,} resampled weather sequences.", "Source")
+    md('<p class="rl-note">The white circle is our farm today. The diamond is the recommended rotation. The dotted line joins the rotations where you cannot raise the average without lowering the bad-year result.</p>')

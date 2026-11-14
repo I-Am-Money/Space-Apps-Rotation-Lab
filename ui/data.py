@@ -17,9 +17,70 @@ except ImportError:
     api = mock_api
 
 CROPS = ["rice", "jowar", "bajra", "pigeonpea"]
-CROP_LABEL = {"rice": "Rice", "jowar": "Jowar", "bajra": "Bajra", "pigeonpea": "Pigeon pea"}
-DEFAULTS = dict(irrigation_mm=500, use_soil_test=False, soil_awc=140, rot0="rice", rot1="rice", rot2="rice", rot3="rice", lam=30, w=30)
-ROT_NAME = {"A": "Rotation A", "B": "Rotation B", "C": "Rotation C", "current": "Your current rotation"}
+try:  # the engine decides which crops are candidates (iteration 2: selected millets only)
+    from engine import optimize as _opt
+    CROPS = list(_opt.CROPS)
+except Exception:
+    pass
+CROP_LABEL = {"rice": "Rice", "jowar": "Jowar", "bajra": "Bajra", "ragi": "Ragi", "pigeonpea": "Pigeon pea"}
+def _farm():
+    try:
+        import yaml
+        from pathlib import Path
+        d = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "farm.yaml").read_text()) or {}
+    except Exception:
+        d = {}
+    f, so, u = d.get("farm", {}), d.get("soil", {}), d.get("units", {})
+    return dict(acres=float(f.get("acres") or 0) or None, m3=float(u.get("m3_per_acre_per_mm") or 0) or None,
+                soil_name=so.get("display_name") or "Black soil (farm input)", awc_range=so.get("awc_range_mm_per_m"), awc_source=so.get("awc_source"))
+
+
+FARM = _farm()
+ACRES = FARM["acres"]
+
+
+def farm_total(per_acre):
+    """Per-acre rupees to whole-farm rupees. Acres come from config/farm.yaml."""
+    return None if per_acre is None or not ACRES else per_acre * ACRES
+
+
+def m3(mm):
+    """Millimetres of water on one acre, summed over the farm, in cubic metres."""
+    return None if mm is None or not ACRES or not FARM["m3"] else mm * ACRES * FARM["m3"]
+
+
+def _assump(key, default):
+    try:
+        import yaml
+        from pathlib import Path
+        d = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "assumptions.yaml").read_text())
+
+        def find(x):
+            if isinstance(x, dict):
+                if key in x:
+                    v = x[key]
+                    return v.get("value") if isinstance(v, dict) else v
+                for v in x.values():
+                    r = find(v)
+                    if r is not None:
+                        return r
+        r = find(d)
+        return default if r is None else r
+    except Exception:
+        return default
+
+
+BASE_IRR = float(_assump("base_available_irrigation_mm", 500))
+BASE_K = float(_assump("recharge_exponent_k", 0.5))
+BASE_CANAL = _assump("base_canal", None)
+BASE_WELL = _assump("base_well", None)
+SOURCE_LABELS = {"canal_and_well": "Canal and well", "unset": "Not sure yet", "canal": "Canal only", "borewell": "Borewell", "tank": "Tank"}
+CANAL_LABEL = "Proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations."
+WELL_LABEL = "Simplified recharge proxy."
+DEFAULTS = dict(irrigation_mm=BASE_IRR, use_soil_test=False, soil_awc=140, rot0="rice", rot1="rice", rot2="rice", rot3="rice",
+                lam=30, w=30, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
+                canal_override=False, canal_supply=None, well_override=False, well_supply=None, soil_mode="farm", split_acres=None)
+ROT_NAME = {"A": "A: our farm today", "B": "Rotation B", "C": "Rotation C", "current": "Your rotation"}
 ROT_SHORT = {"A": "A: all rice", "B": "B: rice and jowar", "C": "C: rice, pigeon pea, jowar"}
 
 
@@ -55,7 +116,12 @@ def params() -> dict:
     s = V()
     return dict(lam=s["lam"] / 100, w=s["w"] / 100, irrigation_mm=float(s["irrigation_mm"]),
                 awc_mm_per_m=float(s["soil_awc"]) if s["use_soil_test"] else None,
-                current_rotation=[s["rot0"], s["rot1"], s["rot2"], s["rot3"]], price_mult=1.0)
+                current_rotation=[s["rot0"], s["rot1"], s["rot2"], s["rot3"]], price_mult=1.0,
+                water_source=s["water_source"], soil_mode=s["soil_mode"],
+                **({"canal_supply_mm": float(s["canal_supply"])} if s["canal_override"] and s["canal_supply"] is not None else {}),
+                **({"well_supply_mm": float(s["well_supply"])} if s["well_override"] and s["well_supply"] is not None else {}),
+                **({"canal_release_factor": float(s["canal_factor"])} if s["water_source"] == "canal" else {}),
+                **({"recharge_exponent_k": float(s["recharge_k"])} if abs(s["recharge_k"] - BASE_K) > 1e-9 and s["water_source"] != "canal" else {}))
 
 
 def is_mock() -> bool:
@@ -65,8 +131,15 @@ def is_mock() -> bool:
 def _call(name, *args):
     try:
         return getattr(api, name)(*args), False
-    except (ImportError, FileNotFoundError):
+    except (ImportError, FileNotFoundError, AttributeError):
         return getattr(mock_api, name)(*args), True
+
+
+MSG = {"get_field_summary": "Loading the field record.",
+       "compare": "Running four rotations through the weather record.",
+       "recommend": "Scoring all rotations for your priorities. The first run takes about 10 seconds; later runs are instant.",
+       "tipping_points": "Finding the tipping points. The first run takes up to 30 seconds; later runs are instant.",
+       "hindcast": "Checking the model against district yields.", "assumptions_table": "Loading assumptions."}
 
 
 def _wrap(name):
@@ -74,7 +147,7 @@ def _wrap(name):
         return _call(name, *args)
 
     raw.__name__ = raw.__qualname__ = "engine_" + name  # cache_data keys on the name, so each wrapper needs its own
-    cached = st.cache_data(show_spinner="Running the model. The first run takes a little while.", max_entries=64)(raw)
+    cached = st.cache_data(show_spinner=False, max_entries=64, ttl=900)(raw)
 
     def outer(*args):
         val, mock = cached(*args)
@@ -89,6 +162,7 @@ _compare = _wrap("compare")
 recommend = _wrap("recommend")
 tipping = _wrap("tipping_points")
 hindcast = _wrap("hindcast")
+_land_split = _wrap("land_split")
 assumptions = _wrap("assumptions_table")
 
 
@@ -96,10 +170,32 @@ def compare(ids, p):
     return _compare(list(ids), p)
 
 
-_PLAN_RE = re.compile(r"\b(?:rice|jowar|bajra|pigeonpea)(?:-(?:rice|jowar|bajra|pigeonpea)){3}\b")
+_C = r"(?:rice|jowar|bajra|ragi|pigeon ?pea)"
+_PLAN_RE = re.compile(rf"\b{_C}(?:-{_C}){{3}}\b")
 
 
 def humanize(text: str) -> str:
     """Engine text names plans by id (rice-jowar-rice-jowar). Show crop names instead; numbers are untouched."""
-    t = _PLAN_RE.sub(lambda m: plan_label(m.group(0)), text or "")
+    t = _PLAN_RE.sub(lambda m: plan_label(m.group(0).replace("pigeon pea", "pigeonpea")), text or "")
+    t = re.sub(r"(?<=[.!?] )([a-z])", lambda m: m.group(1).upper(), t)
     return t[:1].upper() + t[1:] if t else t
+
+
+def delta(rots: dict, rid: str, key: str, base: str = "A"):
+    """Difference of a rotation from the baseline (A, our farm today). Uses the engine's delta_vs_baseline when present."""
+    d = rots[rid].get("delta_vs_baseline")
+    if isinstance(d, dict) and key in d:
+        return d[key]
+    return rots[rid][key] - rots[base][key]
+
+
+def compare_ids(p) -> tuple:
+    """A (our farm today, the baseline), B, C, plus the user's own rotation when it differs from A."""
+    ids = ["A", "B", "C"]
+    if list(p["current_rotation"]) != ["rice"] * 4:
+        ids.append("current")
+    return tuple(ids)
+
+
+def land_split(alt_id, p):
+    return _land_split(alt_id, p)

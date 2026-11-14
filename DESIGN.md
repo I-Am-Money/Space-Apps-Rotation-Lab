@@ -19,5 +19,7 @@ Provenance badge (distinct glyph per kind), stat row (ruled, not carded), rotati
 ## Charts
 No modebar, 1px recessive grid, direct labels or a colour key above the chart, hover tooltips in plain language, a table view for the main charts.
 
-## References studied
-Tokens were derived from the brief and the dataviz skill's validator. The `taste` URL-analysis skill was not run; no reference site was copied.
+## Reference studied (taste capture)
+Our World in Data, "Cereal yields" grapher page, captured in a real browser at 1440x900 (screenshot plus computed styles). A condensed capture: DOM style sampling and a screenshot, not the full four-step written analysis.
+Measured: serif title 25px/600 (Playfair Display) over a Lato 16px body; one plain sentence under the title that states the unit; chart in a 1px hairline frame; axis text 12px grey 91,91,91; sequential map ramp from pale yellow rgb(255,255,229) to deep green; a dedicated "No data" swatch; a "Data source" and "Note" footer under every chart; a segmented Table / Map / Line / Bar control.
+Adapted, not copied: charts sit in hairline frames with 12px axis text; every chart has a Source or Note footer; each section opens with a title plus a one-line unit sentence; crop and rotation controls are segmented; missing data gets a dashed "No validation data" panel. Palette, type pairing and layout stay RotationLab's own.

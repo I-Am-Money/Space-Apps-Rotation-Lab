@@ -1,0 +1,160 @@
+{{Use dmy dates|date=July 2022}}
+{{Infobox dam
+| name = Tungabhadra Dam
+| image = Tungabhadra_dam_all_gates_open.jpg
+| image_caption = Tungabhadra dam with all of its gates open.
+| name_official = Tungabhadra Dam
+| dam_crosses = [[Tungabhadra River]]
+| location = [[Hospete ]], [[Vijayanagara district]], [[Karnataka]], [[Munirabad]], [[Koppal district]], [[Karnataka]],<br/> India
+| dam_type = Composite, Spillway length (701 m)
+| dam_length = {{Convert|2449|m|ft|0|abbr=on}}
+| dam_height = {{Convert|49.50|m|ft|0|abbr=on}} from the deepest foundation.
+| dam_width_base = 
+| spillway_type = 
+| spillway_capacity = 650,000 [[cusec]]s
+| construction_began = 1949
+| opening = 1953
+| cost = 1,066,342 Dollars
+| owner = [[Karnataka State]]
+| operator = Tungabhadra Board
+| website = [http://www.tbboard.gov.in www.tbboard.gov.in]
+| res_name = Tungabhadra Reservoir
+| res_capacity_total = 3.73 cubic kms (132 tmcft)
+| res_capacity_active = 3.31 cubic kms (116.86 tmcft)
+| res_capacity_inactive = 2.3 tmcft (below 477.01 m msl)
+| res_catchment = {{Convert|28180|km2|mi2|abbr=on}}
+| res_surface = {{Convert|350|km2|sqmi|abbr=on}}
+| res_max_depth = 
+| plant_operator = Karnataka Govt
+| plant_turbines = Near toe of the dam and canal drops
+| plant_capacity = 127[[Megawatt|MW]]
+| plant_annual_gen = 
+| plant_commission = 
+| plant_decommission = 
+| pushpin_map = India Karnataka#India
+| pushpin_caption = 
+| extra =
+}}
+[[File:Dam on river in Hosapete, Bellary District.jpg|thumb|View from lighthouse viewpoint]]
+[[File:Tungabhadra Dam.jpg|thumb|Reservoir side]]
+The '''Tungabhadra Dam''', also known as '''Pampa Sagar''', is a water reservoir constructed across the [[Tungabhadra River]] in the [[Hospet|Hosapete]]-[[Koppal]] confluence in [[Karnataka]], [[India]]. It is a multipurpose dam serving irrigation, electricity generation, flood control, ''etc''. for the state. It is India's largest stone masonry dam and one of the only two non-cement dams in the country, the other being the [[Mullaperiyar Dam]] in [[Kerala]]. The dam is built of ''surki'' mortar, a combination of mud and limestone, commonly used at the time of its construction.
+
+The dam was a joint project undertaken in 1949 by the erstwhile [[Hyderabad state|Kingdom of Hyderabad]] and [[Madras Presidency]] when the construction began<ref>{{cite web |title=The Secret History of Hyderabad State of the Nizam (South India; 1724 – 1948) |date=28 June 2016 |url=http://www.cabaltimes.com/2016/06/28/nizam/12/}}</ref> later, after [[Republic Day (India)|India's constitution into a republic]] in 1950, it became a joint project between the governments of [[Madras State|Madras]] and [[Hyderabad State (1948–1956)|Hyderabad]] states. The construction was completed in 1953. The Tungabhadra Dam has withstood the test of time for over 70 years and is expected to well cross many more decades.
+
+The chief architects of the dam were Vepa Krishnamurthy and Pallimalli Papaiah of Hyderabad and [[Malur Srinivasa Thirumale Iyengar|M. S. Tirumale Iyengar]] of Madras. They envisioned it as being built with a large contingent of material and manual labour, as best suited to Indian labour availability and employment at that time. The chief contractor for the dam was Venkat Reddy Mulamalla from Konour, a village in [[Mahbubnagar|Mahabubnagar]], [[Telangana]]. The northern canal on the Hyderabad side (now Telangana) takes off from the combined irrigation and power sluices. The first 19 miles of the canal is in a rugged terrain cutting through three ranges of hills and is held up by three reservoirs at miles 8, 14 and 16 respectively. The canal negotiates the last range of hills by means of a tunnel, named as Papaiah Tunnel, and enters open country.
+
+== History ==
+The famine-ridden region of [[Rayalaseema|Rayalseema]], then comprising the districts of [[Bellary]], [[Anantapur]], [[Kurnool]] and [[Kadapa|Cuddapah]], attracted the attention of British engineers as early as 1860. To relieve the intensity of famines in these districts, proposals were made in 1860 to utilise the waters of the Tungabhadra through a storage reservoir and a system of canals to provide irrigation for the lands. Several agreements were reached for harvesting and imposing restrictions on utilising the Tungabhadra waters. Protracted negotiations and investigations lasted for about eighty years.
+
+=== Proposals and plan agreements ===
+In 1860, [[Arthur Cotton|Sir Arthur Cotton]] of Madras Presidency originally conceived the Tungabhadra project. His proposals were further modified and developed subsequently, evolving it into a joint scheme with the Kingdom of Hyderabad. N. Paramseswaran Pillai accordingly revised the scheme in 1933. In 1940, Madras ordered a detailed investigation of the scheme. Based on the agreements made, an examination of a number of alternatives was conducted by [[L. Venkatakrishna Iyer|L. Venkata Krishna Iyer]], the then Superintending Engineer, Bellary, and F. M. Dowley, Chief Engineer, both from the kingdom, Between 1942 and 1947 further detailed investigations of the project were done by Mr. Pallimalli Papaiah (Chief Engineer- Hyderabad state) and [[Malur Srinivasa Thirumale Iyengar|M. S. Thirumale Iyengar]] (Chief Engineer) from the Madras presidency. The report thus submitted was accepted by the Government of Madras with certain modifications fixing the sill level at RL 1550&nbsp;ft. The June 1944 agreement between Madras and Hyderabad enabled the two governments to finally begin the construction of the Tungabhadra project.
+
+=== Foundation ===
+The Tungabhadra Project was formally inaugurated by laying foundation stones on 28 February 1945 by Nawab [[Azam Jah]], the Prince of Berar, on the left side of the dam and by the Baron [[Arthur Hope, 2nd Baron Rankeillour|Sir Arthur Hope]], Governor of Madras, on the right. However, owing to [[Independence Day (India)|India's freedom]] in 1947, the [[Annexation of Hyderabad|explosive political unrest in Hyderabad]] in 1948, and due to differences of opinion in certain technical matters, much headway could not be made until January 1949. Madras and Hyderabad engineers were sharply divided on:
+
+# The nature of mortar to be used in the construction of the dam,
+# The design of spillway,
+# The design of overflow and non-overflow sections of the dam, and
+# The contraction joints
+
+These differences were referred to a board of engineers chaired by [[M. Visvesvaraya|Sir M. Visveswaraya]], the former [[Diwan of Mysore|prime minister of the Kingdom of Mysore]] and the chief architect of the [[Krishna Raja Sagara|Krishnaraja Sagar Dam]] in Mysore.
+
+=== Construction ===
+Excavation of the riverbed started in 1947 and masonry construction on 15 April 1949. With the help of a cofferdam constructed earlier, the foundation excavation was continued even during the floods season. The riverbed portion was tackled during the summer of 1950 (1949–50). Masonry in the riverbed blocks started in the 1951, followed by vigorous progress.
+
+By 1952, the canals reached an advance and decisive stage of the construction. On 30 January 1952, the [[Government of Tamil Nadu|Government of Madras]] ordered (GO 382) an investigation of the high-level canal. On 15 November 1952, detailed estimates were prepared up to Mile 79/2 covering the reach just before Chinna-Hagari.
+
+A major portion of the construction of the dam was over by the middle of 1953. The low-level canal excavation up to Mile 173 was completed by 1953. The water was led down into the canal on 1 July 1953 to derive partial benefits. Acquisition of lands and villages and rehabilitation of the displaced population from the water spread area of up to 1630&nbsp;ft contour were completed by September 1953. About 90 villages and 54,452 people were affected. By October 1953, the structures were completed, substantially enabling the storage of water in the reservoir up to +1613.00&nbsp;ft.
+
+In 1954, an investigation of the remaining portion of canal from Mile 79/2 to Mile116/0 was completed and a project report was submitted to the [[Government of India]] for approval. The proposals were further reviewed and a final project report was submitted to the [[Planning Commission (India)|Planning Commission]] for clearance, estimating the costs at Rs. 21.90 crores.
+
+Power canal works started in June 1954 and were completed by May 1957. The reservoir circle was entrusted with the construction of canal works in 1956. The balance portion of the low-level canal from Mile 173 to 203 that had to be excavated by the Government of Andhra Pradesh was completed by the end of March 1957. The balance of the works, namely the spillway, bridge road on the top of the dam, construction of utility tower, manufacture of crest grates for storing water up to 1633 level were completed in all respects by the end of June 1958. In 1958, water was let out up to and inclusive of Distributory 42 to serve an area of about 1.80 lakh acres. The cost of dam and appurtenant works was Rs. 16.96 crores.
+{| class="wikitable"
+|+A timeline of the construction of the dam
+|Foundation excavation
+|Completed by June 1952
+|-
+|Masonry
+|Completed by October 1953
+|-
+|Drilling and Grouting
+|Completed by August 1955
+|-
+|Crest Gates, embedded part
+|Completed by February 1955
+|-
+|Spillway shutters
+|Completed by June 1955
+|-
+|Operation bridges
+|Completed by February 1956
+|-
+|Counterweight erection
+|Completed by January 195
+|-
+|Hoists
+|Completed by January 1957
+|-
+|Gate House
+|Completed by June 1957
+|-
+|Utility Tower
+|Completed by June 1958
+|}
+
+=== Technical details ===
+The dam forms the biggest reservoir across the [[Tungabhadra River]] with 101 [[tmcft]] of gross storage capacity at full reservoir level (FRL) 498 m MSL, and a water spread area of 378 square kilometres.<ref>{{cite web |title=Salient data of Tungabhadra dam |url=http://waterresources.kar.nic.in/salient_features_tungabadra.htm |access-date=23 July 2013}}</ref> The dam is 49.39 meters high above its deepest foundation.<ref>{{cite web |title=Tungabhadra Dam D05483 |url=http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Tungabhadra_Dam_D05483 |access-date=23 July 2016 |archive-date=6 January 2014 |archive-url=https://web.archive.org/web/20140106040926/http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Tungabhadra_Dam_D05483 |url-status=dead }}</ref> The left canals emanating from the reservoir supply water for irrigation to the entirety of Karnataka. The two right bank canals—one at low level and the other at high level—serve irrigation for Karnataka and the [[Rayalaseema]] region of Andhra Pradesh. Hydropower units are installed on canal drops. The reservoir water is used to supply water to the downstream barrages [[Rajolibanda Diversion Scheme|Rajolibanda]] and [[K. C. Canal|Sunkesula]] located on the [[Tungabhadra River]]. The identified water use from the project is 220 tmcft by the [[Krishna Water Disputes Tribunal]]. Karnataka and Andhra Pradesh got 151 tmcft and 79 tmcft water use entitlement respectively.<ref>{{cite web |year=1976 |title=Page 97, Further report of KWDT 1, Volume IV |url=https://archive.org/details/KrishnaWaterDisputeTribunalAwardVolumeIv |access-date=17 August 2016}}</ref>
+
+== Harness ==
+
+=== Water commission ===
+In 1954, the [[Central Water Commission]] advised the participating states to execute the water harness project in two stages. The first stage included an unlined canal with a head discharge of 2300 cusecs and the second stage a lined canal with 4000 cusecs head discharge.
+
+The first stage scheme was inaugurated by [[Chandulal Madhavlal Trivedi|Sir Chandulal Madhavlal Trivedi]], [[Governor of Andhra Pradesh]], on 2 October 1956 under the presidency of [[Kadidal Manjappa|K. Manjappa]], [[List of chief ministers of Karnataka|Chief Minister of Mysore]]. The first stage was almost completed by June 1966 at a cost of Rs. 920 lakhs: the canal was commissioned by releasing water for irrigation on 27 July 1966.
+
+The second stage was approved in June 1967 for Rs. 385 lakhs. The works were completed by June 1970 at an estimated cost of Rs. 487 lakhs.
+
+=== Powerplants ===
+The Tungabhadra Hydroelectric Scheme was undertaken in the composite Madras State in the post-war period under the [[First five-year plan (India)|first five-year plan]] in the year 1950. The work on the project was taken up in 1951 but no appreciable progress was achieved till the end of 1953. The powerplant commission was then divided into two stages.
+
+During 1957, two units of 9 MW each at the dam's powerhouse were installed and, in 1958, two units of 9MW each were installed at the powerhouse in Hampi. With this, the first stage of the scheme was completed in 1958. Power generation of this stage was commissioned during 1960–61.<ref>{{Cite web |title=History of Tungabhadra Project {{!}} TUNGABHADRA BOARD |url=https://tbboard.gov.in/tungabhadra-river/history-of-tungabhadra-project/ |access-date=2018-08-18 |website=tbboard.gov.in |language=en-US}}</ref>
+
+The second stage under this scheme was taken up in 1959. The plant erection started in the dam's powerhouse in November 1962 and in the powerhouse in Hampi in February 1963. Units 3 and 4 of both powerhouses started functioning by June 1964. The left side the powerhouses are designed to accommodate 4 units of 9MW each.
+
+== Sharing disputes ==
+Disputes of sharing of waters of the Tungabhadra has its genesis in 1861 when the Kurnool-Cuddapah Canal (KC Canal) was proposed by the Government of Madras. Despite the agreement on the construction of the canal, there was no general agreement between the governments of Mysore and Madras on the sharing of Tungabhadra waters. In 1930, the Government of Madras proposed a joint project on the Tungabhadra. Subsequently, a number of conferences between the governments of Madras, Mysore, Hyderabad, and [[Bombay Presidency|Bombay]] took place, but all were inconclusive. In 1936, there was an agreement between the governments of Madras and Mysore, followed by an agreement between Madras and Hyderabad in 1938. However, due to some differences in interpretation of the agreement between Madras and Hyderabad, no substantial progress was made in implementing the project. It was in a conference between the governments of Madras and Hyderabad held on 26 June 1944 that a final decision was arrived at on the allocation of waters as well as on taking up the project jointly and sharing the cost equally between the two states.<ref>{{Cite web|url=https://tbboard.gov.in/tungabhadra-river/agreements-for-harnessing-tungabhadra-water/|title=Agreements for Harnessing Tungabhadra Water {{!}} TUNGABHADRA BOARD|website=tbboard.gov.in|language=en-US|access-date=2018-08-18}}</ref>
+
+==Future potential for the dam ==
+On the right side of the dam, the tall [[Sanduru]] hill ranges extending up to 800 m [[mean sea level|MSL]] are close to the periphery of the Tungabhadra reservoir. These hill ranges form the Sanduru valley located above 600 m MSL. This reservoir is an ideal place to install pumped storage hydropower plants and lift irrigation projects. A moderate high level storage reservoir of capacity 20 tmcft at FRL 620 m MSL, can be constructed by damming the Sanduru valley. This reservoir will serve as upper pond and existing Tungabhadra reservoir as tail pond for installing [[pumped-storage hydroelectricity]] units. The water pumped during the monsoon months into the upper pond can be diverted by gravity to irrigate an extensive area in the uplands up to 600 m MSL in [[Rayalaseema]] and [[Karnataka]]. This water can be pumped further to meet the drinking water requirements of [[Bengaluru]] city.
+
+However, the available water resources at Tungabhadra dam are over-used, and water shortages are frequent. Water availability in the reservoir could be augmented by transferring water from the [[Krishna River]], if a link canal were constructed from the [[Almatti Dam|Almatti]] reservoir to the Tungabhadra reservoir.<ref>{{cite web |url=http://nwda.gov.in/index4.asp?ssslid=42&subsubsublinkid=19&langid=1|title=Feasibility Report of Krishna (Almatti) Pennar Link|author=NWDA|access-date=15 January 2015}}</ref> Envisaging small balancing reservoirs where this link canal is intercepting the tributaries of Tungabhadra River would facilitate water diversion to Tungabhadra reservoir for augmenting further water availability. Once the Almatti reservoir FRL is raised to 524 m MSL, this canals full supply level (FSL) can also be increased to 516 m MSL from 510 m MSL to reduce its construction cost and serve more area for irrigation in Karnataka.<ref>{{cite web |url=http://nwda.gov.in/writereaddata/linkimages/1986494888.pdf|title=Section 6.5.4 of Chapter 6, Feasibility Report of Krishna (Almatti) Pennar Link|author=NWDA|access-date=15 August 2016}}</ref>
+
+[[File:Tunga Bhadhra Dam, HosaPete.jpg|thumb|Flooding Tungabhadra dam]]
+Nearly 180 tmcft out of 230 tmcft water presently supplied from Tungabhadra reservoir to various canals can be replaced by reliable Krishna river water from the [[Narayanpur Dam|Narayanpur reservoir]].<ref>{{cite web|url=http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Narayanapura_Dam_D04315|title=Narayanapura Dam D04315|access-date=15 August 2015|archive-date=23 March 2018|archive-url=https://web.archive.org/web/20180323041857/http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Narayanapura_Dam_D04315|url-status=dead}}</ref> These are water supply to mid and lower reaches of Tungabhadra left bank canal, water assistance to [[Rajolibanda Diversion Scheme|Rajolibanda canal]], water assistance to [[K. C. Canal|KC canal]] and mid and lower reaches of Tungabhadra right bank low level canal. This is achieved with a 20&nbsp;km long tunnel from Narayanpur reservoir to the Maski nala reservoir / tank situated at 475 m MSL for drawing nearly 250 tmcft Krishna river water.<ref>{{cite web|url=http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Maskinala_D05465|title=Maskinala D05465|access-date=15 August 2015}}{{Dead link|date=September 2023 |bot=InternetArchiveBot |fix-attempted=yes }}</ref> From this tank, north canal would supply Krishna river water by gravity flow to the lower reaches of Tungabhadra left bank canal in addition to bringing substantial uplands under irrigation in Karnataka and [[Telangana]]. From this tank, south canal would supply Krishna river water by gravity flow to the middle portion of Tungabhadra left bank canal in addition to bringing substantial uplands under irrigation in Karnataka and also connected to the Tungabhadra right bank low level canal at 425 m MSL near {{Coord|15|22|09|N|76|32|55|E|name= Tungabhadra RB LLC}} through a 1.5&nbsp;km long [[Aqueduct (water supply)|aqueduct]] over Tungabhadra main river. Water is also released from the Maski nala in to downstream Tungabhadra main river to meet continuous water needs of downstream Rajolibanda canal and KC canal. 180 tmcft water in addition to the water diverted from the Almatti reservoir to Tunghbadra reservoir can be utilised for uplands irrigation in Tungabhadra basin and Rayalaseema region of [[Andhra Pradesh]]. When these joint projects of Karnataka and Andhra Pradesh are constructed, nearly 400 [[tmcft]] water additionally will be available for irrigation and drinking purposes in the high drought risk uplands of [[Rayalaseema]] and Karnataka.{{citation needed|date=March 2019}}
+
+==See also==
+* [[Tungabhadra River]]
+* [[Krishna Raja Sagara|Krishnaraja Sagar Dam]]
+* [[Rajolibanda Diversion Scheme]]
+
+== References ==
+{{Reflist}}
+
+== External links ==
+{{Commons category|Tungabhadra Dam}}
+
+{{Coord|15|18|N|76|20|E|display=title|region:IN_type:landmark_source:GNS-enwiki}}
+
+{{Hydrology of Karnataka|state=expanded}}
+{{Krishna basin |state=expanded}}
+* http://tbboard.gov.in
+
+{{Authority control}}
+
+[[Category:Dams in Karnataka]]
+[[Category:Inter-state disputes in India]]
+[[Category:Dams on the Krishna River]]
+[[Category:Dams completed in 1953]]
+[[Category:Buildings and structures in Ballari district]]
+[[Category:Tourist attractions in Ballari district]]
+[[Category:20th-century architecture in India]]

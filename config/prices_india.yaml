@@ -44,16 +44,16 @@ operating_cost_rs_per_acre:
   pigeonpea: {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
 
 # Potential yield Ym = 90th percentile of linearly detrended district yields (kg/ha),
-# computed by engine/fetch_icrisat.py for the DEV district (Rangareddy, dev_placeholder).
-# Rice and bajra come from the fallback panel (1990-2015). Jowar and pigeonpea need the
-# primary ICRISAT DLD files (not reachable from the build environment): null = placeholder.
+# computed by engine/fetch_icrisat.py for Nalgonda (pre-2016 undivided district).
+# Rice and bajra come from the fallback panel (1990-2015). Crops absent from the files we
+# could fetch (jowar, ragi, pigeonpea) stay null placeholders until the DLD CSVs are supplied.
 potential_yield_kg_ha:
-  district: Rangareddy
-  dev_placeholder: true
-  rice:      {value: 2875.2, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Rangareddy 1990-2015 (26 yrs); mixes irrigated and rainfed"}
-  bajra:     {value: 1146.0, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Rangareddy 1990-2015 (24 yrs)"}
-  jowar:     {value: null, badge: placeholder, source: "needs ICRISAT DLD sorghum file (see docs/INDIA_DATA.md manual steps)"}
-  pigeonpea: {value: null, badge: placeholder, source: "needs ICRISAT DLD pigeonpea file (see docs/INDIA_DATA.md manual steps)"}
+  district: Nalgonda
+  rice:      {value: 3377.6, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Nalgonda 1990-2015 (26 yrs); mixes irrigated and rainfed"}
+  bajra:     {value: 872.6, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Nalgonda 1990-2015 (26 yrs; 2014 and 2015 both exactly 500, check against the DLD CSV)"}
+  jowar:     {value: null, badge: placeholder, source: "no jowar column in the fetched file; needs ICRISAT DLD sorghum CSV (docs/INDIA_DATA.md)"}
+  ragi:      {value: null, badge: placeholder, source: "no ragi column in the fetched file; needs ICRISAT DLD finger millet CSV"}
+  pigeonpea: {value: null, badge: placeholder, source: "no pigeonpea column in the fetched file; needs ICRISAT DLD pigeonpea CSV"}
 
 # Costs of information (EVPI cards). No source: team estimates only.
 soil_test_cost_rs:

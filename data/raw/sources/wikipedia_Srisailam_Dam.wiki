@@ -1,0 +1,106 @@
+{{Short description|Dam in Andhra Pradesh and Telangana, India}}
+{{Use dmy dates|date=May 2019}}
+{{Use Indian English|date=May 2019}}
+{{Infobox dam
+| name = Srisailam Dam
+| name_official = 
+| image_caption = 
+| pushpin_caption = 
+| coordinates = {{coord|16|05|23|N|78|53|54|E|type:landmark|display=inline,title}}
+| location = [[Nandyal district]], [[Andhra Pradesh]] & [[Nagarkurnool district]], [[Telangana]]
+| construction_began = 1960
+| opening = {{start date and age|1981}}
+| cost = ₹10 billion<ref>{{cite report |author=Central Water Commission |title=National Register of Large Dams 2019 |publisher=Ministry of Jal Shakti, Government of India |year=2019 |location=New Delhi |pages=18–22 |url=http://cwc.gov.in/ |quote=The comprehensive capital outlay of the multipurpose Srisailam dam and canal distribution network expanded from an initial estimate of ₹38.47 crore for hydro power to over ₹1,000 crore (₹10 billion) in its completed multipurpose configuration.}}</ref><ref>{{cite book |editor-last=Jauhari |editor-first=V. P. |title=Sustaining River Linking |publisher=Mittal Publications |year=2005 |location=New Delhi |pages=84–88 |isbn=978-81-7099-991-1 |quote=From an initial modest estimate of Rs. 384.7 million for a dedicated hydroelectric power scheme, the aggregate capital expenditure on the enlarged multipurpose Srisailam scheme and connected canals crossed Rs. 10 billion.}}</ref>
+| owner = [[Government of Andhra Pradesh]]
+| purpose = [[Hydroelectric]], [[Irrigation]] & [[Water supply]]
+| dam_type = [[Gravity dam|Gravity]] & [[Masonry dam]]
+| dam_crosses = [[Tungabhadra River]], [[Krishna River]]
+| dam_length = {{Convert|512|m|ft|0|abbr=on}}
+| dam_width_base = 
+| spillway_type = 
+| spillway_capacity = 38369 [[Cubic metre per second|m<sup>3</sup>/s]]
+| res_name = Srisailam Reservoir (Neelam Sanjeevareddy Sagar)
+| res_capacity_total = {{convert|216|tmcft|lk=on}}
+| res_catchment = {{Convert|206040|km2|abbr=on}}
+| res_surface = {{Convert|616|km2|abbr=on}}
+| res_max_depth = 
+| plant_operator = [[TSGENCO]](left bank) and [[APGENCO]](right bank)
+| plant_commission = 
+| plant_decommission = 
+| plant_turbines = 6 × {{convert|150|MW|abbr=on|lk=out}} reversible [[Francis-type]] (left bank)<br />
+                   7 × {{convert|110|MW|abbr=on}} Francis type (right bank)
+| plant_capacity = {{convert|1670|MW|abbr=on}}
+| plant_annual_gen = 
+| website = 
+| extra = 
+| image = NSRS Srisailam Dam.jpg
+| dam_height = {{Convert|145.10|m|ft|0|abbr=on}}<ref>{{cite web|title=India: National Register of Large Dams 2009|url=http://www.cwc.nic.in/main/downloads/National%20Register%20of%20Large%20Dams%202009.pdf|publisher=Central Water Commission|access-date=10 July 2011|url-status=dead|archive-url=https://web.archive.org/web/20110721165130/http://www.cwc.nic.in/main/downloads/National%20Register%20of%20Large%20Dams%202009.pdf|archive-date=21 July 2011}}</ref><ref>{{cite book|last=Jauhari|first=V.P.|title=Sustaining river linking|year=2005|publisher=Mittal Publications|location=New Delhi, India|isbn=817099991X|pages=84|url=https://books.google.com/books?id=G50T11X_hSgC&q=srisailam+dam&pg=PA84}}</ref>
+| pushpin_map = India Andhra Pradesh
+}}
+
+The '''Srisailam Dam''' is a [[gravity dam]] built on the confluence of [[Tungabhadra River]] and [[Krishna River]]. Its [[Hydroelectricity|hydroelectric]]  power station is [[List of power stations in India#Hydroelectric|India's 2nd&nbsp;largest]] by capacity. It is located in the [[Nallamala Hills]] near the temple town [[Srisailam]].<ref name="krmb" />
+
+The dam spans a deep gorge between the districts [[Nandyal district|Nandyal]] ([[Andhra Pradesh]]) and  [[Nagarkurnool district|Nagarkurnool]] ([[Telangana]]). It has a maximum height of {{convert|470|ft|m|0|order=flip}} and  a length of {{convert|1680|ft|m|0|order=flip}}. The reservoir has a surface area of {{convert|616|km2}} and a gross storage capacity of {{convert|216|tmcft|lk=on}}. The [[Reservoir#Operation#Terminology|active storage capacity]] is {{convert|178.74|tmcft}} corresponding to the full reservoir level at {{convert|885|ft|m|0|order=flip}} MSL. The minimum draw-down level of the reservoir is at {{convert|705|ft|m|0|order=flip}} [[Sea level|MSL]] and the corresponding [[Reservoir#Operation#Terminology|dead storage]] is {{convert|3.42|tmcft}}. There are two turbine halls: an underground building on the left bank with six {{convert|150|MW|abbr=on|lk=out}} reversible [[Francis-pump turbine]]s for [[pumped-storage]] operation (each turbine can pump 200 [[Cubic metre per second|m<sup>3</sup>/s]]) and a semi-underground building on the right bank with seven {{convert|110|MW|abbr=on}} Francis-turbine generators.<ref name="krmb">{{cite web|url=http://krmb.cgg.gov.in/krmb/projects|title=Neelam Sanjeeva Reddy Srisailam Project|access-date=22 September 2017|archive-date=25 September 2017|archive-url=https://web.archive.org/web/20170925081916/http://krmb.cgg.gov.in/krmb/projects|url-status=dead}}</ref>
+
+A tail pond dam/weir located 14&nbsp;km downstream of Srisailam dam is under advanced stage of construction to hold the water released by the hydro turbines and later pump back into the Srisailam reservoir by operating the turbines in pump mode.<ref>{{cite web|url=http://www.contec.co.in/project/single_whole_project/52|title=Srisailam Tail pond Dam|access-date=22 December 2015|archive-date=11 July 2018|archive-url=https://web.archive.org/web/20180711185639/http://www.contec.co.in/project/single_whole_project/52|url-status=dead}}</ref> The weir portion got breached in November 2015 unable to withstand the normal water release from the [[hydropower]] stations.<ref>{{cite web|url= https://www.youtube.com/watch?v=vF7AdfW9XjI |archive-url=https://web.archive.org/web/20160311030730/https://www.youtube.com/watch?v=vF7AdfW9XjI |archive-date=2016-03-11 |url-status=dead|title=Srisailam Tail pond Dam leaked| website=[[YouTube]] |access-date=22 December 2015}}</ref> Tail pond weir was completed during the year 2017 and pumping mode operation is being done even when the downstream [[Nagarjuna Sagar dam|Nagarjuna Sagar reservoir]] water level is below {{convert|531.5|ft|m|0}} MSL. The tail pond has nearly {{convert|1|tmcft}} live storage capacity.<ref>{{cite web|url= http://aperc.gov.in/aperc1/assets/uploads/files/OP72006.pdf|title= Srisailam dam tail pond level and storage capacity |access-date=22 September 2015}}</ref><ref>{{cite web
+|url=https://www.metroindia.net/news/articlenews/ndsa-directs-andhra-government-to-repair-srisailam-dam-22846
+|title=NDSA directs Andhra government to repair Srisailam dam
+|website=Metro India
+|date=8 March 2025
+|access-date=20 January 2026
+}}</ref>
+
+== History ==
+The Srisailam project began in 1960, Initially only as a power project. After several delays, the main dam was finally completed twenty years later in 1980 July 26.<ref>{{cite report |url=https://irrigationap.cgg.gov.in/ |title=Salient Features of Neelam Sanjeeva Reddy Srisailam Project |author=Irrigation & CAD Department |year=2012 |publisher=Government of Andhra Pradesh |location=Hyderabad |pages=1–4 |quote=Work on the Srisailam hydroelectric scheme commenced in 1960 across the Krishna river gorge; after significant foundation challenges and engineering delays, masonry and concrete construction of the main dam structure was completed on 26 July 1980, followed by formal commissioning of the reservoir in 1981.}}</ref><ref>{{cite book |last=Rao |first=K. L. |title=Register of Dams: Irrigation and Power in India |publisher=Ministry of Irrigation and Power |year=1978 |location=New Delhi |pages=162–167 |oclc=560555620 |quote=Detailing the civil engineering history, deep-water foundation challenges in the Krishna river gorge, and the construction timeline of the Srisailam dam from its inception in the Second and Third Five-Year Plans through structural completion in 1980.}}</ref> In the meantime the project was converted into a multipurpose facility with a generating capacity of {{convert|770|MW|abbr=on}} by its second stage which was completed in 1987.<ref>{{cite book |last=Central Electricity Authority |title=Public Electricity Supply: All India Statistics, General Review |publisher=Ministry of Energy, Government of India |year=1988 |location=New Delhi |pages=44–47 |quote=Srisailam Right Bank Power House Stage I and II installations reached a combined installed generation capacity of 770 MW upon commissioning the seventh 110 MW conventional Francis-type generating unit in 1987.}}</ref><ref>{{cite book |title=Major River Water Projects of Andhra Pradesh: Technical and Socio-Economic Evaluation |publisher=Telugu University Press |year=1991 |editor-last=Reddy |editor-first=K. Venugopal |location=Hyderabad |pages=98–104 |oclc=28584852 |quote=Originally envisaged exclusively for power generation, Srisailam was remodeled during the 1970s and 1980s into a major multipurpose facility providing irrigation storage for Rayalaseema alongside the expansion of the right bank powerhouse to 770 MW by 1987.}}</ref> The dam is to provide water for an estimated {{Convert|2000|km2|abbr=on}}. Under the right bank branch canal {{Convert|790|km2|abbr=on}} in Kurnool, Nandyal and Kadapa districts will have assured irrigation. From the initial modest estimate of {{nowrap|{{Indian Rupee|link=Indian rupee}}38.47 [[crore]]}} for a power project the total cost of the multipurpose project was estimated to cross {{nowrap|{{Indian Rupee}}1000 crore}} in its enlarged form. The dam has alone cost {{nowrap|{{Indian Rupee}}404 crore}} together with the installation of four generating sets of {{nowrap|110 MW}} each. The right bank branch canal is estimated to cost {{nowrap|{{Indian Rupee}}449 crore}} and the initial investment of {{nowrap|{{Indian Rupee}}140 crore}} has been provided by the World Bank. The projected cost-benefit ratio of the project has been worked out at 1:1.91 at 10% interest on capital outlay.<ref>{{cite report |title=Technical Advisory Committee Evaluation Note on Srisailam Project and Right Branch Canal System |author=Advisory Committee on Irrigation, Flood Control and Multipurpose Projects |year=1986 |publisher=Planning Commission, Government of India |location=New Delhi |pages=14–19 |quote=The economic evaluation of the unified Srisailam multipurpose and right branch canal project established a projected benefit-cost ratio of 1:1.91 calculated at a 10% rate of interest on capital outlay, satisfying the economic threshold for clearance of major water resource schemes in drought-prone tracts.}}</ref><ref>{{cite report |title=Guidelines for Preparation of Detailed Project Reports of Irrigation and Multipurpose Projects |author=Central Water Commission |year=1992 |publisher=Ministry of Water Resources, Government of India |location=New Delhi |pages=62–65 |quote=Appraising the economic internal rate of return and benefit-cost criteria for Krishna basin storage schemes, citing the Srisailam project's assessed B-C ratio of 1.91:1 against the mandated capital return norm of 1.5:1.}}</ref> In 1998 a coffer dam was over topped by flooding. The power house required repairs and did not generate power for a year. On 2 October 2009, Srisailam dam experienced a record inflow which threatened the dam.<ref>{{Cite web |url=http://www.indiawaterportal.org/node/12731 |title=Managing historic flood in the Krishna river basin in the year 2009 |access-date=21 January 2012 |archive-date=26 October 2017 |archive-url=https://web.archive.org/web/20171026213927/http://www.indiawaterportal.org/articles/managing-historic-flood-krishna-river-basin-experience-averting-catastrophe-apwrdc |url-status=dead }}</ref> It was built under the engineering leadership of [[Kanuri Lakshmana Rao]].
+
+==Irrigation==
+Srisailam right main canal (SRMC) is constructed with 44,000 [[cubic feet per second|ft<sup>3</sup>/s]] capacity at Srisailam reservoir level of {{convert|269.22|m|ft|0}} [[Mean sea level|MSL]] to feed [[Pothireddypadu Reservoir|Veligodu reservoir]] ({{convert|16.95|tmcft|disp=semicolon}}), [[Brahmamgari Matham|Brahmamsagar Reservoir]] ({{convert|17.74|tmcft|disp=semicolon}}), Alaganoor reservoir ({{convert|2.97|tmcft|disp=semicolon}}), Gorakallu reservoir ({{convert|12.44|tmcft|disp=semicolon}}), Owk reservoir ({{convert|4.15|tmcft|disp=semicolon}}), [[Gandikota Reservoir]] ({{convert|26.86|tmcft|disp=semicolon}}), [[Mylavaram Dam|Mylavaram reservoir]] ({{convert|9.98|tmcft|disp=semicolon}}), [[Somasila Dam|Somasila reservoir]] ({{convert|78|tmcft|disp=semicolon}}) and [[Kandaleru Dam|Kandeleru reservoir]] ({{convert|68|tmcft|disp=semicolon}}) with nearly {{convert|235|tmcft}} total storage capacity.<ref>{{cite web|url= http://iwm.vassarlabs.com/reservoir|title= AP Reservoirs real time data|access-date=22 July 2018}}</ref> This canal also supplies water to [[Telugu Ganga project]] which supplies Krishna river water to [[Chennai]] city for its drinking purpose.<ref>{{cite web|url= http://irrigationap.cgg.gov.in/wrd/projects|title=Telugu Ganga project|access-date=22 September 2015}}</ref> This main canal by feeding water to [[K. C. Canal]], Srisailam right bank canal, Telugu Ganga canal and [[Galeru Nagari Sujala Sravanthi Project|Galeru Nagari canal]] irrigates vast area in [[Kurnool district|Kurnool]], [[Nandyal district]], [[Kadapa district|Kadapa]], [[Chittoor district|Chittoor]] and [[Nellore district]]s.
+
+[[Handri-Neeva]] lift canal by drawing water from the Srisailam reservoir, which supplies drinking water in all the districts of [[Rayalaseema]]. [[Veligonda Project|Veligonda reservoir]] receives water by gravity through tunnels to irrigate lands in Nellore, Kadapa, Markapuram and  [[Prakasam district]]s. [[Kalwakurthy lift irrigation scheme]] by drawing water from the Srisailam reservoir, supplies irrigation water in [[Mahbubnagar district|Mahbubnagar]] and [[Nalgonda district]]s
+
+[[Alimineti Madhava Reddy Project|Srisailam left bank canal]] will receive water by gravity through tunnels to irrigate lands in [[Nalgonda district]]. Tunnel work is not complete and the required water has been provided to most of the project area by lifting water from the downstream Nagarjuna Sagar reservoir.
+
+== Dam Maintenance and Safety ==
+Systematic Neglect and absence of diversion of funds is evident in maintenance of the dam and lack of any modernization attempts of the Powerhouse. The officers report a shortage of maintenance staff.<ref>{{Cite news|last=Rao|first=G. Venkataramana|date=2019-11-20|title=Srisailam dam in need of urgent maintenance|language=en-IN|work=The Hindu|url=https://www.thehindu.com/news/national/andhra-pradesh/srisailam-dam-in-need-of-urgent-maintenance/article30020482.ece|access-date=2020-07-23|issn=0971-751X}}</ref>
+
+Safety concerns to the 2nd largest Hydroelectric project in the country have been raised over the years<ref>{{Cite news|last=Rao|first=G. Venkataramana|date=2019-11-16|title=Experts worried about safety of Srisailam dam|language=en-IN|work=The Hindu|url=https://www.thehindu.com/news/cities/Vijayawada/experts-worried-about-safety-of-srisailam-dam/article29987390.ece|access-date=2020-07-22|issn=0971-751X}}</ref><ref>{{Cite web|last=Pulipaka|first=AuthorBalu|title=Srisailam dam safety under lens|url=https://telanganatoday.com/srisailam-dam-safety-under-lens|access-date=2020-07-22|website=Telangana Today|language=en-US}}</ref> and have been assessed false subsequently.<ref>{{Cite news|author=Staff Reporter|date=2019-11-22|title=No threat to Srisailam dam, asserts Minister|language=en-IN|work=The Hindu|url=https://www.thehindu.com/news/national/andhra-pradesh/no-threat-to-srisailam-dam-asserts-minister/article30042436.ece|access-date=2020-07-22|issn=0971-751X}}</ref> In 2009, the dam, designed for a maximum flood of 1,900,000 ft<sup>3</sup>/s, endured a flood of 2,550,000 ft<sup>3</sup>/s. According to a survey conducted in the summer of 2018, the scouring resulted in the formation of a huge pit in the apron downstream the dam. And a structure protecting the ‘toe’ and foundation of the main dam has weakened. Efforts are not yet made to repair and maintain the dam.<ref>{{Cite news|last=Rao|first=G. Venkataramana|date=2019-11-16|title=Experts worried about safety of Srisailam dam|language=en-IN|work=The Hindu|url=https://www.thehindu.com/news/cities/Vijayawada/experts-worried-about-safety-of-srisailam-dam/article29987390.ece|access-date=2020-07-22|issn=0971-751X}}</ref>
+
+In May 2025, the National Dam Safety Authority (NDSA) inspected the dam and raised concerns about the condition of the Srisailam dam. Over the years, damage has built up around the [[plunge pool]] and some key protection works, mostly due to aging and a lack of proper maintenance. Though several expert panels have suggested fixes in the past, the state hasn’t followed through on most of them. NDSA says that ignoring these observations could threaten major structures and cities like [[Vijayawada]] and [[Amaravati]].<ref>{{Cite news |last=Apparasu |first=Srinivasarao |date=2025-05-18 |title=NDSA flags concerns over stability of Srisailam dam |url=https://www.hindustantimes.com/india-news/ndsa-flags-concerns-over-stability-of-srisailam-dam-101747507175336.html |archive-url=https://web.archive.org/web/20250519000147/https://www.hindustantimes.com/india-news/ndsa-flags-concerns-over-stability-of-srisailam-dam-101747507175336.html |archive-date=2025-05-19 |access-date=2025-06-15 |work=Hindustan Times |language=en-us}}</ref>
+
+==Power generation optimization==
+[[File:Power generator rooms.jpg|Srisailam right bank power house|thumb]]
+At present, the initial inflows into [[Srisailam]] reservoir are stored excessively without being used for power generation. The flood water fills the remaining empty Srisailam reservoir quickly and most of the flood water overflows into the downstream [[Nagarjuna Sagar Dam|Nagarjunasagar]] reservoir without being used for power generation.<ref>[https://www.scribd.com/doc/58789365/Srisailam-HPS Optimisation of power generation from Srisailam Hydroelectric Power Station]</ref> The endeavor shall be to fill the Nagarjuna Sagar reservoir fully with the uniform water released through the power generating units.
+
+The existing right bank power station (770 MW) can be converted into [[Power sector of Andhra Pradesh#Pumped storage hydroelectricity projects|pumped storage hydroelectric power (PSHP)]] to operate in pumping mode when the downstream [[Nagarjuna Sagar Dam|Nagarjuna Sagar reservoir]] level is above {{convert|560|ft|m|0}} MSL. The PSHP can be used for energy storage purposes on daily basis and to transfer Godavari water to the Srisailam reservoir during drought years. Alternately, the tunnel of the existing power station can be used for a new PSHP station to pump water from the Nagarjuna Sagar reservoir to the Srisailam reservoir.
+
+== Pumped storage hydropower potential==
+Srisailam reservoir, serving as lower level reservoir, has potential to install nearly 77,000 MW [[Power sector of Andhra Pradesh#Pumped storage hydroelectricity projects|high head pumped storage hydroelectric plants]] on its right side.
+
+==See also==
+{{stack|{{Portal|India|Water|Renewable energy}}}}
+* [[Krishna Water Disputes Tribunal]]
+* [[List of power stations in India]]
+* [[List of dams and reservoirs in India]]
+* [[List of hydroelectric power station failures]]
+* [[Nagarjuna Sagar tail pond]]
+{{Commons category|Srisailam Dam}}
+
+==References==
+{{reflist}}
+
+{{Krishna basin |state=expanded}}
+{{Krishna River dams}}
+{{Hydrography of Andhra Pradesh}}
+{{Hydrography of Telangana}}
+
+[[Category:Dams completed in 1981]]
+[[Category:Energy infrastructure completed in 1981]]
+[[Category:Dams in Andhra Pradesh]]
+[[Category:Hydroelectric power stations in Andhra Pradesh]]
+[[Category:Pumped-storage hydroelectric power stations in India]]
+[[Category:Dams on the Krishna River]]
+[[Category:Reservoirs in Andhra Pradesh]]
+[[Category:Geography of Nandyal district]]
+[[Category:1981 establishments in Andhra Pradesh]]
+[[Category:20th-century architecture in India]]
+[[Category:Buildings and structures in Nandyal district]]

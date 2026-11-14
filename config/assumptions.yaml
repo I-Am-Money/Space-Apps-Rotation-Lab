@@ -42,6 +42,15 @@ crops:
     p:        {value: 0.55, range: [0.55, 0.55], unit: "-", source: "FAO-56 Table 22, Millet p = 0.55. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
     ky:       {value: 0.9, range: [0.7, 1.1], unit: "-", source: "team to verify. Millet is not in FAO-66 Table 1 (FAO-33 values); sorghum value 0.9 used as a flagged stand-in.", badge: placeholder}
     sowing_doy: {value: 180, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~29 June, kharif).", badge: assumption}
+  ragi:
+    kc_ini:   {value: 0.30, range: [0.15, 0.60], unit: "-", source: "team to verify. FAO-56 Table 12 has only a general 'Millet' row (finger millet not listed) and its Kc ini cell is blank on the FAO web copy.", badge: placeholder}
+    kc_mid:   {value: 1.00, range: [0.90, 1.10], unit: "-", source: "FAO-56 Table 12 row 'Millet' (Kc mid 1.00) used as the nearest row; ragi-specific value team to verify. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: assumption}
+    kc_end:   {value: 0.30, range: [0.25, 0.40], unit: "-", source: "FAO-56 Table 12 row 'Millet' (Kc end 0.30) used as the nearest row; ragi-specific value team to verify. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: assumption}
+    stages_days: {value: [15, 25, 40, 25], range: [[15, 20], [25, 30], [40, 55], [25, 35]], unit: days, source: "FAO-56 Table 11 row 'Millet' (15/25/40/25 = 105, June, Pakistan; 20/30/55/35 = 140, April, central USA) used as the nearest row; finger millet duration team to verify. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: assumption}
+    root_depth_m: {value: 1.0, range: [1.0, 2.0], unit: m, source: "FAO-56 Table 22 row 'Millet' Zr 1.0-2.0 m (nearest row; ragi-specific team to verify). Lower end chosen. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: assumption}
+    p:        {value: 0.55, range: [0.50, 0.55], unit: "-", source: "FAO-56 Table 22 row 'Millet' p = 0.55 (nearest row; ragi-specific team to verify). https://www.fao.org/4/x0490e/x0490e0e.htm", badge: assumption}
+    ky:       {value: 0.9, range: [0.7, 1.1], unit: "-", source: "team to verify. Finger millet is not in FAO-66 Table 1 (FAO-33 values); sorghum 0.9 used as a flagged stand-in.", badge: placeholder}
+    sowing_doy: {value: 180, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~29 June, kharif).", badge: assumption}
   pigeonpea:
     kc_ini:   {value: 0.40, range: [0.30, 0.50], unit: "-", source: "team to verify. Pigeon pea is not in FAO-56 Table 12; 0.4 is the FAO-56 'Beans, dry and Pulses' Kc ini, used as a flagged stand-in.", badge: placeholder}
     kc_mid:   {value: 1.15, range: [1.00, 1.15], unit: "-", source: "team to verify. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' Kc mid 1.15 (Chick pea 1.00 gives the low end).", badge: placeholder}
@@ -58,6 +67,7 @@ ym_kg_ha:
   rice:      {value: 5000, range: [3500, 6500], unit: kg/ha, source: "PLACEHOLDER; replaced by ICRISAT-derived value in config/prices_india.yaml when present.", badge: placeholder}
   jowar:     {value: 2500, range: [1500, 4000], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
   bajra:     {value: 2200, range: [1200, 3500], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
+  ragi:      {value: 1800, range: [1000, 3000], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
   pigeonpea: {value: 1200, range: [700, 1800], unit: kg/ha, source: "PLACEHOLDER; see above.", badge: placeholder}
 
 hydrology:
@@ -87,8 +97,20 @@ rotation:
   n_credit_after_pigeonpea: {value: 30, range: [0, 60], unit: "kg N/ha", source: "team to verify. Nitrogen credit to the following rice/millet crop; magnitude not sourced.", badge: assumption}
 
 rice_irrigation:
-  percolation_seepage_mm_day: {value: 4.0, range: [1.0, 8.0], unit: mm/day, source: "team to verify. Soil dependent; no source read in this session.", badge: assumption}
-  puddling_water_mm: {value: 200, range: [100, 300], unit: mm, source: "team to verify. One-time land preparation and puddling water at season start.", badge: assumption}
+  percolation_seepage_mm_day: {value: 2.0, range: [2.0, 8.0], unit: mm/day, source: "FAO Irrigation Water Management training manual, ch.4 Step 5 (Paddy rice irrigation schedule): heavy clay PERC = 2 mm/day, more sandy soils 8 mm/day, average 5 mm/day ('best determined locally'). https://www.fao.org/4/t7202e/t7202e07.htm, accessed 2026-11-14. Default set at the LOW end because the farm has black (cracking clay) soil that drains slowly; the farm's own percolation rate is team to verify.", badge: assumption}
+  puddling_water_mm: {value: 200, range: [100, 300], unit: mm, source: "Value from FAO training manual ch.4 Step 4: water to saturate the root zone SAT = 200 mm (assumed in the manual). https://www.fao.org/4/t7202e/t7202e07.htm, accessed 2026-11-14. Range 100-300 is team to verify.", badge: assumption}
   base_available_irrigation_mm: {value: 900, range: [300, 1500], unit: mm per season, source: "team to verify. Farmer input (borewell/tank); simplified recharge proxy, team to verify.", badge: assumption}
   recharge_exponent_k: {value: 0.5, range: [0.0, 1.0], unit: "-", source: "simplified recharge proxy, team to verify. available = base * (season_rain/median_season_rain)^k.", badge: assumption}
   bund_height_mm: {value: 100, range: [50, 150], unit: mm, source: "team to verify. Maximum ponded depth; excess spills as runoff.", badge: assumption}
+  water_source_labels: {value: {unset: "confirm your rice water source (local-rainfall recharge proxy)", borewell: "borewell (local-rainfall recharge proxy)", tank: "tank (local-rainfall recharge proxy)", canal: "proxy for canal water availability (Nagarjuna Sagar releases, not local rain)"}, range: [unset, borewell, tank, canal], unit: label, source: "Owner answer 2026-11-14; simplified proxy, team to verify.", badge: assumption}
+  canal_release_factor: {value: 1.0, range: [0.2, 1.5], unit: "ratio to a normal-year release", source: "team to verify. Editable what-if multiplier on canal availability, NOT local rain. No reservoir release data is used or invented; 1.0 = normal year.", badge: assumption}
+  canal_exponent_k: {value: 1.0, range: [0.5, 1.5], unit: "-", source: "team to verify. Proxy for canal water availability: available = base * canal_release_factor^k.", badge: assumption}
+  base_canal: {value: 600, range: [200, 1200], unit: mm per season, source: "team to verify. Proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations. No reservoir data used.", badge: assumption}
+  k_canal: {value: 1.0, range: [0.5, 1.5], unit: "-", source: "team to verify. S_canal = base_canal * (upstream_rain / median_upstream_rain)^k_canal.", badge: assumption}
+  base_well: {value: 400, range: [100, 800], unit: mm per season, source: "team to verify. Simplified recharge proxy.", badge: assumption}
+  k_well: {value: 0.5, range: [0.0, 1.0], unit: "-", source: "team to verify. S_well = min(max_well, base_well * (local_rain / median_local_rain)^k_well); simplified recharge proxy.", badge: assumption}
+  max_well: {value: 600, range: [200, 1000], unit: mm per season, source: "team to verify. Cap on well water per season (pumping/yield limit).", badge: assumption}
+  water_source_labels_cw: {value: {canal: "proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations.", well: "simplified recharge proxy."}, range: [canal, well], unit: label, source: "Owner contract, iteration 3.", badge: assumption}
+
+soil:
+  black_soil_awc_mm_per_m: {value: 180, range: [120, 200], unit: mm per m, source: "FAO-56 Table 19, Clay: theta_FC - theta_WP = 0.12-0.20 m3/m3 (= 120-200 mm/m). https://www.fao.org/4/x0490e/x0490e0c.htm, accessed 2026-11-14. Table is for generic clay, not Indian vertisol specifically; value in the upper part of the range for black soil, vertisol-specific range team to verify. farm.yaml awc_range_mm_per_m was still null when checked.", badge: assumption}

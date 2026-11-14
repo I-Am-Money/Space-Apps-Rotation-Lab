@@ -31,7 +31,7 @@ def test_lam0_highest_mean_lam1_highest_worst10():
     assert top0.mean_profit == df.mean_profit.max()
     top1 = opt.rescore(df, 1.0, 0.0).sort_values("J", ascending=False).iloc[0]
     assert top1.worst10_profit == df.worst10_profit.max()
-    assert len(df) == 256
+    assert len(df) == len(opt.ALL_PLANS)
 
 
 def test_frontier_non_dominated():
@@ -45,6 +45,9 @@ def test_frontier_non_dominated():
 def test_recommend_and_report_structure():
     r = api.recommend({"current_rotation": ["bajra"] * 4})
     assert set(r["three_strategy_report"]) == {"A", "B", "C", "current"}
+    assert r["baseline_id"] == "A" and "d_mean_profit" in r["metrics"].columns
+    a = r["metrics"][r["metrics"].id == "rice-rice-rice-rice"].iloc[0]
+    assert a.d_mean_profit == 0 and r["top_delta_vs_baseline"]["d_mean_profit"] == r["top"]["mean_profit"] - a.mean_profit
     for v in r["three_strategy_report"].values():
         assert v["why"] and v["benefits"] and v["info_gaps"] and v["risks_for_local_review"] and v["evidence"]
     assert r["top"]["rank"] == 1
@@ -64,5 +67,22 @@ def test_economics_units_and_irrigation_cost():
 
 def test_less_irrigation_cost_for_millet_plan():
     s, df = api._table(api.norm_params())
-    a = df[df.id == "rice-rice-rice-rice"].iloc[0]; m = df[df.id == "jowar-jowar-jowar-jowar"].iloc[0]
+    a = df[df.id == "rice-rice-rice-rice"].iloc[0]; m = df[df.id == "-".join([opt.MILLETS[0]] * 4)].iloc[0]
     assert m.irrigation_mm < a.irrigation_mm
+
+
+def test_candidate_set_follows_selection_and_refs():
+    opt.configure(["ragi"])
+    try:
+        assert len(opt.ALL_PLANS) == 81 and set(opt.CROPS) == {"rice", "pigeonpea", "ragi"}
+        assert opt.REF["B"] == ["rice", "ragi", "rice", "ragi"] and opt.REF["C"] == ["rice", "pigeonpea", "ragi", "rice"]
+    finally:
+        opt.configure(None) if False else None
+        opt._SEL_MTIME = None; opt.CROPS = []; opt.configure()
+
+
+def test_current_defaults_to_A_and_water_source_flag():
+    r = api.recommend({"water_source": "unset"})
+    assert r["params"]["current_rotation"] == ["rice"] * 4
+    assert r["water_source"]["confirm_required"] and "confirm your rice water source" in r["water_source"]["flag"]
+    assert set(r["three_strategy_report"]) == {"A", "B", "C"}

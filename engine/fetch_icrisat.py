@@ -12,6 +12,9 @@ Data actually used, in priority order:
     Mohapatra, Mendeley Data, doi:10.17632/ywp3y5j9vv.1, CC BY 4.0.
     Sorghum and pigeonpea are NOT in it, so they return no rows (never invented).
 
+Nalgonda: pre-2016 (undivided) district; the Mendeley panel lists it under state "Telangana",
+the DLD CSVs may list it under Andhra Pradesh (the loader accepts either).
+
 Caveat: district rice yields mix irrigated and rainfed fields.
 """
 from __future__ import annotations
@@ -30,11 +33,11 @@ DLD_DIR = RAW / "icrisat_dld"
 MENDELEY_XLS = RAW / "icrisat_mendeley" / "main_merge_1990_2015.xls"
 MENDELEY_SLIM = RAW / "icrisat_mendeley" / "slim_rice_bajra.csv"
 DLD_URL = "http://data.icrisat.org/dld/src/crops.html"
-DEV_DISTRICT = "Rangareddy"  # DEV only: district containing the DEV point (17.5N, 78.5E)
+DEV_DISTRICT = "Nalgonda"  # used only when region.yaml has no district (district is now Nalgonda)
 
 # DLD column crop label -> our crop id
 CROP_LABELS = {"RICE": "rice", "KHARIF SORGHUM": "jowar", "SORGHUM": "jowar",
-               "PEARL MILLET": "bajra", "PIGEONPEA": "pigeonpea"}
+               "PEARL MILLET": "bajra", "FINGER MILLET": "ragi", "PIGEONPEA": "pigeonpea"}
 COLS = ["year", "crop", "yield_kg_ha", "area"]  # area in hectares
 
 # Current (2016+) Telangana district -> undivided (pre-2014) ICRISAT district.
@@ -171,7 +174,7 @@ def load_district_yields(district: str | None = None, with_info: bool = False):
     dev = False
     if district is None:
         district = _configured_district()
-        dev = district == DEV_DISTRICT and _raw_cfg_district() == "TEAM_TO_FILL"
+        dev = _raw_cfg_district() in ("TEAM_TO_FILL", "None", "")
     if allv.empty:
         out = pd.DataFrame(columns=COLS)
         out.attrs.update(match=None, source=source, badge="placeholder", dev_placeholder=dev)
@@ -191,6 +194,11 @@ def _raw_cfg_district() -> str:
         return str(yaml.safe_load((ROOT / "config" / "region.yaml").read_text()).get("district"))
     except Exception:
         return ""
+
+
+def year_counts(df: pd.DataFrame) -> dict:
+    """Years of positive yield per crop id (0 = crop absent from the loaded files)."""
+    return {c: int((df["crop"] == c).sum()) for c in ("rice", "jowar", "bajra", "ragi", "pigeonpea")}
 
 
 def detrend(years: np.ndarray, y: np.ndarray) -> np.ndarray:

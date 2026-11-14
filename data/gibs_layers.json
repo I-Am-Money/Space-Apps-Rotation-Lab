@@ -1,4 +1,15 @@
 {
+ "center": {
+  "lat": 16.877,
+  "lon": 79.193,
+  "default_zoom": 8,
+  "source": "config/region.yaml"
+ },
+ "test_tile_zyx": [
+  5,
+  14,
+  23
+ ],
  "capabilities_url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&request=GetCapabilities",
  "retrieved": "2026-11-14",
  "capabilities_default_time_note": "layer dates below come from the capabilities XML",
@@ -33,9 +44,9 @@
     "last_date": "2026-11-10",
     "verified_tile": {
      "date": "2026-11-10",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/22.png",
+     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/23.png",
      "status": 200,
-     "bytes": 11099,
+     "bytes": 10825,
      "content_type": "image/png"
     },
     "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"
@@ -62,9 +73,9 @@
     "last_date": "2026-11-10",
     "verified_tile": {
      "date": "2026-11-10",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/22.png",
+     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/23.png",
      "status": 200,
-     "bytes": 11495,
+     "bytes": 11028,
      "content_type": "image/png"
     },
     "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"
@@ -111,9 +122,9 @@
     "last_date": "2026-10-16",
     "verified_tile": {
      "date": "2026-10-16",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/5/14/22.png",
+     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/5/14/23.png",
      "status": 200,
-     "bytes": 26056,
+     "bytes": 19082,
      "content_type": "image/png"
     },
     "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
@@ -133,9 +144,9 @@
     "last_date": "2026-10-01",
     "verified_tile": {
      "date": "2026-10-01",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_Monthly/default/2026-10-01/GoogleMapsCompatible_Level7/5/14/22.png",
+     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_Monthly/default/2026-10-01/GoogleMapsCompatible_Level7/5/14/23.png",
      "status": 200,
-     "bytes": 25255,
+     "bytes": 18219,
      "content_type": "image/png"
     },
     "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_Monthly/default/2026-10-01/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png"

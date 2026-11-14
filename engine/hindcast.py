@@ -87,10 +87,10 @@ def hindcast(annual, awc, irr, observed=None, farm=None) -> dict:
         d = observed[observed.crop == crop].groupby("year").yield_kg_ha.mean()
         years = np.array(sorted(set(d.index.astype(int)) & set(yrs_all.tolist())))
         if len(d) == 0:
-            out["per_crop"][crop] = {"years": [], "no_data": True, "note": "no data: no district yield series for this crop in the available ICRISAT files"}
+            out["per_crop"][crop] = {"years": [], "no_data": True, "status": "no validation data", "note": "no validation data: no Nalgonda yield series for this crop in the available ICRISAT files"}
             continue
         if len(years) < 8:
-            out["per_crop"][crop] = {"years": years.tolist(), "no_data": False, "note": "fewer than 8 overlapping years"}
+            out["per_crop"][crop] = {"years": years.tolist(), "no_data": False, "status": "no validation data", "note": "no validation data: fewer than 8 overlapping years"}
             continue
         mod_all = model_single_season(annual, crop, awc, irr)
         mod = mod_all[np.searchsorted(yrs_all, years)]
@@ -110,7 +110,7 @@ def hindcast(annual, awc, irr, observed=None, farm=None) -> dict:
                 reasons.append("district rice yields mix irrigated and rainfed fields while the model treats rice as irrigated paddy with a limited water budget")
             reasons.append("district yields reflect management, pests, varieties and area mix that a water-balance model does not capture; weather is a ~0.5 degree grid")
         out["per_crop"][crop] = {
-            "years": years.tolist(), "observed": obs.tolist(), "modeled": mod.tolist(),
+            "status": "validated against district yields", "years": years.tolist(), "observed": obs.tolist(), "modeled": mod.tolist(),
             "observed_anomaly": a_obs.tolist(), "modeled_anomaly": a_mod.tolist(),
             "pearson_r": r, "mae_kg_ha": mae, "mae_anomaly_kg_ha": mae_anom,
             "heldout_years": years[~fit].tolist(), "heldout_r": r_ho, "n_years": int(len(years)),

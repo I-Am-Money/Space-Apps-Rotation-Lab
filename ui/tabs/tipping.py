@@ -3,13 +3,14 @@ import html
 import streamlit as st
 
 from ui import charts, data
-from ui.components import badge, fmt_rs, legend, md, section, stat, stats, tab_head
+from ui.components import srcline, badge, fmt_rs, legend, md, section, stat, stats, tab_head
 from ui.data import humanize
 
 
 def render():
     p = data.params()
-    tp = data.tipping(p)
+    with st.spinner(data.MSG["tipping_points"]):
+        tp = data.tipping(p)
     g, xo = tp["grid"], tp["rainfall_crossover"]
     b = "placeholder" if data.is_mock() else "modeled"
     tab_head("Tipping Points", "At what water level should land move from rice to millets? This is where the answer changes.")
@@ -22,27 +23,54 @@ def render():
     stats([
         stat("Water level where rice-majority plans start to win, usual rain",
              f"{thr[j1]:,.0f}" if thr[j1] is not None else "None", "mm" if thr[j1] is not None else f"up to {top_irr:,.0f} mm", b),
-        stat("Irrigation water you entered", f'{p["irrigation_mm"]:,.0f}', "mm", "local"),
+        stat("Irrigation water in your inputs", f'{p["irrigation_mm"]:,.0f}', "mm", "local"),
         stat("Rainfall where the best rotation switches", f'{co[0]["rain_mult"]:.2f}' if co else "None", "times usual" if co else f"in {rm[0]:.2f} to {rm[-1]:.2f} times usual", b),
     ])
-    md(f'<div class="rl-callout"><p>{html.escape(humanize(g["text"]))}</p></div>')
+    winners = {w for row in g["winner"] for w in row}
+    single = len(winners) == 1
+    if single:
+        only = data.plan_label(next(iter(winners)))
+        md(f'<div class="rl-callout"><p><strong>No shift point at these inputs.</strong> {html.escape(only)} wins every square, so there is no boundary to draw. {html.escape(humanize(g["text"]))} Try another water source, a different amount of water, or the rainfall crossover below.</p></div>')
+    else:
+        md(f'<div class="rl-callout"><p>{html.escape(humanize(g["text"]))}</p></div>')
     section("Which rotation wins, for each rainfall and water supply", b,
-            "Each square is a different season. Read across for rainfall, up for irrigation water. The dashed line is where rice-majority plans start to win. The white circle is your farm in a usual year.")
+            ("One colour fills the grid because one rotation is best everywhere tested. " if single else "") + "Each square is a different season. Read across for rainfall, up for irrigation water. " + ("" if single else "The dashed line is where rice-majority plans start to win. ") + "The white circle is our farm today in a usual year.")
     fig, items = charts.tipping_grid(g, p["irrigation_mm"], colors)
     legend(items)
     charts.show(fig, "grid")
+    srcline(f"Model output over {tp['n_scenarios']:,} resampled weather sequences. {html.escape(humanize(tp.get('frame', '')))}", "Source")
+
+    gu = tp.get("grid_upstream_local")
+    if gu:
+        w2 = {w for row in gu["winner"] for w in row}
+        single2 = len(w2) == 1
+        section("Which rotation wins when canal rain and local rain differ", b,
+                ("One colour fills the grid because one rotation is best everywhere tested. " if single2 else "")
+                + "Across is the monsoon rain upstream of Nagarjuna Sagar, which feeds the canal proxy. Up is local rain on the farm, which feeds the well proxy and the crop. 1.0 means a usual year.")
+        if single2:
+            md(f'<div class="rl-callout"><p><strong>No boundary at these inputs.</strong> {html.escape(data.plan_label(next(iter(w2))))} wins every square, so upstream and local rain do not change the choice here. {html.escape(humanize(gu.get("text", "")))}</p></div>')
+        elif gu.get("text"):
+            md(f'<div class="rl-callout"><p>{html.escape(humanize(gu["text"]))}</p></div>')
+        fig2, items2 = charts.tipping_grid(dict(gu, winner=gu["winner"]), None, colors, xkey="upstream_mult", ykey="local_mult",
+                                           xt="Upstream rainfall compared with usual (1.0 = usual)", yt="Local rainfall compared with usual (1.0 = usual)", farm=(1.0, 1.0),
+                                           hov="Upstream rain %{x:.2f} times usual<br>Local rain %{y:.2f} times usual<br>Best: %{text}<extra></extra>")
+        legend(items2)
+        charts.show(fig2, "grid2")
+        srcline("Model output. Upstream rain is the NASA POWER season rainfall averaged over points upstream of Nagarjuna Sagar; actual canal releases depend on reservoir operations.", "Source")
 
     section("Where rainfall alone tips the choice", b, "Mean profit of the rotations involved in the switch. The shaded band is the 10th to 90th percentile of where the switch lands when the weather record is resampled.")
     md(f'<div class="rl-callout"><p>{html.escape(humanize(xo["text"]))}</p></div>')
     fig, items = charts.crossover(xo, colors)
     legend(items)
     charts.show(fig, "cross")
+    srcline("Model output. The shaded band comes from resampling the weather record.", "Source")
 
     section("If the early monsoon rain arrives late", b)
     md(f'<p style="max-width:75ch">{html.escape(humanize(tp["late_monsoon"]["text"]))}</p>')
     fig, items = charts.late_monsoon(tp["late_monsoon"], colors)
     legend(items)
     charts.show(fig, "late")
+    srcline("Model output. Rain is moved later in the season, with the seasonal total unchanged.", "Source")
 
     section("Is it worth measuring before you decide?", b, "How much a better decision is worth if one unknown is pinned down first. It is an upper limit on what any real test could add.")
     c1, c2 = st.columns(2, gap="large")

@@ -38,12 +38,13 @@ T = dict(
     jowar=oklch(0.76, 0.15, 85),
     bajra=oklch(0.46, 0.13, 30),
     pigeonpea=oklch(0.70, 0.15, 150),
+    ragi=oklch(0.52, 0.09, 60),
     mixed=oklch(0.55, 0.02, 220),
     warn=oklch(0.90, 0.13, 95),
     warn_ink=oklch(0.33, 0.07, 80),
 )
-CROP_COLOR = {"rice": T["rice"], "jowar": T["jowar"], "bajra": T["bajra"], "pigeonpea": T["pigeonpea"]}
-CROP_LABEL = {"rice": "Rice", "jowar": "Jowar", "bajra": "Bajra", "pigeonpea": "Pigeon pea"}
+CROP_COLOR = {"rice": T["rice"], "jowar": T["jowar"], "bajra": T["bajra"], "ragi": T["ragi"], "pigeonpea": T["pigeonpea"]}
+CROP_LABEL = {"rice": "Rice", "jowar": "Jowar", "bajra": "Bajra", "ragi": "Ragi", "pigeonpea": "Pigeon pea"}
 # rotation ids on the tipping grid and Pareto colouring
 ROT_COLOR = {"A": T["rice"], "B": T["jowar"], "C": T["pigeonpea"], "current": T["bajra"]}
 
@@ -76,7 +77,7 @@ a{color:var(--accent);text-underline-offset:3px;}
 /* masthead */
 .rl-mast{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:2rem;align-items:end;padding:1.2rem 0 1.4rem;border-bottom:1px solid var(--line);margin-bottom:.4rem}
 .rl-brand{font-family:var(--serif);font-weight:700;font-size:1rem;color:var(--accent);letter-spacing:.01em;margin-bottom:.6rem}
-.rl-mast h1{font-size:clamp(1.9rem,4.4vw,3.1rem);line-height:1.04;margin:0 0 .7rem;max-width:18ch}
+.rl-mast h1{font-size:clamp(1.9rem,4.2vw,2.9rem);line-height:1.06;margin:0 0 .7rem;max-width:20ch;font-weight:600}
 .rl-mast .lede{font-size:1.12rem;color:var(--ink2);max-width:46ch;margin:0}
 .rl-plan{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem}
 .rl-plan .cap{font-size:.86rem;color:var(--ash);margin:0 0 .5rem}
@@ -152,7 +153,18 @@ div[data-baseweb="select"]>div,div[data-baseweb="input"]>div,input{background:va
 [data-testid="stExpander"] summary p{font-size:.97rem;font-weight:600}
 [data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:8px}
 button:focus-visible,[role="tab"]:focus-visible,a:focus-visible{outline:3px solid var(--accent)!important;outline-offset:2px}
-.stPlotlyChart{margin:.2rem 0}
+[data-testid="stPlotlyChart"]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0 .4rem;margin:.3rem 0 0;overflow:hidden}
+.rl-srcline{font-size:.82rem;color:var(--ash);margin:.35rem 0 1rem;max-width:none;line-height:1.45}
+.rl-srcline b{color:var(--ink2);font-weight:700}
+.rl-delta{font-variant-numeric:tabular-nums;font-weight:700}
+.rl-delta.up{color:%(d_up)s}.rl-delta.dn{color:%(d_dn)s}
+.rl-nodata{border:1.5px dashed var(--line);border-radius:8px;padding:1rem 1.2rem;color:var(--ink2);background:var(--sunken)}
+table.rl-t{border-collapse:collapse;width:100%%;font-size:.97rem;margin:.4rem 0 .2rem}
+table.rl-t th{font-weight:700;color:var(--ink2);text-align:right;padding:.5rem .7rem;border-bottom:1.5px solid var(--ink);font-size:.88rem}
+table.rl-t th:first-child,table.rl-t td:first-child{text-align:left}
+table.rl-t td{padding:.55rem .7rem;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+.rl-tblwrap{overflow-x:auto}
+[data-testid="stSegmentedControl"] button[aria-checked="true"],[data-testid="stSegmentedControl"] button[aria-pressed="true"]{background:var(--ink)!important;color:#fff!important}
 iframe[title*="folium"],iframe{border-radius:8px}
 
 @media (max-width:760px){
@@ -174,6 +186,6 @@ def inject() -> None:
         b_mod=oklch(0.92, 0.04, 235), t_mod=oklch(0.32, 0.09, 235),
         b_loc=oklch(0.92, 0.05, 45), t_loc=oklch(0.38, 0.11, 40),
         b_asm=oklch(0.95, 0.008, 220), t_asm=oklch(0.38, 0.03, 220), l_asm=oklch(0.78, 0.02, 220),
-        l_ph=oklch(0.70, 0.12, 90),
+        l_ph=oklch(0.70, 0.12, 90), d_up=oklch(0.40, 0.11, 150), d_dn=oklch(0.43, 0.15, 30),
     )
     st.markdown("<style>" + (CSS % vals) + "</style>", unsafe_allow_html=True)

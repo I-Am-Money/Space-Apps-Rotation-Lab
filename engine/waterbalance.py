@@ -65,18 +65,21 @@ def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, off=0):
     return Dr, se, sd
 
 
-def _rice_phase(Dr, et0T, rainT, supply, kc, perc, hmax, taw, inv, dcol, rec=None, off=0):
+def _rice_phase(Dr, et0T, rainT, supply, well, kc, perc, hmax, taw, inv, dcol, rec=None, off=0):
     """Irrigated paddy daily loop. Returns Dr, and dict of season sums."""
     z = np.zeros_like(Dr)
     h = z.copy()
-    out = {k: z.copy() for k in ("eta", "etm", "irr", "need", "dp", "ro", "rain")}
+    out = {k: z.copy() for k in ("eta", "etm", "irr", "irr_c", "irr_w", "need", "dp", "ro", "rain")}
     for i in range(et0T.shape[0]):
         etc = kc[i] * et0T[i]
         rain = rainT[i]
         demand = etc + perc
         need = np.maximum(demand + Dr - (h + rain), 0.0)
-        irr = np.minimum(need, supply)
-        supply = supply - irr
+        irr_c = np.minimum(need, supply)            # canal first
+        irr_w = np.minimum(need - irr_c, well)      # wells cover the shortfall only
+        supply = supply - irr_c
+        well = well - irr_w
+        irr = irr_c + irr_w
         W = h + rain + irr
         fill = np.minimum(Dr, W)
         Dr = Dr - fill
@@ -99,6 +102,8 @@ def _rice_phase(Dr, et0T, rainT, supply, kc, perc, hmax, taw, inv, dcol, rec=Non
         out["eta"] += e1 + e2
         out["etm"] += etc
         out["irr"] += irr
+        out["irr_c"] += irr_c
+        out["irr_w"] += irr_w
         out["need"] += need
         out["dp"] += pact
         out["ro"] += over
@@ -146,11 +151,50 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
     rice_rain = precip[:, :, ra:rb].sum(axis=2)                      # [S,4] season rain
     med = params.get("median_season_rain_mm")
     med = float(np.median(rice_rain)) if med is None else float(med)
-    avail = base * (np.maximum(rice_rain, 0.0) / max(med, 1e-9)) ** k   # [S,4]
+    source = params.get("water_source", "unset")
+    if source not in ("unset", "borewell", "tank", "canal", "canal_and_well"):
+        raise ValueError(f"water_source must be unset|borewell|tank|canal|canal_and_well, got {source!r}")
+    zeros = np.zeros((S, 4))
+    if source == "canal_and_well":
+        # S = S_canal + S_well; canal first, wells cover the shortfall (irrigation_available_mm is ignored here:
+        # use params canal_supply_mm / well_supply_mm to override the formulas).
+        def _sf(v):
+            v = np.asarray(v, float)
+            return np.broadcast_to(v[:, None] if v.ndim == 1 else v, (S, 4))
+        if params.get("canal_supply_mm") is not None:
+            s_canal = _sf(params["canal_supply_mm"]).copy()
+        else:
+            if "upstream_season_rain" not in scen:
+                raise KeyError("water_source='canal_and_well' needs scen['upstream_season_rain'] shaped [S,4] "
+                               "(from engine.fetch_upstream); it is missing")
+            up = np.asarray(scen["upstream_season_rain"], float)
+            med_up = params.get("median_upstream_rain")
+            med_up = float(np.median(up)) if med_up is None else float(med_up)
+            s_canal = A(params, "rice_irrigation.base_canal") * (
+                np.maximum(up, 0.0) / max(med_up, 1e-9)) ** A(params, "rice_irrigation.k_canal")
+        if params.get("well_supply_mm") is not None:
+            s_well = _sf(params["well_supply_mm"]).copy()
+        else:
+            med_loc = params.get("median_local_rain")
+            med_loc = float(np.median(rice_rain)) if med_loc is None else float(med_loc)
+            s_well = np.minimum(A(params, "rice_irrigation.max_well"),
+                                A(params, "rice_irrigation.base_well") *
+                                (np.maximum(rice_rain, 0.0) / max(med_loc, 1e-9)) ** A(params, "rice_irrigation.k_well"))
+        avail_c, avail_w = np.maximum(s_canal, 0.0), np.maximum(s_well, 0.0)
+    elif source == "canal":
+        # proxy for canal water availability: driven by a canal release factor, NOT local rain
+        cf = np.asarray(params.get("canal_release_factor", A(params, "rice_irrigation.canal_release_factor")), float)
+        f = np.maximum(cf, 0.0) ** float(A(params, "rice_irrigation.canal_exponent_k"))
+        if f.ndim == 1:
+            f = f[:, None]
+        avail_c, avail_w = base * np.broadcast_to(f, (S, 4)), zeros
+    else:   # simplified local-rainfall recharge proxy (well-like)
+        avail_c, avail_w = zeros, base * (np.maximum(rice_rain, 0.0) / max(med, 1e-9)) ** k
 
     keys3 = ("yield_kg_ha", "eta_mm", "etm_mm", "rain_mm", "irrig_mm", "irrig_needed_mm", "runoff_mm",
              "drainage_mm", "puddle_mm", "rain_total_mm", "eta_total_mm", "runoff_total_mm",
-             "drainage_total_mm", "irrig_total_mm")
+             "drainage_total_mm", "irrig_total_mm", "irrig_canal_mm", "irrig_well_mm",
+             "supply_canal_mm", "supply_well_mm")
     res = {kk: np.zeros((R, S, 4)) for kk in keys3}
     rec_on = bool(params.get("record_daily"))
     daily = {n: np.zeros((R, S, 4, NDAY)) for n in ("dr", "ks", "eta", "need")} if rec_on else None
@@ -186,21 +230,29 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
             kc = c.kc_curve()[:n]
             taw = awc * c.root_depth_m
             if cid == "rice":
-                supply = np.broadcast_to(avail[:, y], (g, S)).copy()
+                supply = np.broadcast_to(avail_c[:, y], (g, S)).copy()
+                well = np.broadcast_to(avail_w[:, y], (g, S)).copy()
                 need_p = np.maximum(pud, d)                          # land prep + saturate soil
-                irr_p = np.minimum(need_p, supply)
-                supply = supply - irr_p
+                ip_c = np.minimum(need_p, supply)
+                ip_w = np.minimum(need_p - ip_c, well)
+                irr_p = ip_c + ip_w
+                supply = supply - ip_c
+                well = well - ip_w
                 fill = np.minimum(d, irr_p)
                 d = d - fill
                 dp_all += irr_p - fill                               # puddling water beyond soil fill leaves as drainage
                 irr_all += irr_p
                 inv = 1.0 / ((1.0 - c.p) * taw)
-                d, o = _rice_phase(d, et0[:, y, a:b].T, precip[:, y, a:b].T, supply, kc, perc, hmax,
+                d, o = _rice_phase(d, et0[:, y, a:b].T, precip[:, y, a:b].T, supply, well, kc, perc, hmax,
                                    taw, inv, dcol, rec, a)
                 eta_all += o["eta"]; dp_all += o["dp"]; ro_all += o["ro"]; irr_all += o["irr"]
                 res["eta_mm"][idx, :, y] = o["eta"]
                 res["etm_mm"][idx, :, y] = o["etm"]
                 res["irrig_mm"][idx, :, y] = irr_p + o["irr"]
+                res["irrig_canal_mm"][idx, :, y] = ip_c + o["irr_c"]
+                res["irrig_well_mm"][idx, :, y] = ip_w + o["irr_w"]
+                res["supply_canal_mm"][idx, :, y] = avail_c[:, y]
+                res["supply_well_mm"][idx, :, y] = avail_w[:, y]
                 res["irrig_needed_mm"][idx, :, y] = need_p + o["need"]
                 res["puddle_mm"][idx, :, y] = need_p
                 res["runoff_mm"][idx, :, y] = o["ro"]

@@ -26,11 +26,15 @@ URL = "https://rest.isric.org/soilgrids/v2.0/properties/query"
 DEPTHS = [("0-5cm", 50), ("5-15cm", 100), ("15-30cm", 150), ("30-60cm", 300), ("60-100cm", 400)]  # mm thick
 PROPS = ["wv0033", "wv1500", "sand", "silt", "clay"]
 STAT = ["mean", "Q0.05", "Q0.95"]
-# FAO-56 Table 19 (Allen et al. 1998) total available water, mm per m of soil, mid-point of range.
-# Values here are team-entered mid-points of the FAO-56 Table 19 ranges (TEAM TO VERIFY against the table).
-FAO56_AWC_MM_PER_M = {"sand": 80, "loamy sand": 90, "sandy loam": 110, "loam": 130,
-                      "silt loam": 150, "clay loam": 140, "silty clay loam": 150, "clay": 160, "silty clay": 160,
-                      "sandy clay": 140, "sandy clay loam": 125, "silt": 150}
+# FAO-56 Table 19 (Allen et al. 1998, Chapter 7, https://www.fao.org/4/x0490e/x0490e0c.htm,
+# read 2026-11-14): theta_FC - theta_WP ranges (m3/m3) -> mm per m is x1000; values below are the
+# range MID-POINTS. Table 19 lists: sand .05-.11, loamy sand .06-.12, sandy loam .11-.15,
+# loam .13-.18, silt loam .13-.19, silt .16-.20, silt clay loam .13-.18, silty clay .13-.19,
+# clay .12-.20. Classes not in the table (sandy clay, clay loam, sandy clay loam) use the nearest
+# listed class (assumption).
+FAO56_AWC_MM_PER_M = {"sand": 80, "loamy sand": 90, "sandy loam": 130, "loam": 155,
+                      "silt loam": 160, "silt": 180, "silty clay loam": 155, "silty clay": 160,
+                      "clay": 160, "clay loam": 155, "sandy clay loam": 130, "sandy clay": 140}
 HSG = {"sand": "A", "loamy sand": "A", "sandy loam": "B", "loam": "B", "silt loam": "B", "silt": "B",
        "sandy clay loam": "C", "clay loam": "C", "silty clay loam": "C", "sandy clay": "D",
        "silty clay": "D", "clay": "D"}
@@ -129,6 +133,50 @@ def get_soil(lat: float, lon: float) -> dict:
                 pixel_offset_km=round(off, 2),
                 awc_low_pm25=round(awc * 0.75, 1), awc_high_pm25=round(awc * 1.25, 1),
                 band_note="awc_low/high are the (very wide) SoilGrids 5-95% prediction band; awc_*_pm25 is a +-25% assumption alternative")
+
+
+def farm_soil(lat: float | None = None, lon: float | None = None) -> dict:
+    """The farm's own soil (farmer input: black soil / vertisol) with a cited AWC range from
+    config/farm.yaml, plus a note comparing it with SoilGrids at the district centroid.
+    No place or person names are stored or returned."""
+    import yaml
+    cfg = yaml.safe_load((ROOT / "config" / "farm.yaml").read_text())["soil"]
+    rng = cfg.get("awc_range_mm_per_m")
+    out = dict(display_name=cfg.get("display_name", "Black soil (farm input)"))
+    if not rng:
+        out.update(awc_low=None, awc_mid=None, awc_high=None, badge="assumption",
+                   source="team to verify (no AWC range in config/farm.yaml)")
+        return out
+    lo, hi = float(rng[0]), float(rng[1])
+    src = str(cfg.get("awc_source") or "team to verify")
+    out.update(awc_low=lo, awc_high=hi, awc_mid=round((lo + hi) / 2, 1), source=src,
+               badge="local" if "team to verify" not in src.lower() else "assumption",
+               awc_note="soil type is a farmer input (local); the AWC range is literature, not measured on the farm",
+               fao56_clay_range_mm_per_m=[120, 200])
+    if lat is None:
+        try:
+            r = yaml.safe_load((ROOT / "config" / "region.yaml").read_text())
+            lat, lon = r["lat"], r["lon"]
+        except Exception:
+            return out
+    sg = get_soil(lat, lon)
+    clay = sg.get("clay_pct")
+    clayey = (clay is not None and clay >= 35) or sg["hydrologic_group"] in ("C", "D")
+    in_rng = lo <= sg["awc_mm_per_m"] <= hi
+    if clayey and in_rng:
+        verdict = "agrees"
+    elif clayey:
+        verdict = "agrees on texture, AWC below the vertisol range"
+    else:
+        verdict = "disagrees strongly"
+    out["soilgrids_comparison"] = dict(
+        verdict=verdict, soilgrids_texture=sg["texture"], soilgrids_clay_pct=clay,
+        soilgrids_hydrologic_group=sg["hydrologic_group"], soilgrids_awc_mm_per_m=sg["awc_mm_per_m"],
+        note=(f"SoilGrids at the district centroid: {sg['texture']}, clay {clay}%, group "
+              f"{sg['hydrologic_group']}, AWC {sg['awc_mm_per_m']} mm/m (district estimate, 250 m model). "
+              f"Black soil (cracking clay) AWC range {lo:.0f}-{hi:.0f} mm/m: {verdict}. "
+              "Keep SoilGrids as the district estimate; the farm soil is shown separately."))
+    return out
 
 
 if __name__ == "__main__":

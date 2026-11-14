@@ -14,13 +14,46 @@ import pandas as pd
 
 from engine import economics
 
-CROPS = list(economics.CROPS)
-REF = {"A": ["rice"] * 4, "B": ["rice", "jowar", "rice", "jowar"], "C": ["rice", "pigeonpea", "jowar", "rice"]}
-ALL_PLANS = [list(p) for p in itertools.product(CROPS, repeat=4)]
+BASELINE_ID = "A"
+CROPS: list = []
+MILLETS: list = []
+REF: dict = {}
+ALL_PLANS: list = []
+SELECTION_SOURCE = ""
+_SEL_MTIME = None
 
+
+def configure(millets=None, region_path=None):
+    """Set the crop universe from config/region.yaml `crop_selection.millets` (or an explicit list).
+    CROPS = rice, pigeonpea + selected millets. A = rice x4 (baseline), B = rice,M,rice,M, C = rice,pigeonpea,M,rice."""
+    global CROPS, MILLETS, REF, ALL_PLANS, SELECTION_SOURCE, _SEL_MTIME
+    import yaml
+    from pathlib import Path
+    rp = Path(region_path) if region_path else Path(__file__).resolve().parent.parent / "config" / "region.yaml"
+    if millets is None:
+        mt = rp.stat().st_mtime if rp.exists() else None
+        if CROPS and mt == _SEL_MTIME:
+            return
+        _SEL_MTIME = mt
+        sel = ((yaml.safe_load(open(rp)) or {}).get("crop_selection") or {}) if rp.exists() else {}
+        millets = list(sel.get("millets") or [])
+        if not millets:
+            raise ValueError("config/region.yaml has no crop_selection.millets; india-data must fill it (no default crop is assumed)")
+        SELECTION_SOURCE = "config/region.yaml crop_selection"
+    else:
+        SELECTION_SOURCE = "explicit"
+    m = millets[0]
+    MILLETS = list(millets)
+    CROPS = ["rice", "pigeonpea"] + MILLETS
+    REF = {"A": ["rice"] * 4, "B": ["rice", m, "rice", m], "C": ["rice", "pigeonpea", m, "rice"]}
+    ALL_PLANS = [list(p) for p in itertools.product(CROPS, repeat=4)]
+
+
+configure()
 _SIM = None
 _SIM_CACHE: dict = {}
 _ARR_CACHE: dict = {}
+SIM_PARAMS: dict = {}       # passed to simulate_batch (water_source, median_season_rain_mm, ...)
 
 
 def set_simulator(fn):
@@ -54,26 +87,62 @@ def worst_fraction_mean(x: np.ndarray, frac: float = 0.10) -> float:
 
 
 def prefetch(plans, scenset, awc: float, irr: float) -> None:
-    """Simulate all not-yet-cached plans in ONE batched call (waterbalance.simulate_batch)."""
+    prefetch_multi(plans, [scenset], awc, irr)
+
+
+def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
+    """Simulate every missing (plan, scenario set) in ONE simulate_batch call by concatenating the
+    scenario sets along the scenario axis. Needs a fixed median_season_rain_mm in SIM_PARAMS so that
+    concatenation does not change the rice water-availability scaling."""
     if _SIM is not None:          # test stand-in: per-plan simulator
         return
     todo, seen = [], set()
-    for p in plans:
-        k = _sim_key(p, scenset, awc, irr)
-        if k not in _SIM_CACHE and k not in seen:
-            seen.add(k); todo.append(list(p))
+    for ss in scensets:
+        for p in plans:
+            if _sim_key(p, ss, awc, irr) not in _SIM_CACHE and tuple(p) not in seen:
+                seen.add(tuple(p)); todo.append(list(p))
     if not todo:
         return
     from engine.waterbalance import simulate_batch
-    res = simulate_batch(scenset.scen, todo, float(awc), float(irr))
-    for r, p in enumerate(todo):
-        _SIM_CACHE[_sim_key(p, scenset, awc, irr)] = {k: (v[r] if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
-                                                      for k, v in res.items()}
+    keys = ["et0", "precip", "tmax"] + (["upstream_season_rain"] if all("upstream_season_rain" in ss.scen for ss in scensets) else [])
+    cat = {k: np.concatenate([ss.scen[k] for ss in scensets]) for k in keys}
+    res = simulate_batch(cat, todo, float(awc), float(irr), params_for(irr))
+    off = 0
+    for ss in scensets:
+        n = ss.n
+        for r, p in enumerate(todo):
+            _SIM_CACHE[_sim_key(p, ss, awc, irr)] = {
+                k: (v[r, off:off + n] if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
+                for k, v in res.items() if k not in ("plans", "daily")}
+        off += n
+
+
+SPLIT: dict = {}            # {"base_canal": .., "base_well": ..}: how the irrigation slider is split in canal_and_well mode
+
+
+def set_sim_params(split=None, **kw):
+    SIM_PARAMS.clear()
+    SIM_PARAMS.update({k: v for k, v in kw.items() if v is not None})
+    SPLIT.clear()
+    SPLIT.update(split or {})
+
+
+def params_for(irr: float) -> dict | None:
+    """simulate_batch params for a given irrigation level. In canal_and_well mode physics ignores the
+    irrigation argument, so the slider (total base supply, mm) scales base_canal and base_well in their
+    assumption ratio (rain linkage kept). Explicit canal_supply_mm / well_supply_mm stay as fixed overrides."""
+    prm = dict(SIM_PARAMS)
+    if prm.get("water_source") == "canal_and_well" and SPLIT:
+        tot = SPLIT["base_canal"] + SPLIT["base_well"]
+        prm["base_canal"] = float(irr) * SPLIT["base_canal"] / tot
+        prm["base_well"] = float(irr) * SPLIT["base_well"] / tot
+    return prm or None
 
 
 def _sim_key(plan, scenset, awc, irr):
     # irrigation only matters when the plan contains rice: drop it from the key otherwise
-    return (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4) if "rice" in plan else None)
+    return (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4) if "rice" in plan else None,
+            tuple(sorted(SIM_PARAMS.items())))
 
 
 def sim_plan(plan, scenset, awc: float, irr: float) -> dict:
@@ -98,7 +167,9 @@ def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dic
              "stress": (np.asarray(sim["etm_mm"]) - np.asarray(sim["eta_mm"])).sum(1),
              "irrig": np.asarray(sim["irrig_mm"]).sum(1),
              "total": (np.asarray(sim["rain_mm"]) + np.asarray(sim["irrig_mm"])).sum(1),
-             "yield": np.asarray(sim["yield_kg_ha"]), "eco": eco}
+             "yield": np.asarray(sim["yield_kg_ha"]), "eco": eco,
+             "irrig_canal": (np.asarray(sim["irrig_canal_mm"]).sum(1) if "irrig_canal_mm" in sim else None),
+             "irrig_well": (np.asarray(sim["irrig_well_mm"]).sum(1) if "irrig_well_mm" in sim else None)}
         _ARR_CACHE[key] = a
     return a
 
@@ -106,7 +177,9 @@ def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dic
 def metrics(a: dict) -> dict:
     return {"mean_profit": float(a["profit"].mean()), "worst10_profit": worst_fraction_mean(a["profit"]),
             "water_stress_mm": float(a["stress"].mean()), "irrigation_mm": float(a["irrig"].mean()),
-            "total_water_mm": float(a["total"].mean())}
+            "total_water_mm": float(a["total"].mean()),
+            "irrigation_canal_mm": float("nan") if a.get("irrig_canal") is None else float(a["irrig_canal"].mean()),
+            "irrigation_well_mm": float("nan") if a.get("irrig_well") is None else float(a["irrig_well"].mean())}
 
 
 def objective(mean, worst10, stress, lam, w, scale):
@@ -139,7 +212,26 @@ def rescore(df: pd.DataFrame, lam, w, scale=None) -> pd.DataFrame:
     df["J"] = objective(df.mean_profit, df.worst10_profit, df.water_stress_mm, lam, w, scale)
     df["rank"] = df.J.rank(ascending=False, method="first").astype(int)
     df["on_frontier"] = pareto_mask(df.mean_profit.values, df.worst10_profit.values)
+    return add_deltas(df)
+
+
+DELTA_FIELDS = {"mean_profit": "d_mean_profit", "worst10_profit": "d_worst10_profit", "total_water_mm": "d_total_water_mm",
+                "irrigation_mm": "d_irrigation_mm", "water_stress_mm": "d_water_stress_mm"}
+
+
+def add_deltas(df: pd.DataFrame) -> pd.DataFrame:
+    """Columns d_* = value minus rotation A (rice x4, our farm today, the baseline)."""
+    base = df[df.id == plan_id(REF[BASELINE_ID])]
+    if base.empty:
+        return df
+    b = base.iloc[0]
+    for src, dst in DELTA_FIELDS.items():
+        df[dst] = df[src] - b[src]
     return df
+
+
+def delta_vs_baseline(row) -> dict:
+    return {dst: float(row[dst]) for dst in DELTA_FIELDS.values() if dst in row}
 
 
 def pareto_mask(x, y) -> np.ndarray:
@@ -179,12 +271,12 @@ def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price
         p_beat = float((arr["profit"] >= top_arr["profit"]).mean())
         p_loss = float((arr["profit"] < 0).mean())
         credit = float(np.sum(economics.n_credit_kg_ha(plan)))
-        ev = {"rank_of_256": int(row["rank"]), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
+        ev = {"rank_of_256": int(row["rank"]), "n_rotations": int(len(df)), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
               "worst10_profit_rs_acre": float(row.worst10_profit), "water_stress_mm": float(row.water_stress_mm),
               "irrigation_mm": float(row.irrigation_mm), "total_water_mm": float(row.total_water_mm),
               "share_of_scenarios_at_least_as_profitable_as_recommended": p_beat,
               "share_of_scenarios_with_loss": p_loss, "n_credit_kg_ha_over_plan": credit,
-              "n_scenarios": int(scenset.n)}
+              "n_scenarios": int(scenset.n), "delta_vs_baseline": delta_vs_baseline(row), "baseline_id": BASELINE_ID}
         if row.id == top.id:
             why = (f"Ranked 1 of {len(df)} on the objective J (lam={params['lam']:.2f}, w={params['w']:.2f}): "
                    f"mean {row.mean_profit:,.0f} Rs/acre, worst-10% {row.worst10_profit:,.0f} Rs/acre, "

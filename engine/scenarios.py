@@ -44,11 +44,13 @@ class ScenSet:
     def n(self) -> int:
         return self.scen["precip"].shape[0]
 
-    def derive(self, rain_mult: float = 1.0, dT: float = 0.0, shift_days: int = 0) -> "ScenSet":
-        if rain_mult == 1.0 and dT == 0.0 and shift_days == 0:
+    def derive(self, rain_mult: float = 1.0, dT: float = 0.0, shift_days: int = 0,
+               upstream_mult: float = 1.0) -> "ScenSet":
+        if rain_mult == 1.0 and dT == 0.0 and shift_days == 0 and upstream_mult == 1.0:
             return self
-        return ScenSet(self.key + (("wi", round(float(rain_mult), 4), round(float(dT), 4), int(shift_days)),),
-                       apply_whatif(self.scen, rain_mult, dT, shift_days), WHATIF_LABEL)
+        return ScenSet(self.key + (("wi", round(float(rain_mult), 4), round(float(dT), 4), int(shift_days),
+                                    round(float(upstream_mult), 4)),),
+                       apply_whatif(self.scen, rain_mult, dT, shift_days, upstream_mult=upstream_mult), WHATIF_LABEL)
 
     def subset(self, n: int) -> "ScenSet":
         n = min(n, self.n)
@@ -57,9 +59,11 @@ class ScenSet:
 
 
 # ---------------------------------------------------------------- annual data
-def annual_from_arrays(years, et0, precip, tmax) -> dict:
+def annual_from_arrays(years, et0, precip, tmax, upstream=None) -> dict:
+    """upstream = Jun-Oct season rain (mm) upstream of Nagarjuna Sagar per year, or None if not available."""
     return {"years": np.asarray(years), "et0": np.asarray(et0, float),
-            "precip": np.asarray(precip, float), "tmax": np.asarray(tmax, float)}
+            "precip": np.asarray(precip, float), "tmax": np.asarray(tmax, float),
+            "upstream": None if upstream is None else np.asarray(upstream, float)}
 
 
 def annual_from_daily(weather, et0_daily_arr) -> dict:
@@ -77,6 +81,21 @@ def annual_from_daily(weather, et0_daily_arr) -> dict:
                               mat(weather["tmax"].to_numpy()))
 
 
+def load_upstream_for(years):
+    """Upstream (upper Krishna basin) season rain aligned to `years`, from engine.fetch_upstream.
+    Returns (array [Y] or None, note)."""
+    try:
+        from engine import fetch_upstream
+        df = fetch_upstream.load_upstream_season_rain()
+    except Exception as e:      # module absent or data not cached yet
+        return None, f"upstream rain unavailable ({type(e).__name__}: {e})"
+    d = df.set_index("year")["mean_season_rain_mm"] if "year" in df.columns else df["mean_season_rain_mm"]
+    missing = [int(y) for y in years if int(y) not in d.index]
+    if missing:
+        return None, f"upstream rain missing for years {missing[:5]}..."
+    return np.array([float(d.loc[int(y)]) for y in years]), "NASA POWER upstream points (engine.fetch_upstream)"
+
+
 @lru_cache(maxsize=4)
 def load_annual(lat: float | None = None, lon: float | None = None) -> dict:
     """Real weather -> annual arrays. Needs engine.fetch_power and engine.et0 (other agents)."""
@@ -87,7 +106,9 @@ def load_annual(lat: float | None = None, lon: float | None = None) -> dict:
     lon = float(lon if lon is not None else reg.get("lon", 78.5))
     elev = float(reg.get("elevation_m", 0.0) or 0.0)
     w = fetch_power.load_weather(lat, lon)
-    return annual_from_daily(w, et0.et0_daily(w, lat, elev))
+    a = annual_from_daily(w, et0.et0_daily(w, lat, elev))
+    a["upstream"], a["upstream_note"] = load_upstream_for(a["years"])
+    return a
 
 
 # ------------------------------------------------------------ seasonal stats
@@ -117,6 +138,8 @@ def _take(annual, idx) -> dict:
 
 def make_scen(annual: dict, idx: np.ndarray, labels: list[str]) -> dict:
     s = _take(annual, idx)
+    if annual.get("upstream") is not None:
+        s["upstream_season_rain"] = np.asarray(annual["upstream"])[np.asarray(idx)]      # [S,4] mm
     s["labels"] = list(labels)
     s["year_idx"] = np.asarray(idx)
     return s
@@ -158,6 +181,11 @@ def stress_tests(annual: dict) -> dict:
         ("latest monsoon onset in year 1", int(np.argmax(on)), 1,
          lambda i: f"onset proxy on day {on[i]+1} of {yrs[i]} (first 7-day rain >= 50 mm after 15 May), median day {int(np.median(on))+1}"),
     ]
+    if annual.get("upstream") is not None:
+        up = annual["upstream"]
+        picks.append(("low canal release year", int(np.argmin(up)), 2,
+                      lambda i: f"lowest upstream (upper Krishna basin) Jun-Oct rain {up[i]:.0f} mm in {yrs[i]}, record median {np.median(up):.0f} mm; "
+                                f"proxy for canal releases, actual releases depend on reservoir operations"))
     out = {}
     for name, i, py, desc in picks:
         row = [med_year] * PLAN_YEARS
@@ -185,7 +213,7 @@ def shift_june_july(precip: np.ndarray, n_days: int) -> np.ndarray:
 
 
 def apply_whatif(scen: dict, rain_mult: float = 1.0, dT: float = 0.0, shift_days: int = 0,
-                 et0_per_degc: float = ET0_PER_DEGC) -> dict:
+                 et0_per_degc: float = ET0_PER_DEGC, upstream_mult: float = 1.0) -> dict:
     """Return a copy with rain scaled, temperature raised by dT, ET0 scaled by (1+k*dT),
     and Jun-Jul rain shifted later. Labelled as what-if, not forecast."""
     out = dict(scen)
@@ -193,6 +221,24 @@ def apply_whatif(scen: dict, rain_mult: float = 1.0, dT: float = 0.0, shift_days
     out["precip"] = p
     out["tmax"] = scen["tmax"] + float(dT)
     out["et0"] = scen["et0"] * (1.0 + et0_per_degc * float(dT))
-    out["whatif"] = {"rain_mult": float(rain_mult), "dT": float(dT), "shift_days": int(shift_days),
+    if "upstream_season_rain" in scen:      # independent of the local multiplier
+        out["upstream_season_rain"] = np.asarray(scen["upstream_season_rain"]) * float(upstream_mult)
+    out["whatif"] = {"rain_mult": float(rain_mult), "upstream_mult": float(upstream_mult), "dT": float(dT), "shift_days": int(shift_days),
                      "label": WHATIF_LABEL, "et0_scaling": ET0_PER_DEGC_NOTE}
     return out
+
+
+def upstream_median(scen: dict):
+    u = scen.get("upstream_season_rain")
+    return None if u is None else float(np.median(u))
+
+
+def median_year_scenario(annual: dict) -> ScenSet:
+    """One scenario: the median-monsoon real year repeated for all 4 plan years (base for the canal what-if)."""
+    mr = monsoon_rain(annual)
+    i = int(np.argsort(np.abs(mr - np.median(mr)))[0])
+    return ScenSet(("medyear", int(annual["years"][i])), make_scen(annual, np.array([[i] * PLAN_YEARS]),
+                   [f"median-monsoon year {int(annual['years'][i])} x4"]), "median real year repeated")
+
+
+CANAL_LOW_RELEASE_FACTOR = 0.5   # what-if multiplier on available irrigation; assumption, team to verify; NOT release data

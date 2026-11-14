@@ -71,3 +71,25 @@ def bullets(title: str, items) -> str:
     if not items:
         return ""
     return f'<div class="sub">{title}</div><ul>' + "".join(f"<li>{html.escape(str(i))}</li>" for i in items) + "</ul>"
+
+
+def srcline(text: str, label: str = "Source") -> None:
+    md(f'<p class="rl-srcline"><b>{label}:</b> {html.escape(text)}</p>')
+
+
+def delta_html(v, fmt="{:,.0f}", unit="", good_when_up=True) -> str:
+    """Signed difference from baseline. Sign is shown in text so colour is never the only cue."""
+    if v is None:
+        return "n/a"
+    if abs(v) < 0.5:
+        return f'<span class="rl-delta">same</span>'
+    up = v > 0
+    good = up == good_when_up
+    sign = "+" if up else "-"
+    return f'<span class="rl-delta {"up" if good else "dn"}">{sign}{fmt.format(abs(v))}{unit}</span>'
+
+
+def table(headers: list[str], rows: list[list[str]]) -> None:
+    th = "".join(f"<th>{h}</th>" for h in headers)
+    tr = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
+    md(f'<div class="rl-tblwrap"><table class="rl-t"><thead><tr>{th}</tr></thead><tbody>{tr}</tbody></table></div>')

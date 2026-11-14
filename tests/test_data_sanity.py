@@ -83,8 +83,15 @@ def test_describe(wx):
 
 
 def test_region_config():
-    assert REGION["district"] == "TEAM_TO_FILL" and REGION["dev_placeholder"] is True
-    assert REGION["icrisat_district"] == "TEAM_TO_FILL" and REGION["country"] == "India"
+    assert REGION["district"] == "Nalgonda" and REGION["state"] == "Telangana" and REGION["country"] == "India"
+    assert "dev_placeholder" not in REGION
+    assert REGION["icrisat_district"] == "Nalgonda" and REGION["water_source"] == "canal_and_well"
+    assert REGION["centroid_source"]
+    assert 16 < REGION["lat"] < 18 and 78.5 < REGION["lon"] < 80  # inside the district bbox (OSM)
+
+
+def test_elevation_matches_cache(wx):
+    assert wx.attrs["elevation_m"] == REGION["elevation_m"]
 
 
 def test_gibs_layers_file():
@@ -93,3 +100,54 @@ def test_gibs_layers_file():
         pid = g["primary"][key]
         assert pid
         assert any(l["id"] == pid and l["verified_tile"]["status"] == 200 for l in g["layers"][key])
+
+
+# ---- upstream Krishna basin points (iteration 3) ----
+from engine import fetch_upstream  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def up():
+    return fetch_upstream.load_upstream_season_rain()
+
+
+def test_upstream_points_config():
+    assert REGION["water_source"] == "canal_and_well"
+    pts = REGION["upstream_points"]
+    assert 3 <= len(pts) <= 5
+    for p in pts:
+        assert p["name"] and p["reason"] and p["source"]
+        assert p["lon"] < 79.31  # west of Nagarjuna Sagar (the river flows east)
+
+
+def test_upstream_shape_and_years(up):
+    assert len(up) == 42 and list(up["year"]) == list(range(1984, 2026))
+    assert list(up.columns[:2]) == ["year", "mean_season_rain_mm"]
+    assert len(up.columns) == 2 + len(REGION["upstream_points"])
+
+
+def test_upstream_no_nan_or_missing(up):
+    assert not up.isna().any().any()
+    assert not (up == -999).any().any()
+
+
+def test_upstream_cached_raw_has_no_unhandled_missing():
+    for p in REGION["upstream_points"]:
+        raw = json.loads(fetch_power.cache_path(p["lat"], p["lon"]).read_text())
+        par = raw["properties"]["parameter"]
+        for k, v in par.items():
+            n = sum(x == -999 for x in v.values())
+            assert n == (1095 if k == "ALLSKY_SFC_SW_DWN" else 0), (p["name"], k, n)
+
+
+def test_upstream_season_totals_plausible(up):
+    pcols = up.columns[2:]
+    assert up[pcols].min().min() > 100 and up[pcols].max().max() < 4000  # mm per Jun-Oct season
+    assert up["mean_season_rain_mm"].between(300, 1500).all()
+    assert np.allclose(up["mean_season_rain_mm"], up[pcols].mean(axis=1))
+
+
+def test_lowest_upstream_year(up):
+    y, v = fetch_upstream.lowest_upstream_year(up)
+    assert y in set(up["year"]) and v == up["mean_season_rain_mm"].min()
+    assert y == 2015

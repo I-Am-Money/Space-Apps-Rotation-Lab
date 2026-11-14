@@ -1,0 +1,18 @@
+# Farm facts supplied by the farm owner. Badge: local (farmer input).
+# Privacy rule: no village name and no team member names anywhere in the app or repo.
+farm:
+  label: "A rice farm in Nalgonda, Telangana"
+  acres: 40
+  acres_badge: local
+  current_crop: rice          # rice only today; rotation A (rice x4) is the baseline
+soil:
+  type: black                 # cracking clay, vertisol-type (farmer input)
+  type_badge: local
+  display_name: "Black soil (farm input)"
+  # SoilGrids values at the district centroid stay as the district-level estimate.
+  # If SoilGrids disagrees strongly with a black soil, keep SoilGrids for the district
+  # and show the farm soil as "Black soil (farm input)" with the AWC range below.
+  awc_range_mm_per_m: [145, 380]   # Indian Vertisols, upper 1 m (mm per m); FAO-56 Table 19 Clay 120-200 as cross-check
+  awc_source: "Mandal et al. 2013, Int. J. Plant Production 7(3), https://j.gau.ac.ir/article_1114_f275ecc4f56af699b45a91ab995fb3ef.pdf (text: AWC of these Vertisols 145 to 380 mm for the upper one-meter depth, citing Gupta et al. 1991; primary Gupta table not opened, team to verify the range for the local soil series). Cross-check: FAO-56 Table 19, Clay theta_FC-theta_WP 0.12-0.20 m3/m3 = 120-200 mm/m, https://www.fao.org/4/x0490e/x0490e0c.htm. Accessed 2026-11-14."
+units:
+  m3_per_acre_per_mm: 4.0469  # 1 mm of water over 1 acre = 4046.86 m2 * 0.001 m

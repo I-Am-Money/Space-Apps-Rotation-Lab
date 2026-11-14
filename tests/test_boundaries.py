@@ -51,10 +51,10 @@ def test_hindcast_machinery_on_synthetic_observed():
     from engine import hindcast as hc
     a = api.annual()
     yrs = a["years"]
-    mod = hc.model_single_season(a, "jowar", 140.0, 400.0)
-    obs = pd.DataFrame({"year": yrs, "crop": "jowar", "yield_kg_ha": mod * 0.9 + 20 * (yrs - yrs[0])})
+    mod = hc.model_single_season(a, opt.MILLETS[0], 140.0, 400.0)
+    obs = pd.DataFrame({"year": yrs, "crop": opt.MILLETS[0], "yield_kg_ha": mod * 0.9 + 20 * (yrs - yrs[0])})
     h = hc.hindcast(a, 140.0, 400.0, observed=obs, farm=None)
-    c = h["per_crop"]["jowar"]
+    c = h["per_crop"][opt.MILLETS[0]]
     assert c["pearson_r"] > 0.99 and c["heldout_r"] > 0.9 and len(c["heldout_years"]) == 10
     assert h["farm_records"] is None
 
@@ -63,3 +63,13 @@ def test_hindcast_unavailable_is_honest():
     from engine import hindcast as hc
     h = hc.hindcast(api.annual(), 140.0, 400.0, observed=__import__("pandas").DataFrame(columns=["year", "crop", "yield_kg_ha"]), farm=None)
     assert not h["available"] and "fabricated" in h["note"]
+
+
+def test_upstream_local_grid_and_canal_well_split():
+    t = api.tipping_points({"irrigation_mm": 400})
+    g = t["grid_upstream_local"]
+    assert g["available"] and len(g["winner"]) == len(g["local_mult"]) and len(g["winner"][0]) == len(g["upstream_mult"])
+    assert g["text"] and "proxy" in g["text"]
+    c = api.compare(["A"], {"irrigation_mm": 400})
+    r = c["rotations"]["A"]
+    assert abs(r["irrigation_canal_mm"] + r["irrigation_well_mm"] - r["irrigation_mm"]) < 1e-6

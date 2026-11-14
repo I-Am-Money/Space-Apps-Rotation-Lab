@@ -11,8 +11,8 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 ASSUMPTIONS_PATH = ROOT / "config" / "assumptions.yaml"
 PRICES_PATH = ROOT / "config" / "prices_india.yaml"
-CROP_IDS = ("rice", "jowar", "bajra", "pigeonpea")
-MILLETS = ("jowar", "bajra")
+CROP_IDS = ("rice", "jowar", "bajra", "ragi", "pigeonpea")
+MILLETS = ("jowar", "bajra", "ragi")
 
 
 @lru_cache(maxsize=1)

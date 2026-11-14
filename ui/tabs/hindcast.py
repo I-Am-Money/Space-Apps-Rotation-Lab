@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from ui import charts, data
-from ui.components import badge, md, section, tab_head
+from ui.components import srcline, badge, md, section, tab_head
 from ui.data import CROP_LABEL, humanize, plan_label
 
 LIMITS_FILE = Path(__file__).resolve().parents[2] / "LIMITATIONS.md"
@@ -16,13 +16,14 @@ SOURCES = [
     ("NASA SMAP mission", "https://smap.jpl.nasa.gov/", "Opened in a browser."),
     ("NASA Earth Observatory, NDVI", "https://science.nasa.gov/earth/earth-observatory/measuring-vegetation-ndvi-evi/", "Opened in a browser: NDVI is the most common satellite measure of the density of plant growth."),
     ("FAO Paper 56, evapotranspiration", "https://www.fao.org/4/x0490e/x0490e04.htm", "Opened in a browser: evapotranspiration is water lost from soil by evaporation plus from the crop by transpiration."),
-    ("ICRISAT District Level Database", "https://data.icrisat.org/dld/", "Link taken from the project brief. The site did not load when checked, so this entry is unverified."),
+    ("ICRISAT Dataverse: District Level Data (DLD) and Dashboard for Agriculture and Allied-sectors in India", "https://doi.org/10.21421/D2/XFB1BZ", "Opened in a browser: the dataset page title matches (persistent id doi:10.21421/D2/XFB1BZ)."),
 ]
 
 
 def render():
     p = data.params()
-    h = data.hindcast(p)
+    with st.spinner(data.MSG["hindcast"]):
+        h = data.hindcast(p)
     b = "placeholder" if data.is_mock() else "modeled"
     tab_head("How Good Is This?", "A check of the model against what the district actually harvested, plus every assumption and limit in one place.")
     if h.get("note"):
@@ -31,12 +32,16 @@ def render():
     if not h.get("available") or not pc:
         md(f'<p>{badge("placeholder")} District yield data is not loaded, so the comparison is skipped. Nothing has been made up.</p>')
     else:
-        crop = st.radio("Crop", list(pc), format_func=CROP_LABEL.get, horizontal=True, key="hc_crop")
+        missing = [c for c in data.CROPS + ["ragi"] if c in h.get("per_crop", {}) and c not in pc]
+        if missing:
+            md('<div class="rl-nodata"><strong>No validation data</strong> for ' + ", ".join(CROP_LABEL.get(c, c.title()) for c in missing) + ". The Nalgonda yield record for these crops is missing or too short, so the model is not checked against them.</div>")
+        crop = st.segmented_control("Crop", list(pc), format_func=CROP_LABEL.get, default=list(pc)[0], key="hc_crop") or list(pc)[0]
         d = pc[crop]
         c1, c2 = st.columns([1.5, 1], gap="large")
         with c1:
             section("Model against district yields", b, "Each dot is a year, with the long-run trend removed from both. On the dotted line the model matches the district.")
             charts.show(charts.hindcast_scatter(d, crop), "hc")
+            srcline("District yields from ICRISAT against single-season model output, both detrended. District rice mixes irrigated and rainfed fields.", "Data source")
             if h.get("farm_records"):
                 md(f'{badge("local")} Your farm records were provided and are listed below.')
                 st.dataframe(pd.DataFrame(h["farm_records"]["rows"]), hide_index=True, use_container_width=True)
@@ -60,12 +65,17 @@ def render():
         bt["id"] = bt["id"].map(lambda i: plan_label(i) if "-" in str(i) else i)
         bt = bt.rename(columns=dict(strategy="Strategy", id="Rotation", mean_profit="Average profit (Rs per acre)", worst10_profit="Worst 10% (Rs per acre)",
                                     water_stress_mm="Water stress (mm)", irrigation_mm="Irrigation (mm)"))
+        num = [c for c in bt.columns if c not in ("Strategy", "Rotation")]
+        bt[num] = bt[num].round(0).astype(int)
         st.dataframe(bt, hide_index=True, use_container_width=True)
 
     section("Every assumption", None, "Each row says where its value comes from. Rows marked team to verify have no confirmed source yet.")
-    a = data.assumptions().copy()
-    a["value"] = a["value"].astype(str); a["range"] = a["range"].astype(str).replace({"None": ""})
-    st.dataframe(a.rename(columns=str.title), hide_index=True, use_container_width=True)
+    try:
+        a = data.assumptions().copy()
+        a["value"] = a["value"].astype(str); a["range"] = a["range"].astype(str).replace({"None": ""})
+        st.dataframe(a.rename(columns=str.title), hide_index=True, use_container_width=True)
+    except Exception as e:  # engine output changing under us: say so, never crash the page
+        md(f'<div class="rl-nodata">{badge("placeholder")} The assumptions table could not be built by the engine ({html.escape(type(e).__name__)}: {html.escape(str(e))}). The values are in <code>config/assumptions.yaml</code> and <code>config/prices_india.yaml</code>.</div>')
 
     section("Limitations")
     try:

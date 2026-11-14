@@ -1,0 +1,12 @@
+numpy
+pandas
+scipy
+streamlit
+plotly
+folium
+streamlit-folium
+requests
+pyyaml
+pytest
+anthropic
+xlrd

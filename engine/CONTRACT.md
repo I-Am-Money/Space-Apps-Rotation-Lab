@@ -3,7 +3,7 @@
 Governing docs: RotationLab Build Spec v2 (summarised in the lead's brief) + `SPEC_CHANGES_INDIA.md` (wins on conflicts). Read both first.
 
 ## Global rules
-- Python from `/Users/naveenkonreddy/Space-Apps-Rotation-Lab/.venv/bin/python`. Run tests with `.venv/bin/pytest`.
+- Python from `<repo>/.venv/bin/python`. Run tests with `.venv/bin/pytest`.
 - Stay inside the files you own (table below). Need a change elsewhere? Write it to `engine/REQUESTS.md` (append a line) instead of editing.
 - **Never invent data.** Every number is cached data, a computed value, user input, or an `assumptions.yaml`-style parameter with a `source` note. If you cannot verify a source, write `source: "literature range, team to verify"`. Missing real values get `badge: placeholder`.
 - Badges: `observed` (NASA/ICRISAT/MSP official data), `modeled`, `local` (soil data, farmer entry, farm_records.csv), `assumption`, `placeholder`.
@@ -61,3 +61,51 @@ Sliders must recompute in under ~1 s (vectorise; cache scenario arrays and per-r
 
 ## Frontend (consumes `engine.api`; until it exists use `engine/mock_api.py`)
 `mock_api.py` mirrors `engine/api.py` signatures exactly and returns clearly labelled `placeholder` data so the UI can be built and screenshotted now. `app.py` imports `engine.api` and falls back to `engine.mock_api` only when the real module raises ImportError, showing a visible banner when mock data is on screen.
+
+---
+# ITERATION 2 CHANGES (owner answers, 2026-11-14; these override anything above)
+
+1. **District = Nalgonda, Telangana.** ICRISAT match = the old pre-2016 Nalgonda district listed under Andhra Pradesh (the lineage must be verified from a primary source, not memory). Use the Nalgonda DISTRICT CENTROID (a sourced coordinate, cite where it comes from) for NASA POWER and the map. No village location. Remove `dev_placeholder` once the real centroid is in; re-fetch and cache POWER for it.
+2. **Our farm today is rice only.** Rotation **A = rice x4 = "our farm today", the BASELINE** every alternative is compared against. Alternatives use crops grown in Nalgonda:
+   - Millets: pick the one or two of jowar, bajra, ragi with the MOST COMPLETE Nalgonda yield record in ICRISAT (count years from the real data). Record the choice and year counts under `crop_selection:` in `config/region.yaml` (`millets: [..]`, `year_counts: {rice:, jowar:, bajra:, ragi:, pigeonpea:}`, `source`). Crop ids: `rice, jowar, bajra, ragi, pigeonpea`. Only the selected millets enter the candidate set (so 3 to 4 crops, 81 to 256 sequences).
+   - Legume: pigeonpea.
+   - B = rice, M, rice, M. C = rice, pigeonpea, M, rice. (M = the best millet.) `current_rotation` defaults to A.
+3. **Water source** is `water_source: unset | canal | borewell | tank` in `config/region.yaml` (default `unset`; the owner has NOT yet chosen, so the UI must say "confirm your rice water source"). Modes:
+   - `borewell` / `tank` / `unset`: local-rainfall recharge proxy as specified.
+   - `canal`: availability depends on Nagarjuna Sagar reservoir releases, NOT local rain. Keep the same formula shape but label it "proxy for canal water availability"; `base_available` and `k` editable. Add a named stress test **"low canal release year"**. Do not invent reservoir release numbers; if real release data cannot be sourced, the stress test is a labelled what-if multiplier on available water.
+   The water source is a `params` key: `water_source`.
+4. **ICRISAT**: try the ICRISAT Dataverse DOI 10.21421/D2/XFB1BZ (https://doi.org/10.21421/D2/XFB1BZ) first, in a real browser. If unreachable, say so; the owner will place the CSV in `data/raw/icrisat_dld/` by hand. NEVER use fake yields for validation. A crop with no Nalgonda yield data: hindcast shows "no validation data" in the UI and LIMITATIONS.md.
+5. **Framing**: the app opens on "A rice farm in Nalgonda, Telangana", rotation A preselected as baseline, and EVERY chart and table shows comparison to A (delta vs baseline). `engine.api` results carry `baseline_id: "A"` and per-rotation `delta_vs_baseline` fields (profit mean, worst10, water use, irrigation).
+
+File ownership is unchanged. `region.yaml`: nasa-data owns everything except the `crop_selection:` block, which india-data owns (use targeted edits; re-read before editing).
+
+---
+# ITERATION 3 CHANGES (owner update, 2026-11-14; overrides iteration 2 where they conflict)
+
+**Rice irrigation supply is now two sources.** `config/region.yaml: water_source: canal_and_well` (the older modes unset/borewell/tank/canal stay accepted for the selector, but `canal_and_well` is the default).
+```
+S = S_canal + S_well
+S_canal = base_canal * (upstream_rain / median_upstream_rain) ** k_canal
+S_well  = min(max_well, base_well * (local_rain / median_local_rain) ** k_well)
+Order of use: canal first; wells cover the shortfall, up to S_well. Total irrigation used never exceeds S.
+```
+- `upstream_rain` = Jun-Oct season rainfall averaged over 3 to 5 NASA POWER points in the upper Krishna basin, UPSTREAM of Nagarjuna Sagar. nasa-data picks the points (coordinates and reasons from primary sources, e.g. India-WRIS basin maps or the Krishna Water Disputes Tribunal / CWC basin description; no guessing), lists them in `config/region.yaml: upstream_points`, and caches the data like the Nalgonda data. New module `engine/fetch_upstream.py` with `load_upstream_season_rain() -> DataFrame[year, mean_season_rain_mm, one column per point]` (same 1984-2025 window, same -999 rules).
+- Labels: canal = "proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations." Wells = "simplified recharge proxy."
+- `config/assumptions.yaml` (physics owns): `base_canal, k_canal, base_well, k_well, max_well` with ranges and note "team to verify".
+- **Scenario arrays** gain `upstream_season_rain` shaped `[S, 4]` (mm, from fetch_upstream, aligned to the same years as each scenario; decision agent builds it). `median_upstream_rain` and `median_local_rain` are fixed at base climate, not rescaled by what-ifs.
+- **PlanResult** gains `[S,4]` arrays `irrig_canal_mm`, `irrig_well_mm` (their sum equals `irrig_mm`), plus `supply_canal_mm`, `supply_well_mm` `[S,4]`.
+- **params** gain `canal_supply_mm` and `well_supply_mm` overrides (None = use the formula).
+- **Named stress test** "low canal release year" = the real year with the lowest upstream rainfall, labelled with that year (replaces the x0.5 what-if for this water source).
+- **Tipping Points**: keep the rainfall multiplier x irrigation heat map, and ADD a second heat map: upstream rain multiplier (x) vs local rain multiplier (y), coloured by winning rotation. api key `tipping_points()["grid_upstream_local"] = {upstream_mult[], local_mult[], winner[][]}`.
+- **Compare Futures** reports canal water and well water separately per rotation (`irrigation_canal_mm`, `irrigation_well_mm`).
+- **Our Farm tab**: two overrides, canal supply and well supply (mm).
+- **LIMITATIONS**: canal releases are a rainfall proxy, not a reservoir model; groundwater depletion is not simulated.
+- **Tests (physics)**: S_canal and S_well never negative; S_well never exceeds max_well; less upstream rain never raises rice yield; less local rain never raises rice yield; wells are drawn only when canal falls short; total irrigation used never exceeds S.
+
+---
+# ITERATION 4 CHANGES (owner update, 2026-11-14)
+- **Farm facts live in `config/farm.yaml`** (lead-owned; read-only for agents): 40 acres, black soil (cracking clay, vertisol-type), rice only today. Display name for the soil: "Black soil (farm input)", badge `local`.
+- **Farm totals everywhere** (total profit, total irrigation water in m3 using `units.m3_per_acre_per_mm`, total water use) in addition to per-acre numbers. **Land-split slider**: "X of 40 acres in rice", the rest in the chosen alternative rotation; api `land_split(alt_id, params) -> {acres_rice[0..40], total_profit_mean, total_profit_worst10, total_irrigation_m3, ...}` with the baseline (40 acres rice) marked.
+- **Soil**: SoilGrids at the Nalgonda centroid stays as the district estimate. If it disagrees strongly with a black soil, keep SoilGrids for the district but show the farm soil as "Black soil (farm input)" with a cited black-soil AWC range (FAO-56 or a cited Indian vertisol source), badge `local`/`assumption`; else "team to verify".
+- **Paddy percolation_seepage** at the LOW end of its range (black soils drain slowly); AWC range high. Sourced or "team to verify".
+- **PRIVACY (hard rule)**: never store or show the village name or ANY team member name or email anywhere in the app, docs, code comments, data files or commit messages. Use "the farm" and "your farm".

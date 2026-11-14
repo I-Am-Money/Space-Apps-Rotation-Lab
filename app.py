@@ -16,14 +16,17 @@ theme.inject()
 data.init_state()
 
 p = data.params()
-rec = data.recommend(p)
+with st.spinner(data.MSG["recommend"]):
+    rec = data.recommend(p)
 top = rec["top"]
+base_plan = ["rice"] * 4
+same = top["plan"] == base_plan
 md(f"""<div class="rl-mast"><div>
 <div class="rl-brand">RotationLab</div>
-<h1>What should follow what, when water is short?</h1>
-<p class="lede">Compare four-year crop plans for rice, jowar, bajra and pigeon pea against decades of real weather, and see the water level where the best plan changes.</p>
-</div><div class="rl-plan"><p class="cap">Best plan for your current inputs {badge("placeholder" if data.is_mock() else "modeled")}</p>{ribbon(top["plan"])}
-</div></div>""")
+<h1>A rice farm in Nalgonda, Telangana</h1>
+<p class="lede">The farm grows rice every year today. Should some plots move to millets or pigeon pea when irrigation water is limited? Compare four-year plans against decades of real weather and find the water level where the answer changes.</p>
+</div><div class="rl-plan"><p class="cap">Our farm today (Rotation A, the baseline)</p>{ribbon(base_plan, True)}
+<p class="cap" style="margin-top:.8rem">{"Best plan for your inputs is the same as today" if same else "Best plan for your inputs"} {badge("placeholder" if data.is_mock() else "modeled")}</p>{"" if same else ribbon(top["plan"], True)}</div></div>""")
 banner = st.empty()
 md(f'<div class="rl-strip"><span><strong>{html.escape(JUDGMENT)}</strong></span><span>{html.escape(REGIONAL)}</span></div>')
 

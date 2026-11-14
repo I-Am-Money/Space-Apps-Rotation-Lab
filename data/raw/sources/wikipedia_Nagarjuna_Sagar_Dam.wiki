@@ -1,0 +1,184 @@
+{{Use dmy dates|date=September 2018}}
+{{Use Indian English|date=July 2015}}
+{{Infobox dam
+| name = Nagarjuna Sagar Dam
+| image = NagarjunaSagarDam.JPG
+| image_caption = Nagarjuna Sagar Dam
+| pushpin_caption = 
+| coordinates = {{coord|16|34|32|N|79|18|42|E|type:landmark|display=inline,title}}
+| location = [[Nalgonda district]], [[Telangana]] & [[Palnadu district]], [[Andhra Pradesh]]
+| pushpin_map = India Andhra Pradesh
+| pushpin_map_size = 200px
+| construction_began = {{start date|df=yes|1955|12|10}}
+| opening = {{start date and age|1967}}
+| cost = 132.32 crore rupees
+| dam_crosses = [[Krishna River]]
+| dam_height = {{convert|124|m|ft|0}} from the deepest river bed level
+| dam_length = {{convert|1550|m|ft|0}}
+| dam_width_base = 
+| purpose = [[Hydroelectric]] & [[Irrigation]]
+| res_name = Nagarjuna Sagar Reservoir
+| res_capacity_total = {{Convert|11.56|km3|e6acre.ft|0|abbr=on}}<br />(405 [[Tmcft]])
+| res_capacity_active = {{Convert|6.92|km3}} (244.41 Tmcft)<ref name= damre>{{cite web|title=India: National Register of Large Dams 2009|url=http://www.cwc.nic.in/main/downloads/National%20Register%20of%20Large%20Dams%202009.pdf|publisher=Central Water Commission|access-date=7 August 2011|archive-url=https://web.archive.org/web/20110721165130/http://www.cwc.nic.in/main/downloads/National%20Register%20of%20Large%20Dams%202009.pdf|archive-date=21 July 2011|url-status=dead}}</ref>
+| res_catchment = {{convert|215000|km2}}
+| res_surface = {{Convert|285|km2|abbr=on}}
+| res_tidal_range = 
+| plant_operator = [[Andhra Pradesh Power Generation Corporation]]{{br}}[[Telangana State Power Generation Corporation Limited]]
+| plant_commission = 1978–1985
+| plant_decommission = 
+| plant_type = 
+| plant_turbines = 1 x 110 MW [[Francis turbine]], 7 x 100.8 MW reversible Francis turbines
+| plant_capacity = {{convert|816|MW|abbr=on}}
+| plant_annual_gen = 
+| website = 
+| extra =
+}}
+
+[[File:Nagarjuna Sagar gates opened.jpg|thumb|Nagarjuna Sagar gates opened]]
+'''Nagarjuna Sagar Dam''' is a [[masonry dam]] across the [[Krishna River]] at Nagarjuna Sagar, which straddles the border between [[Nalgonda district]] in [[Telangana]], and [[Palnadu district]] in [[Andhra Pradesh]].<ref name="lift-mint">{{cite news |url=https://www.livemint.com/news/india/ap-telangana-jointly-release-water-from-nagarjuna-sagar-dam-1565527726541.html |title= AP, Telangana jointly release water from Nagarjuna Sagar dam |last=Lasania |first=Yunus Y. |date=11 August 2019 |access-date=16 September 2020}}</ref> The dam provides irrigation water to the districts of [[Nalgonda district|Nalgonda]], [[Suryapet district|Suryapet]], [[Khammam district|Khammam]], [[Bhadradri Kothagudem district|Bhadradri Kothagudem]] districts of Telangana and also [[Krishna district|Krishna]], [[Guntur district|Guntur]], [[Palnadu district|Palnadu]],[[Prakasam district|, Prakasam]], and parts of [[West Godavari district|West Godavari]] districts of Andhra Pradesh. It is also a source of [[electricity generation]] for the [[National Grid (India)|national grid]].<ref>{{Cite book |last=Everard |first=Mark |url= |title=The Hydropolitics of Dams: Engineering or Ecosystems? |date=2013-08-08 |publisher=Bloomsbury Publishing |isbn=978-1-78032-542-2 |pages=22 |language=en}}</ref><ref>{{Cite book |last=Sankararao |first=N. |url= |title=A Conceptual Study On Power Sector Reforms In Andhra Pradesh |publisher=Archers & Elevators Publishing House |isbn=978-81-950384-6-6 |pages=33 |language=en}}</ref><ref>{{Cite news |date=2018-11-20 |title=Palnadu lift irrigation scheme back in spotlight |language=en-IN |work=The Hindu |url=https://www.thehindu.com/news/national/andhra-pradesh/palnadu-lift-irrigation-scheme-back-in-spotlight/article25552454.ece |access-date=2023-05-29 |issn=0971-751X}}</ref>
+
+Constructed between 1955 and 1967, the dam created a [[Reservoir|water reservoir]] with gross storage capacity of {{convert|11.472|e9m3}}, its effective capacity is 6.92 cubic km or 244.41 Tmcft. The dam is {{convert|124|m}} tall from its deepest foundation and {{convert|1.6|km|ft}} long with 26 flood gates which are {{convert|42|ft|order=flip}} wide and {{convert|45|ft|order=flip}} tall.<ref>{{cite web
+|url=http://www.tourisminap.com/nagarjunasagar.htm|title=Nagarjunasagar|access-date=2007-01-25|archive-url = https://web.archive.org/web/20070124174958/http://www.tourisminap.com/nagarjunasagar.htm <!-- Bot retrieved archive --> |archive-date = 2007-01-24}}</ref> It is jointly operated by Andhra Pradesh and Telangana.<ref name="lift-mint"/><ref name="lift-hindu">{{cite news |url=https://www.thehindu.com/news/national/telangana/all-gates-of-nagarjunasagar-lifted/article29036673.ece |title= All gates of Nagarjunasagar lifted |first=B. |last=Pradeep |work=[[The Hindu]] |date=12 August 2019 |access-date=16 September 2020}}</ref>
+
+Nagarjuna Sagar Dam was the first in a series of major infrastructure projects termed as "modern temples" initiated for achieving the [[Green Revolution in India]]. It is also one of the earliest multi-purpose irrigation and [[Hydroelectricity|hydroelectric]] projects in India.
+
+== History ==
+The [[Nizam]] made the British engineers begin the survey work for this dam across the Krishna River in the year 1903.<ref>{{Cite web|url=http://www.cabaltimes.com/2016/06/28/nizam/|title=The Secret History of Hyderabad State of the Nizam (South India; 1724–1948)|first=Hamad|last=Subani|date=28 June 2016|website=Cabal Times}}</ref>
+
+The project's construction was officially inaugurated by Prime Minister [[Jawaharlal Nehru]] on 10 December 1955 and proceeded for the next twelve years. Raja Vasireddy Ramagopala Krishna Maheswara Prasad, popularly known as the late [[Raja of Muktyala|Muktyala Raja]], was instrumental in the construction of the Nagarjuna Sagar Dam through active political lobbying and the donation of one hundred and ten million GBP in 1952 and {{cvt|55000|acres|order=flip}} of land.<ref>{{Cite web|last=India|first=The Hans|date=2018-03-10|title=Jaggaiahpet ex-MLA dies|url=https://www.thehansindia.com/posts/index/Andhra-Pradesh/2018-03-09/Jaggaiahpet-ex-MLA-dies/364945|access-date=2021-07-19|website=www.thehansindia.com|language=en}}</ref> It was the tallest masonry dam in the world at that time, built entirely with local know-how under the engineering leadership of [[Kanuri Lakshmana Rao]].{{Citation needed|date=March 2025}}
+
+The reservoir water was released into the left and right bank canals by Prime Minister [[Indira Gandhi]] on 4 August 1967.<ref name="Tame">{{Cite news|url=https://www.thehindu.com/mag/2005/12/18/stories/2005121800150200.htm|newspaper=[[The Hindu]]|title=Magazine / Focus : Taming the Krishna|date=18 December 2005}}{{dead link|date=September 2026|bot=medic}}{{cbignore|bot=medic}}</ref> Construction of the hydroelectric power plant followed, with power generation increasing between 1978 and 1985 as additional units came into service. In 2015, the [[diamond jubilee]] celebrations of the project's inauguration were held, alluding to the prosperity the dam has ushered into the region.<ref>{{cite web|url=http://www.ap7am.com/lv-207199-special-focus-nagarjuna-sagar-dam-completes-60-years.html|title=Nagarjuna Sagar dam completed 60 years|access-date=11 December 2015|archive-date=12 December 2015|archive-url=https://web.archive.org/web/20151212203047/http://www.ap7am.com/lv-207199-special-focus-nagarjuna-sagar-dam-completes-60-years.html|url-status=dead}}</ref>
+
+The construction of the dam submerged an ancient Buddhist settlement, [[Nagarjunakonda]], which was the capital of the [[Andhra Ikshvaku|Ikshvaku dynasty]] in the 1st and 2nd centuries and the successors of the [[Satavahanas]] in the Eastern Deccan. Excavations yielded 30 Buddhist monasteries as well as artwork and inscriptions of historical importance. Prior to the reservoir's flooding, monuments were dug up and relocated. Some were moved to Nagarjunakonda, now an island in the middle of the reservoir. Others were moved to the nearby mainland village of Anupu.<ref>{{cite web
+|url=http://www.art-and-archaeology.com/india/nkonda/nk01.html|title=Nagarjunakonda|access-date=2007-01-25}}</ref>
+
+The site of the dam was selected in 2022 to be developed as part of the [[UDAN]] scheme. The selection calls for the development of a [[water aerodrome]] at the site.<ref>{{cite web | url=https://www.deccanchronicle.com/nation/current-affairs/150621/telangana-state-andhra-pradesh-to-have-water-aerodromes-soon.html | title=Telangana State, Andhra Pradesh to have water aerodromes soon | date=16 June 2021 }}</ref><ref>{{cite news | url=https://timesofindia.indiatimes.com/city/hyderabad/aerodrome-at-sagar-in-udan-plan-vk-singh/articleshow/99227748.cms | title=Aerodrome at Sagar in UDAN plan: VK Singh | newspaper=The Times of India | date=4 April 2023 }}</ref>
+
+== Data ==
+[[File:Nagarjuna Sagar Right Earth Dam.JPG|right|thumbnail|250px|Nagarjuna Sagar right Earth Dam]]
+* Catchment Area : {{convert|214185|km2|abbr=on}}
+* Full Reservoir Level (FRL): {{convert|179.83|m|ft|0}} [[Mean sea level|msl]]
+* Water spread area at FRL: 285&nbsp;km<sup>2</sup>
+* Gross storage capacity at FRL: 312 TMC<ref>{{cite web
+|url=https://www.deccanchronicle.com/nation/current-affairs/180618/nagarjunasagar-dam-loses-25-per-cent-storage.html|title=Nagarjunasagar dam loses 25 per cent storage|access-date=28 June 2018|date=2018-06-18}}</ref>
+* MDDL of river sluices: {{convert|137.3|m|ft|0}} [[Mean sea level|msl]]
+* [[Masonry dam]]
+**[[Spillway]] of dam : 471 m
+** Non-over flow dam : 979 m
+** Length of Masonry dam : 1450 m
+** Maximum height : 125 m
+* Earth dam
+** Total Length of Earth dam : 3414 m
+** Maximum height : 128 m
+* Power Generation
+** Power Units : 1 No. conventional (110 MW capacity), 7 nos Reversible (100 MW capacity)
+* Canal power house
+** Right side : 3 units 30 MW (each)
+**Left side : 2 units 30 MW (each)<ref name=nspro />
+
+== Utilisation ==
+=== Irrigation ===
+The right canal (Jawahar canal) is {{convert|203|km|abbr=on}} long with a maximum 311.5 [[cumec]]s capacity and irrigates {{convert|1.117|e6acre|order=flip}} of land in Guntur and Prakasam districts. The left canal (Lalbahadur Shastri canal) is {{convert|179|km|abbr=on}} long with maximum 311.5 cumecs capacity and irrigates {{convert|1.008|e6acre|order=flip}} of land in Nalgonda, Suryapet, Krishna, West Godavari and Khammam districts.<ref name=nspro>{{cite web|url=http://irrigationap.cgg.gov.in/wrd/projects|title=Nagarjuna Sagar project|access-date=22 September 2015|archive-date=10 November 2015|archive-url=https://web.archive.org/web/20151110060003/http://irrigationap.cgg.gov.in/wrd/projects|url-status=dead}}</ref> The project transformed the economy of above districts. 54 villages (48 in Nalgonda and 6 in Guntur) were submersed in water and 24,000 people were affected. The relocation of the people was completed by 2007.
+
+[[Alimineti Madhava Reddy Project|Alimineti Madhava Reddy lift irrigation canal]] draws water from the Nagarjuna Sagar reservoir to irrigate {{convert|0.37|e6acre|order=flip}} of land in Nalgonda district.<ref>{{cite web|url= http://www.irrigation.telangana.gov.in/icad/projects|title=Aliminati Madhava Reddy Project (AMRP)|access-date=22 September 2015}}</ref> This lift scheme with pump house located near Puttamgandi village on the left bank of Krishna river also supplies nearly 20 TMC water for the drinking water needs of [[Hyderabad]] city.<ref>{{cite news|url= https://www.thehindu.com/news/national/telangana/expert-suggests-alternative-plan-for-dindi-project/article8401180.ece|title=Expert suggests for full use of Puttamgandi pump house for Dindi project|access-date=22 April 2016|newspaper=The Hindu|date=2016-03-26|last1=Reddy|first1=T. Karnakar}}</ref><ref>{{cite news|url= https://timesofindia.indiatimes.com/city/hyderabad/Pumping-station-proposal-in-doldrums-over-funding-delay/articleshow/21752059.cms|title=Pumping station proposal in doldrums over funding delay|website=[[The Times of India]] |date=11 August 2013 |access-date=22 September 2015}}</ref> Nearly 80% of the Nagarjuna Sagar water used in Hyderabad city is available for irrigation use in [[Nalgonda district]] in the form of regenerated water/treated sewage water. In addition, the high level flood flow canal drawing water from the left side shore of the reservoir also supplies irrigation water in Nalgonda district.
+
+=== Power generation ===
+The [[hydroelectric plant]] has a power generation capacity of 815.6&nbsp;MW with 8 units (1x110 MW+7x100.8 MW). The first unit was commissioned on 7 March 1978 and the 8th unit on 24 December 1985. The right canal plant has a power generation capacity of 90&nbsp;MW with 3 units of 30&nbsp;MW each. The left canal plant has a power generation capacity of 60&nbsp;MW with 2 units of 30&nbsp;MW each.<ref>[http://www.apgenco.com/inner.asp?frm=our_pow_plants_hydel1 Andhra Pradesh Hydel Power plants]</ref> The [[Nagarjuna Sagar tail pond|tail pond]] is under advanced stage of construction to put to use the pumped storage features of 7 x 100.8&nbsp;MW units. And it will be used for irrigation.
+[[File:Nagarjuna sagar dam....33.JPG|thumb|Nagarjuna sagar dam power generation]]
+Many times, it happens that power generation from the 150&nbsp;MW canal based units is not optimised when the Nagarjunasagar reservoir is overflowing on its spillway and less water is required for irrigation from the canals during the monsoon floods. Power generation from the canal based hydro units can be optimised by running these units during the flooding period by releasing the water fully into the canals. The unwanted canal water can be released into the natural stream when it is crossing the major stream. Thus run off power can be generated from the water going down unutilised into the river by the canal based power units also.
+
+The water level in the Nagarjunasagar reservoir shall be maintained above the minimum level required for these units in most of the time by releasing water from the upstream Srisailam reservoir to optimise the power generation from the canal based units during dry season.
+
+== Tourism ==
+Nagarjunasagar Dam is one of the popular weekend getaways. It is 65 km away from [[Nalgonda]], 97 km away from [[Suryapet]], 146 km away from [[Guntur]], 184 km away from [[Vijayawada]] and 152 km away from [[Hyderabad]]. Thousands of tourists visit  the dam when gates are open in monsoon season (around September / October). 
+
+Some of the nearby tourist places of interest include:
+
+* [[Buddhavanam]], [[Telangana]]
+* [[Nagarjunakonda]] in [[Andhra Pradesh]] – Has to be reached by a boat from boating point operated by [[Andhra Pradesh Tourism Development Corporation]] or [[Telangana State Tourism Development Corporation|TSTDC]].
+* Anupu in [[Andhra Pradesh]]
+* [[Ethipothala Falls]] near [[Macherla]] in [[Andhra Pradesh]] – The water released from the Nagarjuna Sagar right bank canal, the Chandravanka and Suryavanka streams keeps the water fall live or flowing during the rainy season.
+
+== Environmental aspects ==
+The artificial lift irrigation based diversion of the river from its natural delta area into [[Nalgonda district]] caused erosion of the [[fluorine]]-rich volcanic rocks in Nalgonda and contaminated its groundwater supply. It also caused uncertain flows of water into the Krishna River delta area and a shrinkage of the natural wonder "The Kolleru Lake".<ref>{{cite news|url=https://www.thehindu.com/news/national/andhra-pradesh/worries-grow-as-kolleru-shrinks/article8235423.ece|agency=The Hindu|work=The Hindu|title=Worries grow as Kolleru shrinks |date=13 February 2016 |last1=Srinivas |first1=Rajulapudi }}</ref> The use of erosion resistant canals interfered with the natural silting process of a river to the deltas and created long-term ecological issues to the health of the delta lands. Reduced flows into the sea resulted in land salination and sea encroachment of coastal lands in Diviseema. The diversion of Krishna water for 200&nbsp;km to Hyderabad resulted in massive evaporation losses especially in summer and reduced the size of Krishna River. Many forest preserves along the natural Krishna flow are now categorized as "completely degraded" forest areas. The Krishna River was once home to an ecological wonderland of freshwater fish and aquatic population that is now completely depopulated. The river stopped being navigable since the year of Nagarjuna sagar construction.
+
+=== Impact on Hyderabad water security ===
+Water planning for Hyderabad city started in 1920 with the tapping of Musi River for 15 Mgd. It progressed to tapping Esi (Himayat Sagar 1927 – 11mgd) and Manjira (1965–1993 – Majira and Singur dams) for another additional 130 Mgd. It took a huge leap during 1995–2004 with the commissioning of Krishna river water project (Phases I – III) at a total cost of over ten thousand crores to supply an additional 190Mgd to Hyderabad from Nagarjuna sagar.<ref>{{cite book|title=Provisioning of Drinking water to Hyderabad|publisher=JNU University Press|pages=155|url=http://shodhganga.inflibnet.ac.in/bitstream/10603/4070}}</ref> The project incurs an additional evaporation and leakage loss of 64 Mgd. About 30% of the water naturally flowing to Krishna Delta before 1995 is now diverted to Hyderabad.
+
+== Future potential ==
+=== Methods to harness huge dead storage ===
+*The left and right bank canals sill level is fixed at {{convert|490|ft|m|0}} [[Mean sea level|MSL]] to supply irrigation water to two million acres. The unutilized storage capacity is nearly 180 [[Tmcft|TMC]] below the canals sill/bed level.<ref name=techdata>{{cite web|url= https://upload.wikimedia.org/wikipedia/commons/d/d6/Nagarjunasagar_Dam.pdf|title=Technical data of Nagarjunasagar dam|access-date=22 September 2015}} {{dead link|date=August 2025|fix-attempted=yes}}</ref> Nagarjuna Sagar reservoir also meets the Krishna delta water requirements to the extent of 80 TMC by letting water downstream into the river. Nearly {{convert|1.3|e6acre}} is irrigated under Krishna Delta Canals. There is a possibility to utilize most of this idle dead storage capacity to store the river flood water further and to use as carry over storage. Nearly 150 TMC idle storage up to {{convert|380|ft|m|0}} MSL, can be used leaving 30 TMC for silt settlement. This is possible by installing Water Powered Pump<ref>{{Cite web|url=https://www.scribd.com/document/58789354/Nagarjuna-Sagar-WPP-Units|title=Nagarjuna Sagar WPP Units &#124; Hydroelectricity (2.0K views)|website=Scribd}}</ref> (WPP) units at the base of the dam.
+
+*It is technically feasible to generate power from the existing hydro turbines from the lower head (75 to 50 meters) by running the turbines below the rated speed.<ref>{{cite web|url=https://cleantechnica.com/2018/07/04/variable-speed-is-key-to-worlds-biggest-pumped-hydro-energy-storage-project-chinas-fengning-plant/ |title=Variable Speed Is Key To World's Biggest Pumped Hydro Energy Storage Project, China's Fengning Plant|date=4 July 2018 |accessdate=28 August 2020}}</ref><ref>{{cite web|url=http://www.powertoday.in//News/Converting-to-Full-Power/103795#sthash.5xGWgcUC.dpbs|title=Converting to full – power|access-date=22 December 2016|archive-date=25 December 2016|archive-url=https://web.archive.org/web/20161225213957/http://www.powertoday.in//News/Converting-to-Full-Power/103795#sthash.5xGWgcUC.dpbs|url-status=dead}}</ref> However, major modifications of generators are to be done for running below the rated speed and improve the power generation efficiency.
+
+*The sill level of the right bank canal powerhouse (3 x 30 MW) is at {{convert|479|ft|m|0}} MSL. It is possible to draw water from the dead storage by tapping water from the penstocks to feed water to a pump house (3 x 15 MW) located on the left side of the powerhouse. The pump house will have three pump sets each of 5000 cusecs flow capacity to feed into the NS main right bank canal. Power generation from the 90 MW powerhouse is no way affected since its units can only operate when the reservoir level is above 540&nbsp;ft MSL and the pumping units need to operate below the 508&nbsp;ft MSL to draw water from the dead storage. Thus nearly 50 TMC water can be utilized during the drought years.<ref name=nspro /> The power generation units are normally in operation for five months in a year when the water level is above its minimum draw down level at {{convert|540|ft|m|0}} MSL. During the drought years, the additional water availability is more valuable than the pumping power consumption. The consumed pumping power is compensated fully by the enhanced generation from the 44 MW capacity mini hydel plants located on the downstream canals.
+
+*The sill level of river sluices of the dam is at {{convert|450|ft|m|0}} MSL. Nearly 90 TMC of water from the dead storage can be released from the river sluices to the downstream river tail pond during drought periods and further pumped to the adjacent right bank canal by constructing a [[Power sector of Andhra Pradesh#Pumped storage hydroelectricity projects|pumped storage hydroelectric power (PSHP)]] station. The PSHP station can also be used to transfer Godavari water to the Nagarjuna Sagar reservoir by converting the existing right bank canal powerhouse (3 x 30 MW) into PSHP units to transfer 15,000 cusecs into the Nagarjuna Sagar reservoir. Both PSHPs together can also be used for energy storage purposes on daily basis by consuming surplus power and generating electricity during the peak load hours.
+
+The reservoir dead storage water below the 125&nbsp;m MSL can be fully released into the downstream river/tail pond through the existing diversion tunnel which was in use to divert the river flow during the dam construction.<ref name=nspro />
+
+=== Pumped storage hydro power potential ===
+Nagarjuna Sagar reservoir, serving as low level reservoir, has potential to install nearly 2,18,000 MW [[Power sector of Andhra Pradesh#Pumped storage hydroelectricity projects|high head pumped storage hydroelectric plants]] on its right side.{{citation needed|date=October 2022}}
+
+=== Assured water supply to Hyderabad city ===
+At present nearly one [[Tmcft]] per month or 250 million gallons per day or 350 [[cusec]]s is supplied to the Hyderabad city from Nagarjuna Sagar (NS) reservoir.<ref>{{cite web|url= http://www.newindianexpress.com/cities/hyderabad/Water-to-be-Pumped-From-Dead-Storage-Level/2016/04/27/article3402248.ece|archive-url= https://web.archive.org/web/20160428134456/http://www.newindianexpress.com/cities/hyderabad/Water-to-be-Pumped-From-Dead-Storage-Level/2016/04/27/article3402248.ece|url-status= dead|archive-date= 28 April 2016|title=Water to be Pumped From Dead Storage Level|access-date=22 April 2016}}</ref> The water supply is nearly 50% of the total city water requirement. This water pumping scheme is part of [[Alimineti Madhava Reddy Project|Alimineti Madhava Reddy lift irrigation project]] with its foreshore pumping station at Puttamgandi which has nearly 2400 cusecs pumping capacity.<ref>{{cite news|url= http://www.business-standard.com/article/economy-policy/alimineti-project-fourth-pump-commissioned-103031701117_1.html|title=Alimineti Project Fourth Pump Commissioned|access-date=22 September 2015|newspaper=Business Standard India|date=2003-03-16|last1=Bureau|first1=Our Regional}}</ref> The water supply to the Hyderabad city is nearly 15% of its total capacity. The approach channel from the reservoir to the Puttamgandi pump house (PH) is located at {{Coord|16|34|31|N|79|07|51|E|name=Puttangadi PH approach channel}} where the Bhimanapalli Vagu tributary is joining the Krishna river.<ref>{{cite web|url=http://www.india-wris.nrsc.gov.in/Publications/WatershedSubbasinAtlas/4.%20Krishna%20Middle.pdf|title=Krishna Middle Sub-Basin map|access-date=22 April 2016|archive-date=8 August 2016|archive-url=https://web.archive.org/web/20160808232905/http://www.india-wris.nrsc.gov.in/Publications/WatershedSubbasinAtlas/4.%20Krishna%20Middle.pdf|url-status=dead}}</ref> The minimum draw down level (MDDL) of the PH is {{convert|502|ft|m|0}} MSL below which water can not be pumped from NS reservoir.<ref>{{cite news|url= https://timesofindia.indiatimes.com/city/hyderabad/AP-Telangana-staring-at-severe-water-crisis/articleshow/52017608.cms |title=AP, Telangana staring at severe water crisis|website=[[The Times of India]] |date=28 April 2016 |access-date=29 April 2016}}</ref> The reliability / dependability of the PH for supplying assured water supply to Hyderabad city, is not adequate due to meagre inflows into the NS reservoir in some years and the need to deplete the NS reservoir water below 502&nbsp;ft MSL for other purposes. In these circumstances, adequate water is to be stored above the 502&nbsp;ft MSL to maintain 100% assured water source without depending totally on NS reservoir.<ref name=pra>{{cite news|url= https://www.thehindu.com/news/cities/Vijayawada/water-level-in-prakasam-barrage-head-pond-dips-to-half/article8522310.ece|title=Water level in Prakasam Barrage head pond dips to half|access-date=29 April 2016|newspaper=The Hindu|date=2016-04-25|last1=Rao|first1=G. Venkataramana}}</ref>
+
+This is possible by constructing a balancing reservoir by separating some area of the NS reservoir with a new dam across the Bhimanapalli Vagu tributary at {{Coord|16|34|33|N|79|06|53|E|name=Proposed dam location}} just upstream of the Puttamgandi PH approach channel. This new dam with FRL {{convert|590|ft|m|0}} MSL, would not submerge any additional area other than the area already submerged by the NS reservoir. The water inflows from the Bhimanapalli Vagu tributary joining the NS reservoir are first impounded by the new dam and if found excess over flows into the downstream NS reservoir. This new balancing reservoir's live capacity is nearly 6 Tmcft above the 502&nbsp;ft MDDL which is equal to six months water supply to the Hyderabad city. This reservoir would have provision to receive water from the Puttamgandi PH when inflows from the Bhimanapalli Vagu tributary is not satisfactory and water is at adequate level in NS reservoir during monsoon months. When water level of NS reservoir goes below the 502&nbsp;ft MSL, water is fed to the Puttamgandi PH approach channel from the new balancing reservoir for pumping water needs of Hyderabad city. The cost of this new dam project would be nearly 1.5 billion rupees only which will provide 100% assured water supply to the Hyderabad city without depending on the water availability from NS reservoir during the non monsoon months and drought years.<ref name=pra />
+
+Sunkishala underground pump house is under construction at an estimated cost of Rs 1450 crores for drawing water up to {{convert|462|ft|m|0}} MSL from the dead storage.<ref>{{cite web|url=https://www.newindianexpress.com/states/telangana/2021/mar/19/rs-725-crore-for-sunkishala-project-to-end-hyderabads-water-woes-2278540.html|title=Rs 725 crore for Sunkishala project to end Hyderabad's water woes|access-date=22 April 2022}}</ref>
+
+=== Godavari water transfer via Nagarjuna Sagar left canal to Krishna River ===
+[[File:NagarjunaSagarLeftCanal.JPG|right|thumbnail|200px|Nagarjuna Left Canal deep cut before entering the gravity tunnel]]
+The Nagarjuna Sagar left canal supplies nearly 130 TMC of water for irrigation needs in Telangana and Andhra Pradesh states. This is a [[Contour canal|contour gravity canal]] with gradual downward gradient (≃ 1:10,000) along the water flow direction. This canal can be used for transferring nearly 80 TMC [[Godavari River]] water into the Nagarjuna Sagar reservoir in addition to supplying the Godavari water under its entire command area. Thus a total of 210 TMC of Godavari water can be used in the Krishna basin of Telangana state from [[Srisailam Dam|Srisailam]] and [[Jurala Project|Jurala]] reservoirs for the new projects with 100% water dependability. Godavari water transferred into the Nagarjuna Sagar reservoir and Krishna main river can also be used for the proposed Palamuru lift irrigation and Nakkalagandi lift irrigation schemes in Telangana.{{citation needed|date=June 2019}}
+
+This is possible by re-engineering of the left canal to reverse its water flow direction from the location (near {{Coord|17|22|13|N|80|21|43|E|type:landmark_region:AP}}) where Godavari water would be pumped into this canal. The canal embankments would be raised to facilitate flow reversing towards Nagarjuna Sagar reservoir and intermediate pumping stations  (with low head & high flow concrete volute pumps) would be installed near the [[Paleru]] balancing reservoir, Pedda Devulapalli balancing reservoir, left canal head regulator on the rim of Nagarjuna Sagar reservoir and the existing major [[Aqueduct (bridge)|aqueducts]] across Halia, [[Musi River (India)|Musi]] and [[Munneru]] tributaries. The cost of this canal redesigning and the associated pump houses would be one third of a new scheme to transfer Godavari River water into Nagarjuna Sagar reservoir at its FRL {{convert|590|ft|m|0}} [[Mean sea level|MSL]] with least possible total pumping head.<ref>{{cite web|url= http://www.irrigation.telangana.gov.in/icad/static/projects/nstpp.html |title= Jyothi Rao Pule Dummugudem Nagarjunasagar Sujala Sravanthi Project|access-date=19 July 2015}}</ref> The above re-engineering of the canal is similar to modifications carried out to reverse the water flow of ancient [[Grand Canal (China)|Grand Canal]] under Eastern Route project of [[South–North Water Transfer Project|South to North Water Transfer]] in China.<ref>{{cite web |url= http://www.nsbd.gov.cn/zx/english/erp.htm |title= Eastern Route project of South to North Water Transfer in China |access-date= 19 July 2015 |archive-date= 28 June 2015 |archive-url= https://web.archive.org/web/20150628203217/http://www.nsbd.gov.cn/zx/english/erp.htm |url-status= dead }}</ref>
+
+== Nearest Cities ==
+
+*[[Nalgonda]]- 65 km
+*[[Suryapet]]- 97 km
+*[[Narasaraopet]]- 104 km 
+*[[Khammam]]- 150 km
+*[[Guntur]]- 150 km
+*[[Hyderabad]]- 160 km
+*[[Vijayawada]]-190 km
+*[[Warangal]]- 200 km
+
+== See also ==
+{{stack|{{Portal|India|Water|Renewable energy}}}}
+* [[Nagarjuna Sagar tail pond]]
+* [[Dummugudem Lift Irrigation Scheme]]
+* [[Krishna Water Disputes Tribunal]]
+* [[List of dams and reservoirs in India]]
+
+== References ==
+{{reflist}}
+
+== External links ==
+{{Commons category-inline}}
+* [http://www.nagarjunasagar.org/ Nagarjuna Sagar – Community Website & Photo Gallery]
+* [https://web.archive.org/web/20071016203750/http://hindu.com/mag/2005/12/18/stories/2005121800150200.htm Article on the dam in The Hindu]
+* [http://www.nagarjunasagar.com/ Tale of Nagarjuna Sagar]
+* [https://www.youtube.com/watch?v=PC2IlOFBKK4 Nagarjuna Sagar documentary film]
+
+{{Krishna basin}}
+{{Krishna River dams}}
+{{Hydrography of Andhra Pradesh}}
+{{Hydrography of Telangana}}
+{{Waters of South Asia}}
+{{Dams and reservoirs in India}}
+{{Dams and Reservoirs}}
+
+[[Category:Dams completed in 1967]]
+[[Category:Energy infrastructure completed in 1985]]
+[[Category:Tourist attractions in Palnadu district]]
+[[Category:Tourist attractions in Nalgonda district]]
+[[Category:Hydroelectric power stations in Andhra Pradesh]]
+[[Category:Hydroelectric power stations in Telangana]]
+[[Category:Dams in Telangana]]
+[[Category:Buildings and structures in Palnadu district]]
+[[Category:Pumped-storage hydroelectric power stations in India]]
+[[Category:Dams on the Krishna River]]
+[[Category:Masonry dams]]
+[[Category:1967 establishments in Andhra Pradesh]]
+[[Category:20th-century architecture in India]]

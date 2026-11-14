@@ -1,0 +1,73 @@
+{{Short description|Dam in North Karnataka, India}}
+{{EngvarB|date=January 2014}}
+{{Use dmy dates|date=January 2014}}
+{{Infobox dam
+| name               = Lal Bahadur Shastri Dam
+| image              = Alamatti dam.JPG
+| image_caption      = Almatti Dam with its right bank power house
+| name_official      = Upper Krishna-I (Almatti)
+| dam_crosses        = [[Krishna River]]
+| res_name           = 
+| location           = Almatti,<br/>Nidgundi, [[Bijapur district, Karnataka|Bijapur district]], [[Karnataka]]
+| operator           = Karnataka Power Corporation Limited
+| dam_length         = 1565.15 m
+| dam_height         = 49.3m
+| dam_width_base     = 
+| construction_began = 1997
+| opening            = July 2005
+| cost               = ₹ 520 crores
+| res_capacity_total = 123.08 [[Tmcft]] at 519 m MSL
+| res_catchment      = 33,375 sq. km
+| res_surface        = 24,230 hectares
+| coordinates        = {{coord|16.331|75.888|display=inline,title}}
+| extra              = Minimum Draw Down Level : 504.75 m MSL
+}}
+
+The '''Lal Bahadur Shastri Dam''' is also known as '''Almatti Dam''' is a hydroelectric project on the [[Krishna River]]<ref>{{Cite web |url=http://www.kgbo-cwc.ap.nic.in/About%20Basins/Krishna.pdf |title="Map of Krishna River basin" |access-date=30 January 2012 |archive-date=6 August 2017 |archive-url=https://web.archive.org/web/20170806181213/http://www.kgbo-cwc.ap.nic.in/About%20Basins/Krishna.pdf |url-status=dead }}</ref> in [[North Karnataka]], India which was completed in July 2005. The target annual electric output of the dam is 560 MU (or GWh).<ref>{{Cite web |url=http://www.cea.nic.in/monthly_gen.html |title=CEA Monthly Generation Report |access-date=3 April 2013 |archive-url=https://web.archive.org/web/20130403102231/http://cea.nic.in/monthly_gen.html |archive-date=3 April 2013 |url-status=dead |df=dmy-all }}</ref>
+
+The Almatti Dam is the main reservoir of the [[Upper Krishna Irrigation Project]]; the 290 [[Watt#Megawatt|MW]] power station is located on the right side of the Almatti Dam. The facility uses vertical [[Kaplan turbine]]s: five 55MW generators and one 15MW generator. Water is released in to the [[Narayanpur Dam|Narayanpur reservoir]] after using for power generation to serve the downstream irrigation needs. Two separate facilities namely, Almatti 1 Powerhouse and Almatti II Powerhouse each separated by distance do provide power generation capabilities.
+
+During the initial stages of the project, estimated costs were projected as ₹ 1,470 crores, but following the transfer of project's management to the [[Karnataka Power Corporation Limited]] (KPCL), the estimated cost was reduced by over fifty percent to ₹ 674 crores. KPCL eventually completed the project at an even lower cost of ₹ 520 crores.{{citation needed|date=March 2012}} The entire dam was finished in less than forty months, with construction ending in July 2005.
+The dam is located on the edge of [[Bijapur|Vijayapura]] and [[Bagalkot district|Bagalkote]] districts. Geographically, it is located in the Vijayapura district,<ref name="resources">[http://waterresources.kar.nic.in/salient_features_ukp.htm Upper Krishna project] at Karnataka water resources website</ref> but large areas of Bagalkote district have also been submerged due to filling of the reservoir. The dam holds a gross water storage capacity of 123.08 [[Tmcft|TMC]] at 519 meters MSL.<ref name="resources" /><ref>{{cite web|title=How to Reach any City in India|url=http://www.howtoreach.info/2011/08/how-to-reach-almatti-dam-from-bangalore.html|work=howtoreach.info|publisher=Blogger|access-date=25 March 2012|author=Oasis|date=4 August 2011|archive-date=1 August 2013|archive-url=https://web.archive.org/web/20130801063413/http://www.howtoreach.info/2011/08/how-to-reach-almatti-dam-from-bangalore.html|url-status=dead}}</ref> The backwaters of the dam host several migratory birds during summer.<ref>{{Cite news|last=Rozindar|first=Firoz|url=https://www.thehindu.com/news/national/karnataka/over-2000-flamingoes-found-in-almatti-backwaters-in-vijayapura-bagalkot/article27190679.ece|title=Over 2,000 flamingoes found in Almatti backwaters in Vijayapura-Bagalkot|date=2019-05-21|work=The Hindu|access-date=2020-02-23|language=en-IN|issn=0971-751X}}</ref>
+[[File:Almatti Dam 26.jpg|thumb|Lal Bahaddur Shastri Dam, Alamatti]]
+
+==Height==
+The full reservoir level of Almatti dam was originally restricted to 160 feet [[Sea level|MSL]] by the [[supreme court of India]]. The Krishna River conflict between [[Andhra Pradesh]], [[Karnataka]], and [[Maharashtra]] was resolved by the [[Krishna Water Disputes Tribunal|Brijesh Kumar Tribunal]] and the dam was authorized to be raised to the height of 524 feet MSL with nearly 200 TMC gross storage capacity.<ref>{{cite web | url=http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Almatti_Dam_D04310 | title=wrpinfo | work=india-wris.nrsc.gov.in | date=3 April 2018 | access-date=30 May 2018 | archive-url=https://web.archive.org/web/20180425131601/http://india-wris.nrsc.gov.in/wrpinfo/index.php?title=Almatti_Dam_D04310 | archive-date=25 April 2018 | url-status=dead }}</ref>
+26 different radial spillway gates  are housed in the Dam.
+
+==See also==<!-- Please respect alphabetical order -->
+* [[Aihole]]
+* [[Badami]]
+* [[Banashankari]]
+* [[Krishna Water Disputes Tribunal]]
+* [[Kudalasangama]]
+* [[Mahakuta]]
+* [[North Karnataka]]
+* [[Pattadakal]]
+* [[Tourism in North Karnataka]]
+* [[Upper Krishna Project]]
+* [[Vijayapur, Karnataka|Vijayapur]]
+* [[List of dams and reservoirs in India]]
+* [[Narayanapura Dam]]
+
+==References==
+{{stack|{{Portal|Water|Renewable energy}}}}
+{{Reflist}}
+
+==External links==
+*{{commonscatinline}}
+* [https://web.archive.org/web/20070210022256/http://www.karnatakapower.com/almatti.htm Almatti Dam Power House] at Karnataka Power Corp
+* [http://www.hindu.com/2005/08/12/stories/2005081218100100.htmoration Alamatti Dam]{{dead link|date=January 2025|bot=medic}}{{cbignore|bot=medic}}
+
+{{Krishna basin |state=expanded}}
+{{Krishna River dams}}
+{{Hydrology of Karnataka|state=expanded}}
+
+[[Category:Dams in Karnataka]]
+[[Category:2005 establishments in Karnataka]]
+[[Category:Hydroelectric power stations in Karnataka]]
+[[Category:Reservoirs in Karnataka]]
+[[Category:Buildings and structures in Bijapur district]]
+[[Category:Geography of Bijapur district]]
+[[Category:Tourist attractions in Bijapur district]]
+[[Category:Dams completed in 2005]]

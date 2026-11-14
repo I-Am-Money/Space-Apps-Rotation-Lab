@@ -142,7 +142,13 @@ def describe(df: pd.DataFrame) -> dict:
             "trimmed_range": df.attrs.get("trimmed_range")}
 
 
+def _region_point():
+    import yaml
+    r = yaml.safe_load((ROOT / "config" / "region.yaml").read_text())
+    return r["lat"], r["lon"]
+
+
 if __name__ == "__main__":
     import sys
-    la, lo = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else (17.5, 78.5)
+    la, lo = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else _region_point()
     print(json.dumps(describe(load_weather(la, lo)), indent=2))

@@ -107,30 +107,106 @@ def default_awc():
     return float(s["awc_mm_per_m"]), s.get("badge", "assumption")
 
 
-def default_irrigation():
+def default_irrigation(ws=None):
+    if ws == "canal_and_well":
+        try:
+            return _assump("base_canal") + _assump("base_well"), "assumption"
+        except Exception:
+            pass
     v = _dfs(_yaml("assumptions.yaml"), ("base_available_irrigation_mm", "irrigation_available_mm", "base_available_mm"))
     return (v, "assumption") if v is not None else (_IRR_FALLBACK, "placeholder")
 
 
 def norm_params(params=None) -> dict:
     p = dict(params or {})
-    awc_d, _ = default_awc()
-    return {"lam": float(p.get("lam", 0.5)), "w": float(p.get("w", 0.2)),
-            "irrigation_mm": float(p["irrigation_mm"]) if p.get("irrigation_mm") is not None else default_irrigation()[0],
-            "awc_mm_per_m": p.get("awc_mm_per_m"), "awc": float(p["awc_mm_per_m"]) if p.get("awc_mm_per_m") is not None else awc_d,
+    opt.configure()
+    soil_mode = p.get("soil_mode") or "farm_black_soil"
+    soil = active_soil({"soil_mode": soil_mode})
+    awc_d = soil["awc"]
+    ws = p.get("water_source") or _yaml("region.yaml").get("water_source") or "unset"
+    cs, wsup = p.get("canal_supply_mm"), p.get("well_supply_mm")
+    requested = ws
+    try:
+        no_up = ws == "canal_and_well" and annual().get("upstream") is None
+    except Exception:
+        no_up = False
+    if no_up:      # physics needs upstream rain for this mode; degrade visibly to the local-rainfall proxy
+        ws = "unset"
+    return {"water_source": ws, "water_source_requested": requested, "soil_mode": soil["mode"], "soil_mode_requested": soil_mode, "canal_supply_mm": None if cs is None else float(cs),
+            "well_supply_mm": None if wsup is None else float(wsup), "lam": float(p.get("lam", 0.5)), "w": float(p.get("w", 0.2)),
+            "irrigation_mm": float(p["irrigation_mm"]) if p.get("irrigation_mm") is not None else default_irrigation(ws)[0],
+            "awc_mm_per_m": p.get("awc_mm_per_m"), "soil": soil, "awc": float(p["awc_mm_per_m"]) if p.get("awc_mm_per_m") is not None else awc_d,
             "current_rotation": list(p.get("current_rotation") or opt.REF["A"]),
             "price_mult": float(p.get("price_mult", 1.0))}
+
+
+def _assump(name: str) -> float:
+    from engine import crops
+    return float(crops.A(None, f"rice_irrigation.{name}"))
+
+
+def _median_rain() -> float:
+    """Median rice-season rain of the BASE (un-adjusted) bootstrap set; fixed so rainfall what-ifs
+    reduce irrigation availability instead of rescaling the median with them."""
+    from engine import crops
+    c = crops.load_crops()["rice"]
+    ra = c.sowing_doy - 1
+    rb = min(ra + c.season_days, sc.DAYS)
+    return float(np.median(boot_set().scen["precip"][:, :, ra:rb].sum(2)))
+
+
+def _apply_sim_params(p):
+    med = _median_rain()
+    split = None
+    if p["water_source"] == "canal_and_well":
+        split = {"base_canal": _assump("base_canal"), "base_well": _assump("base_well")}
+    opt.set_sim_params(split=split, water_source=p["water_source"], median_season_rain_mm=med, median_local_rain=med,
+                       median_upstream_rain=sc.upstream_median(boot_set().scen),
+                       canal_supply_mm=p.get("canal_supply_mm"), well_supply_mm=p.get("well_supply_mm"))
+
+
+WATER_SOURCE_LABEL = {
+    "canal_and_well": "Canal plus well: canal is a proxy for canal releases based on upstream monsoon rain (actual releases depend on reservoir operations); wells are a simplified recharge proxy. Canal is used first, wells cover the shortfall.",
+    "unset": "Rice water source not chosen: confirm your rice water source (borewell, tank or canal). Showing the local-rainfall recharge proxy.",
+    "borewell": "Borewell: local-rainfall recharge proxy for water availability (simplified, team to verify).",
+    "tank": "Tank: local-rainfall recharge proxy for water availability (simplified, team to verify).",
+    "canal": "Canal: proxy for canal water availability (Nagarjuna Sagar releases, not local rain); base_available and exponent are editable assumptions.",
+}
+
+
+def _supply_params() -> dict:
+    return {n: {"value": _assump(n), "badge": "assumption", "note": "team to verify"}
+            for n in ("base_canal", "k_canal", "base_well", "k_well", "max_well")}
+
+
+def _water_flag(p) -> dict:
+    ws = p["water_source"]
+    up = annual().get("upstream") is not None
+    fb = None
+    if p.get("water_source_requested") not in (None, ws):
+        fb = (f"water source {p['water_source_requested']} needs upstream rain data (engine.fetch_upstream), which is not available; "
+              f"showing the local-rainfall proxy instead")
+    return {"water_source": ws, "fallback_reason": fb, "label": WATER_SOURCE_LABEL.get(ws, ws), "confirm_required": ws == "unset",
+            "upstream_data_available": up, "upstream_note": annual().get("upstream_note"),
+            "supply_params": _supply_params() if ws == "canal_and_well" else None,
+            "irrigation_slider_note": ("the irrigation slider is the total base supply (mm); it scales base_canal and base_well in their assumption ratio"
+                                       if ws == "canal_and_well" else None),
+            "canal_supply_override_mm": p.get("canal_supply_mm"), "well_supply_override_mm": p.get("well_supply_mm"),
+            "flag": "confirm your rice water source" if ws == "unset" else None, "badge": "assumption"}
 
 
 def _badges(p):
     prices = economics.load_prices()
     return {"profit": "modeled", "prices": economics.economics_badges(prices)["prices"],
-            "water": "modeled", "weather": "observed", "irrigation_mm": default_irrigation()[1] if p.get("irrigation_mm") is None else "local",
-            "awc": default_awc()[1] if p["awc_mm_per_m"] is None else "local",
+            "water": "modeled", "weather": "observed", "irrigation_mm": default_irrigation(p["water_source"])[1] if p.get("irrigation_mm") is None else "local",
+            "water_supply_params": "assumption",
+            "awc": p["soil"]["badge"] if p["awc_mm_per_m"] is None else "local",
             "rotation_effects": "assumption", "econ_detail": economics.economics_badges(prices)}
 
 
 def _table(p, n=None):
+    opt.configure()
+    _apply_sim_params(p)
     ss = boot_set(n)
     return ss, opt.evaluate_table(ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"])
 
@@ -143,6 +219,76 @@ def _resolve(rid, p):
     if rid in opt.REF:
         return list(opt.REF[rid])
     return rid.split("-")
+
+
+# ------------------------------------------------------------ farm facts
+def farm_info() -> dict:
+    """config/farm.yaml (lead-owned, read-only): acres, soil, unit conversion. Never hardcoded here."""
+    f = _yaml("farm.yaml")
+    acres = float((f.get("farm") or {}).get("acres"))
+    m3 = float((f.get("units") or {}).get("m3_per_acre_per_mm", economics.M3_PER_MM_ACRE))
+    return {"acres": acres, "acres_badge": (f.get("farm") or {}).get("acres_badge", "local"), "m3_per_acre_per_mm": m3,
+            "label": (f.get("farm") or {}).get("label"), "soil": f.get("soil") or {}}
+
+
+def farm_soil_info():
+    """Farm black soil via fetch_soil.farm_soil() when it exists and has an AWC; else None."""
+    try:
+        from engine import fetch_soil
+        d = fetch_soil.farm_soil()
+        if d and d.get("awc_mid") is not None:
+            return d
+    except Exception:
+        pass
+    return None
+
+
+def active_soil(p) -> dict:
+    """Soil used for AWC: farm black soil (default) if available, else the district SoilGrids estimate."""
+    mode = p.get("soil_mode", "farm_black_soil")
+    if mode == "farm_black_soil":
+        fs = farm_soil_info()
+        if fs:
+            return {"mode": mode, "awc": float(fs["awc_mid"]), "low": fs.get("awc_low"), "high": fs.get("awc_high"),
+                    "badge": fs.get("badge", "local"), "display_name": fs.get("display_name", "Black soil (farm input)"),
+                    "source": fs.get("source") or fs.get("awc_source"), "fallback_reason": None}
+        si = soil_info()
+        return {"mode": "district_soilgrids", "awc": float(si["awc_mm_per_m"]), "low": si.get("awc_low_pm25"), "high": si.get("awc_high_pm25"),
+                "badge": si.get("badge", "assumption"), "display_name": "District soil (SoilGrids estimate)", "source": si.get("source"),
+                "fallback_reason": "farm black-soil AWC is not filled in config/farm.yaml yet (team to verify); using the district SoilGrids estimate"}
+    si = soil_info()
+    return {"mode": "district_soilgrids", "awc": float(si["awc_mm_per_m"]), "low": si.get("awc_low_pm25"), "high": si.get("awc_high_pm25"),
+            "badge": si.get("badge", "assumption"), "display_name": "District soil (SoilGrids estimate)", "source": si.get("source"),
+            "fallback_reason": None}
+
+
+def farm_totals(per_acre: dict, farm=None) -> dict:
+    """Farm totals from per-acre metrics (profit over the plan in Rs, water in mm -> m3)."""
+    farm = farm or farm_info()
+    a, k = farm["acres"], farm["m3_per_acre_per_mm"]
+    def m3(x):
+        return None if x is None or (isinstance(x, float) and np.isnan(x)) else float(x) * a * k
+    return {"acres": a, "total_profit_mean": float(per_acre["mean_profit"]) * a,
+            "total_profit_worst10": float(per_acre["worst10_profit"]) * a,
+            "total_irrigation_m3": m3(per_acre["irrigation_mm"]), "irrigation_canal_m3": m3(per_acre.get("irrigation_canal_mm")),
+            "irrigation_well_m3": m3(per_acre.get("irrigation_well_mm")), "total_water_m3": m3(per_acre["total_water_mm"]),
+            "badge": "modeled", "acres_badge": farm["acres_badge"]}
+
+
+def _add_farm_cols(df, farm):
+    a, k = farm["acres"], farm["m3_per_acre_per_mm"]
+    df = df.copy()
+    df["total_profit_mean"] = df.mean_profit * a
+    df["total_profit_worst10"] = df.worst10_profit * a
+    df["total_irrigation_m3"] = df.irrigation_mm * a * k
+    df["irrigation_canal_m3"] = df.irrigation_canal_mm * a * k
+    df["irrigation_well_m3"] = df.irrigation_well_mm * a * k
+    df["total_water_m3"] = df.total_water_mm * a * k
+    df["d_total_profit_mean"] = df.d_mean_profit * a
+    df["d_total_profit_worst10"] = df.d_worst10_profit * a
+    df["d_total_irrigation_m3"] = df.d_irrigation_mm * a * k
+    df["d_total_water_m3"] = df.d_total_water_mm * a * k
+    return df
 
 
 # ------------------------------------------------------------------- API
@@ -169,9 +315,39 @@ def get_field_summary() -> dict:
 
 
 def list_rotations() -> list[dict]:
-    rows = [{"id": k, "plan": list(v), "label": f"{k}: " + ", ".join(v)} for k, v in opt.REF.items()]
-    rows.append({"id": "current", "plan": None, "label": "Your current rotation"})
+    opt.configure()
+    rows = [{"id": k, "plan": list(v), "label": f"{k}: " + ", ".join(v) + (" (our farm today, baseline)" if k == "A" else "")} for k, v in opt.REF.items()]
+    rows.append({"id": "current", "plan": None, "label": "Your current rotation (defaults to A)"})
     rows += [{"id": opt.plan_id(p), "plan": list(p), "label": ", ".join(p)} for p in opt.ALL_PLANS]
+    return rows
+
+
+def _stress_rows(plan, p, stress, base_rows=None):
+    rows = []
+    for name, t in stress.items():
+        tss = sc.ScenSet(t["key"], t["scen"])
+        at = opt.rotation_arrays(plan, tss, p["awc"], p["irrigation_mm"], p["price_mult"])
+        rows.append({"test": name, "label": t["label"], "source_year": t["source_year"], "description": t["description"],
+                     "profit": float(at["profit"][0]), "yield_kg_ha": at["yield"][0].tolist(),
+                     "water_stress_mm": float(at["stress"][0]), "irrigation_mm": float(at["irrig"][0]),
+                     "total_water_mm": float(at["total"][0])})
+    if p["water_source"] == "canal":      # x0.5 what-if only for the older canal mode; canal_and_well uses the real low-upstream year
+        ms = sc.median_year_scenario(annual())
+        f = sc.CANAL_LOW_RELEASE_FACTOR
+        at = opt.rotation_arrays(plan, ms, p["awc"], p["irrigation_mm"] * f, p["price_mult"])
+        rows.append({"test": "low canal release year",
+                     "label": f"low canal release year (what-if: available irrigation x{f:g}, no release record used)",
+                     "source_year": None, "badge": "assumption",
+                     "description": f"Median real weather year ({ms.scen['labels'][0]}) with available irrigation scaled by {f:g}. "
+                                    f"The {f:g} factor is an assumption, team to verify; no Nagarjuna Sagar release data is used.",
+                     "profit": float(at["profit"][0]), "yield_kg_ha": at["yield"][0].tolist(),
+                     "water_stress_mm": float(at["stress"][0]), "irrigation_mm": float(at["irrig"][0]),
+                     "total_water_mm": float(at["total"][0])})
+    if base_rows is not None:
+        for r, b in zip(rows, base_rows):
+            r["delta_profit_vs_baseline"] = r["profit"] - b["profit"]
+            r["delta_irrigation_vs_baseline"] = r["irrigation_mm"] - b["irrigation_mm"]
+            r["delta_water_vs_baseline"] = r["total_water_mm"] - b["total_water_mm"]
     return rows
 
 
@@ -180,8 +356,15 @@ def compare(rotation_ids: list, params=None) -> dict:
     ss, df = _table(p)
     hist = hist_set()
     prices = economics.load_prices()
-    stress = sc.stress_tests(annual())
+    stress = {k: v for k, v in sc.stress_tests(annual()).items()
+              if k != "low canal release year" or p["water_source"] == "canal_and_well"}
+    base_plan = list(opt.REF["A"])
+    base_st = _stress_rows(base_plan, p, stress)
+    brow = df[df.id == opt.plan_id(base_plan)].iloc[0]
     out = {"params": p, "badges": _badges(p), "n_scenarios": ss.n, "scenario_note": ss.note,
+           "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today", "water_source": _water_flag(p),
+           "farm": {"acres": farm_info()["acres"], "badge": farm_info()["acres_badge"], "m3_per_acre_per_mm": farm_info()["m3_per_acre_per_mm"]},
+           "crop_selection": {"millets": list(opt.MILLETS), "source": opt.SELECTION_SOURCE},
            "fixed_prices_note": prices["fixed_prices_note"], "rotations": {}}
     ym = {}
     for rid in rotation_ids:
@@ -195,29 +378,98 @@ def compare(rotation_ids: list, params=None) -> dict:
             if c not in ym:
                 ym[c] = max(1e-9, float(opt.rotation_arrays([c] * 4, ss, p["awc"], p["irrigation_mm"], p["price_mult"])["yield"].max()))
             resid.append(float(a["yield"][:, y].mean() / ym[c]))
-        st_rows = []
-        for name, t in stress.items():
-            tss = sc.ScenSet(t["key"], t["scen"])
-            at = opt.rotation_arrays(plan, tss, p["awc"], p["irrigation_mm"], p["price_mult"])
-            st_rows.append({"test": name, "label": t["label"], "source_year": t["source_year"], "description": t["description"],
-                            "profit": float(at["profit"][0]), "yield_kg_ha": at["yield"][0].tolist(),
-                            "water_stress_mm": float(at["stress"][0]), "irrigation_mm": float(at["irrig"][0])})
+        row = df[df.id == opt.plan_id(plan)].iloc[0]
         out["rotations"][rid] = {"plan": plan, "profit": a["profit"], "yield_kg_ha": a["yield"], "yield_mean": a["yield"].mean(0),
-            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(df[df.id == opt.plan_id(plan)].J.iloc[0]),
+            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(row.J),
+            "delta_vs_baseline": opt.delta_vs_baseline(row),
+            "farm_totals": farm_totals({**m, "irrigation_canal_mm": None if a["irrig_canal"] is None else float(a["irrig_canal"].mean()),
+                                        "irrigation_well_mm": None if a["irrig_well"] is None else float(a["irrig_well"].mean())}),
+            "farm_total_profit_distribution": a["profit"] * farm_info()["acres"],
+            "irrigation_canal_mm": None if a["irrig_canal"] is None else float(a["irrig_canal"].mean()),
+            "irrigation_well_mm": None if a["irrig_well"] is None else float(a["irrig_well"].mean()),
+            "irrigation_source_note": "canal = proxy for canal releases from upstream monsoon rain; wells = simplified recharge proxy",
+            "profit_delta_distribution": a["profit"] - opt.rotation_arrays(base_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])["profit"],
             "residue_index": resid, "residue_index_note": "proxy: modeled yield relative to best modeled yield of that crop, not measured residue",
             "historical_blocks": {"labels": hist.scen["labels"], "profit": ah["profit"]},
-            "stress_tests": st_rows, "badges": {"profit": "modeled", "water": "modeled", "yield": "modeled"}}
+            "stress_tests": _stress_rows(plan, p, stress, base_st), "badges": {"profit": "modeled", "water": "modeled", "yield": "modeled"}}
     return out
+
+
+def land_split(alt_id, params=None) -> dict:
+    """Farm total when k acres follow rotation A (rice x4, baseline) and the rest follow `alt_id`, k = 0..acres.
+    Worst-10% is computed on the combined per-scenario total (not by mixing the two worst cases)."""
+    p = norm_params(params)
+    ss, df = _table(p)
+    farm = farm_info()
+    N = int(round(farm["acres"]))
+    k_m3 = farm["m3_per_acre_per_mm"]
+    base_plan, alt_plan = list(opt.REF["A"]), _resolve(alt_id, p)
+    aA = opt.rotation_arrays(base_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])
+    aB = opt.rotation_arrays(alt_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])
+    k = np.arange(N + 1, dtype=float)[:, None]               # acres in rice
+    w_rice, w_alt = k, (N - k)
+    def mix(x, y):
+        return w_rice * x[None, :] + w_alt * y[None, :]       # [N+1, S]
+    profit = mix(aA["profit"], aB["profit"])                  # farm total over the plan, Rs
+    S = profit.shape[1]
+    nw = max(1, int(np.ceil(0.1 * S)))
+    mean = profit.mean(1)
+    worst10 = np.sort(profit, axis=1)[:, :nw].mean(1)
+    def lin(key):
+        if aA.get(key) is None or aB.get(key) is None:
+            return None
+        return (w_rice[:, 0] * aA[key].mean() + w_alt[:, 0] * aB[key].mean()) * k_m3
+    irr_m3, canal_m3, well_m3, water_m3 = lin("irrig"), lin("irrig_canal"), lin("irrig_well"), lin("total")
+    stress_acre_mm = w_rice[:, 0] * aA["stress"].mean() + w_alt[:, 0] * aB["stress"].mean()
+    scale = df.attrs["scale"]
+    J = opt.objective(mean, worst10, stress_acre_mm, p["lam"], p["w"], scale)
+    b = N   # baseline index: all acres in rice
+    def d(x):
+        return None if x is None else (x - x[b]).tolist()
+    best = int(np.argmax(J))
+    text = (f"{N} of {N} acres in rice is the baseline (our farm today). With {best} acres in rice and {N - best} in {opt.plan_id(alt_plan)}, "
+            f"mean total profit over the plan changes by {mean[best] - mean[b]:+,.0f} Rs and worst-10% by {worst10[best] - worst10[b]:+,.0f} Rs"
+            + (f"; irrigation water changes by {irr_m3[best] - irr_m3[b]:+,.0f} m3" if irr_m3 is not None else "")
+            + f". Best split at these slider settings: {best} acres in rice (highest J).")
+    return {"alt_id": alt_id, "alt_plan": alt_plan, "baseline_id": opt.BASELINE_ID, "acres_total": N,
+            "acres_rice": k[:, 0].astype(int).tolist(), "baseline_index": b,
+            "total_profit_mean": mean.tolist(), "total_profit_worst10": worst10.tolist(),
+            "total_irrigation_m3": None if irr_m3 is None else irr_m3.tolist(),
+            "irrigation_canal_m3": None if canal_m3 is None else canal_m3.tolist(),
+            "irrigation_well_m3": None if well_m3 is None else well_m3.tolist(),
+            "total_water_m3": None if water_m3 is None else water_m3.tolist(),
+            "J_total": J.tolist(), "best_acres_rice": best,
+            "delta_vs_baseline": {"total_profit_mean": d(mean), "total_profit_worst10": d(worst10),
+                                  "total_irrigation_m3": d(irr_m3), "irrigation_canal_m3": d(canal_m3),
+                                  "irrigation_well_m3": d(well_m3), "total_water_m3": d(water_m3)},
+            "text": text, "badges": {"profit": "modeled", "acres": farm["acres_badge"]}, "n_scenarios": S,
+            "water_source": _water_flag(p), "fixed_prices_note": economics.load_prices()["fixed_prices_note"]}
 
 
 def recommend(params=None) -> dict:
     p = norm_params(params)
     ss, df = _table(p)
+    farm = farm_info()
+    df = _add_farm_cols(df, farm)
     r = opt.recommend_from_table(df)
-    strategies = {"A": opt.REF["A"], "B": opt.REF["B"], "C": opt.REF["C"], "current": p["current_rotation"]}
+    strategies = {"A": opt.REF["A"], "B": opt.REF["B"], "C": opt.REF["C"]}
+    if opt.plan_id(p["current_rotation"]) != opt.plan_id(opt.REF["A"]):
+        strategies["current"] = p["current_rotation"]
     rep = opt.three_strategy_report(df, ss, p["awc"], p["irrigation_mm"], p, strategies, p["price_mult"])
-    pts = df[["id", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"]]
+    for v in rep.values():
+        row = df[df.id == v["id"]].iloc[0]
+        v["evidence"]["farm_totals"] = farm_totals(row.to_dict(), farm)
+    cols = ["id", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"] + list(opt.DELTA_FIELDS.values()) + [
+        "irrigation_canal_mm", "irrigation_well_mm", "total_profit_mean", "total_profit_worst10", "total_irrigation_m3",
+        "irrigation_canal_m3", "irrigation_well_m3", "total_water_m3", "d_total_profit_mean", "d_total_profit_worst10",
+        "d_total_irrigation_m3", "d_total_water_m3"]
+    pts = df[cols]
     return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts,
+            "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today",
+            "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "label": farm["label"],
+                     "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"], "soil": p["soil"]},
+            "top_delta_vs_baseline": opt.delta_vs_baseline(r["top"]), "runner_up_delta_vs_baseline": opt.delta_vs_baseline(r["runner_up"]),
+            "water_source": _water_flag(p), "crop_selection": {"millets": list(opt.MILLETS), "source": opt.SELECTION_SOURCE},
             "three_strategy_report": rep, "badges": _badges(p), "n_scenarios": ss.n,
             "scale_rs_per_mm": df.attrs["scale"],
             "objective": "J = (1-lam)*mean + lam*worst10 - w*scale*water_stress",
@@ -232,16 +484,24 @@ def tipping_points(params=None) -> dict:
     cands = bd.candidate_plans(df)
     prices = economics.load_prices()
     awc, irr, pm = p["awc"], p["irrigation_mm"], p["price_mult"]
-    out = {"params": p, "badges": _badges(p), "n_scenarios": bs.n, "frame": bd.FRAME}
+    farm = farm_info()
+    out = {"params": p, "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"]},
+           "badges": _badges(p), "n_scenarios": bs.n, "frame": bd.FRAME, "baseline_id": opt.BASELINE_ID,
+           "water_source": _water_flag(p), "crop_selection": {"millets": list(opt.MILLETS), "source": opt.SELECTION_SOURCE}}
     out["rainfall_crossover"] = bd.rainfall_crossover(bs, awc, irr, p, scale, cands)
     irr_levels = np.round(np.linspace(0, max(2 * irr, 1.0), 9), 1)
     g = bd.decision_grid(bs, awc, p, scale, cands, irr_levels)
     out["grid"] = {"rain_mult": g["rain_mult"], "irrigation_mm": g["irrigation_mm"], "winner": g["winner"],
-                   "rice_shift_threshold_mm": g["rice_shift_threshold_mm"], "text": g["text"], "badge": "modeled"}
+                   "rice_shift_threshold_mm": g["rice_shift_threshold_mm"], "baseline_id": opt.BASELINE_ID,
+                   "delta_mean_profit_vs_baseline": g["delta_mean_profit_vs_baseline"], "text": g["text"], "badge": "modeled"}
     out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands[:6] if len(cands) > 6 else cands)
     si = soil_info()
+    sa = p["soil"]
     lo, hi = si.get("awc_low_pm25"), si.get("awc_high_pm25")
-    if lo and hi and hi > lo > 0:
+    if sa["mode"] == "farm_black_soil" and sa.get("low") and sa.get("high") and sa["high"] > sa["low"] > 0:
+        awc_vals = np.linspace(sa["low"], sa["high"], 9)
+        awc_note = (f"{sa['display_name']}: AWC range {sa['low']:.0f}-{sa['high']:.0f} mm/m ({sa['badge']}); source: {sa.get('source') or 'team to verify'}")
+    elif lo and hi and hi > lo > 0:
         # fetch_soil's SoilGrids 5-95% band is unphysically wide here (awc_low 0, awc_high 342 mm/m), so use its
         # +-25% band (assumption, flagged by fetch_soil) and say so.
         awc_vals = np.linspace(lo, hi, 9)
@@ -251,15 +511,21 @@ def tipping_points(params=None) -> dict:
         awc_vals = np.linspace(0.7 * awc, 1.3 * awc, 9)
         awc_note = "AWC uncertainty range +-30% of the base value, assumption, team to verify"
     e1 = bd.evpi(bs, p, scale, cands, "awc", awc_vals, awc, irr,
-                 prices["soil_test_cost_rs"] / prices["farm_area_acres"], prices["badges"]["soil_test_cost_rs"], "soil water capacity")
+                 prices["soil_test_cost_rs"] / farm["acres"], prices["badges"]["soil_test_cost_rs"], "soil water capacity")
     e1["range_note"] = awc_note
     e1["text"] = bd.evpi_text_awc(e1)
     irr_vals = np.linspace(0.5 * irr, 1.5 * irr, 9)     # +-50% range: ASSUMPTION
     e2 = bd.evpi(bs, p, scale, cands, "irr", irr_vals, awc, irr,
-                 prices["water_measure_cost_rs"] / prices["farm_area_acres"], prices["badges"]["water_measure_cost_rs"], "available irrigation water")
+                 prices["water_measure_cost_rs"] / farm["acres"], prices["badges"]["water_measure_cost_rs"], "available irrigation water")
     e2["range_note"] = "irrigation uncertainty range +-50% of the input, assumption, team to verify"
     e2["text"] = bd.evpi_text_irr(e2)
     out["evpi_awc"], out["evpi_irrigation"] = e1, e2
+    out["grid_upstream_local"] = bd.upstream_local_grid(bs, awc, irr, p, scale, cands)
+    a_ = farm["acres"]
+    out["rainfall_crossover"]["delta_total_profit_vs_baseline"] = [x * a_ for x in out["rainfall_crossover"]["delta_vs_baseline"]]
+    out["grid"]["delta_total_profit_vs_baseline"] = [[x * a_ for x in r] for r in g["delta_mean_profit_vs_baseline"]]
+    if out["grid_upstream_local"].get("available"):
+        out["grid_upstream_local"]["delta_total_profit_vs_baseline"] = [[x * a_ for x in r] for r in out["grid_upstream_local"]["delta_mean_profit_vs_baseline"]]
     return out
 
 

@@ -25,7 +25,9 @@ def test_stress_tests_use_actual_years():
     assert t["source_year"] == int(a["years"][np.argmin(sc.monsoon_rain(a))])
     assert str(t["source_year"]) in t["label"]
     assert np.allclose(t["scen"]["precip"][0, 1], a["precip"][np.argmin(sc.monsoon_rain(a))])
-    assert set(st) == {"driest monsoon in year 2", "hottest summer in year 3", "latest monsoon onset in year 1"}
+    assert set(st) == {"driest monsoon in year 2", "hottest summer in year 3", "latest monsoon onset in year 1", "low canal release year"}
+    c = st["low canal release year"]
+    assert c["source_year"] == int(a["years"][np.argmin(a["upstream"])]) and str(c["source_year"]) in c["label"]
 
 
 def test_whatif_rain_and_temperature():
@@ -45,3 +47,15 @@ def test_late_monsoon_conserves_total_and_delays():
     assert np.allclose(w["precip"].sum(-1), s["precip"].sum(-1))
     cum0 = s["precip"][..., 151:273].cumsum(-1); cum1 = w["precip"][..., 151:273].cumsum(-1)
     assert np.all(cum1 <= cum0 + 1e-9)
+
+
+def test_upstream_aligned_and_independent_multipliers():
+    a = synthetic_annual(30)
+    h = sc.historical_blocks(a)
+    up = h.scen["upstream_season_rain"]
+    assert up.shape == (h.n, 4)
+    assert np.allclose(up[0], a["upstream"][:4])
+    w = sc.apply_whatif(h.scen, rain_mult=0.5, upstream_mult=1.0)
+    assert np.allclose(w["upstream_season_rain"], up) and np.allclose(w["precip"], 0.5 * h.scen["precip"])
+    w2 = sc.apply_whatif(h.scen, rain_mult=1.0, upstream_mult=0.6)
+    assert np.allclose(w2["upstream_season_rain"], 0.6 * up) and np.allclose(w2["precip"], h.scen["precip"])
