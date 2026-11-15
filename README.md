@@ -58,7 +58,7 @@ Tests: `.venv/bin/pytest -q` (117 tests, about 25 seconds, no internet needed). 
 ## Deploy (Streamlit Community Cloud)
 
 1. Sign in at share.streamlit.io with the GitHub account that owns this repository.
-2. New app, this repository, branch `main`, main file `app.py`.
+2. New app, this repository, branch `main`, main file `app.py`. Under Advanced settings choose Python 3.13 (the version the tests were run on).
 3. Optional: add `ANTHROPIC_API_KEY` under Secrets.
 4. Open the public link in a private window before submitting, so it is awake.
 
