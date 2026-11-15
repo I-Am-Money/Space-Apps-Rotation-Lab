@@ -86,3 +86,38 @@ def test_current_defaults_to_A_and_water_source_flag():
     assert r["params"]["current_rotation"] == ["rice"] * 4
     assert r["water_source"]["confirm_required"] and "confirm your rice water source" in r["water_source"]["flag"]
     assert set(r["three_strategy_report"]) == {"A", "B", "C"}
+
+
+def test_combine_profit_worst10_is_not_mix_of_worst10s():
+    # two rotations with opposite scenario luck: 10 scenarios; A bad in scenario 0, B bad in scenario 1
+    pa = np.array([0., 10, 10, 10, 10, 10, 10, 10, 10, 10])
+    pb = np.array([10., 0, 10, 10, 10, 10, 10, 10, 10, 10])
+    tot = opt.combine_profit(pa, pb, 2)          # rows: 0, 1, 2 acres in rice
+    w = np.array([opt.worst_fraction_mean(r) for r in tot])
+    mix_of_worst = 1 * opt.worst_fraction_mean(pa) + 1 * opt.worst_fraction_mean(pb)   # 0 + 0
+    assert w[1] == 10.0 and mix_of_worst == 0.0 and w[1] > mix_of_worst
+    assert w[0] == opt.worst_fraction_mean(2 * pb) and w[2] == opt.worst_fraction_mean(2 * pa)
+
+
+def test_land_split_all_rice_equals_A_times_acres_and_totals():
+    farm = api.farm_info()
+    N = int(farm["acres"])
+    ls = api.land_split("B", {"irrigation_mm": 400})
+    c = api.compare(["A"], {"irrigation_mm": 400})["rotations"]["A"]
+    assert ls["acres_rice"][0] == 0 and ls["acres_rice"][-1] == N and ls["baseline_index"] == N
+    assert abs(ls["total_profit_mean"][-1] - c["mean_profit"] * N) < 1e-6
+    assert abs(ls["total_profit_worst10"][-1] - c["worst10_profit"] * N) < 1e-6
+    m3 = farm["m3_per_acre_per_mm"]
+    assert abs(ls["total_irrigation_m3"][-1] - c["irrigation_mm"] * N * m3) < 1e-6
+    assert abs(ls["irrigation_canal_m3"][-1] + ls["irrigation_well_m3"][-1] - ls["total_irrigation_m3"][-1]) < 1e-6
+    assert ls["delta_vs_baseline"]["total_profit_mean"][N] == 0
+    assert abs(c["farm_totals"]["total_profit_mean"] - c["mean_profit"] * N) < 1e-6
+    # linear in acres for means
+    mid = ls["total_profit_mean"][N // 2]
+    assert abs(mid - (ls["total_profit_mean"][0] + ls["total_profit_mean"][N]) / 2) < 1e-6 or N % 2 == 1
+
+
+def test_land_split_fast_when_cached():
+    import time
+    api.land_split("C", {"irrigation_mm": 400})
+    t = time.time(); api.land_split("C", {"irrigation_mm": 400}); assert time.time() - t < 0.5

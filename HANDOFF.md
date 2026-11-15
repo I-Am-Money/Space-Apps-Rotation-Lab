@@ -57,5 +57,5 @@ Portal rules, read from the Space Apps site on 2026-11-14:
 4. Review the "team to verify" parameters with an agronomist or the farm's own records.
 5. When the team agrees, submit through the portal.
 
-## Known failing test at push time
-`tests/test_decision_integration.py::test_real_compare_and_tipping_run` fails (78 other tests pass). It asserts an older count of named stress tests; the stress-test list now has 4 entries including the "low canal release year" test (source year 2015). Update the assertion to the intended list, or check that the decision layer was left finished. Land-split totals and farm-level outputs may also be incomplete; check `engine/api.py` for `land_split`.
+## Status at last push
+All tests passed (82). The frontend agent was cut off by a usage limit before it finished visually re-checking the canal and well inputs, farm totals, land-split slider and second Tipping Points heat map in the browser. Click through all five tabs on desktop and a phone width before relying on them.

@@ -408,9 +408,7 @@ def land_split(alt_id, params=None) -> dict:
     aB = opt.rotation_arrays(alt_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])
     k = np.arange(N + 1, dtype=float)[:, None]               # acres in rice
     w_rice, w_alt = k, (N - k)
-    def mix(x, y):
-        return w_rice * x[None, :] + w_alt * y[None, :]       # [N+1, S]
-    profit = mix(aA["profit"], aB["profit"])                  # farm total over the plan, Rs
+    profit = opt.combine_profit(aA["profit"], aB["profit"], N)   # farm total over the plan, Rs [N+1, S]
     S = profit.shape[1]
     nw = max(1, int(np.ceil(0.1 * S)))
     mean = profit.mean(1)

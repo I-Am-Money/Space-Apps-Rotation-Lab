@@ -182,6 +182,12 @@ def metrics(a: dict) -> dict:
             "irrigation_well_mm": float("nan") if a.get("irrig_well") is None else float(a["irrig_well"].mean())}
 
 
+def combine_profit(p_rice, p_alt, n_acres: int) -> np.ndarray:
+    """Per-scenario farm total [n_acres+1, S] for k = 0..n_acres acres on rotation A (rice) and the rest on the alternative."""
+    k = np.arange(n_acres + 1, dtype=float)[:, None]
+    return k * np.asarray(p_rice)[None, :] + (n_acres - k) * np.asarray(p_alt)[None, :]
+
+
 def objective(mean, worst10, stress, lam, w, scale):
     return (1 - lam) * mean + lam * worst10 - w * scale * stress
 

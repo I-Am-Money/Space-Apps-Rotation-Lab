@@ -36,7 +36,7 @@ def test_real_millet_uses_less_irrigation_than_rice():
 
 def test_real_compare_and_tipping_run():
     c = api.compare(["A", "B", "C"], {})
-    assert len(c["rotations"]["A"]["stress_tests"]) == 3
+    assert len(c["rotations"]["A"]["stress_tests"]) == 4   # incl. low canal release year (canal_and_well default)
     t = api.tipping_points({})
     assert t["evpi_awc"]["value"] >= 0
 
@@ -68,6 +68,7 @@ def test_real_canal_stress_test_and_baseline_deltas():
     assert c["baseline_id"] == "A"
     assert c["rotations"]["A"]["delta_vs_baseline"]["d_mean_profit"] == 0
     c2 = api.compare(["A"], {"water_source": "borewell"})
+    assert c["rotations"]["B"]["stress_tests"][-1]["test"] == "low canal release year"
     assert "low canal release year" not in [r["test"] for r in c2["rotations"]["A"]["stress_tests"]]
 
 

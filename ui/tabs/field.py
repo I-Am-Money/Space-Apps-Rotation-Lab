@@ -59,7 +59,7 @@ def render():
     rng = fs_["awc_range"]
     if isinstance(rng, (list, tuple)) and len(rng) == 2:
         awc_txt = f'{rng[0]:g} to {rng[1]:g}'
-        awc_note = f'Source: {html.escape(str(fs_["awc_source"] or "not stated"))}. {badge("assumption")}'
+        awc_note = f'{badge("assumption")} <details style="margin-top:.4rem"><summary style="cursor:pointer;font-weight:600">Source for this range</summary><p style="margin:.3rem 0 0;font-size:.9rem">{html.escape(str(fs_["awc_source"] or "not stated"))}</p></details>'
     else:
         awc_txt = "Not set"
         awc_note = f'The black-soil water holding range has no cited source yet. {badge("assumption")} team to verify'

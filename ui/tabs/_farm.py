@@ -40,5 +40,6 @@ def land_split_panel(alt_id: str, alt_name: str, key: str, p: dict) -> None:
     fig.add_vline(x=x, line=dict(color=T["ink"], width=2, dash="dash"))
     fig.add_annotation(x=max(xs), y=ls["total_profit_mean"][j], text="All rice (our farm today)", showarrow=False, xanchor="right", yanchor="bottom", font=dict(size=12, color=T["ink2"]))
     charts._layout(fig, 320, xt=f"Acres in rice (of {total:,.0f})", yt="Total profit over 4 years (Rs)", legend=False)
+    fig.update_layout(margin=dict(l=8, r=30, t=14, b=18))
     charts.show(fig, f"split_chart_{key}")
     srcline("Model output for the whole farm. Blue is the average, clay red is the worst 10% of seasons.", "Source")
