@@ -133,3 +133,8 @@ runs inside Feature 2 at run time: the simulation, climate modes and tipping poi
   four crops it took about 11 seconds on the build machine (4 cores); expect longer on a small cloud machine, where
   the time budget (40 seconds) makes it use fewer weather plans and then a coarser map. Pre-cache it for the demo
   presets.
+- Speed for Feature 3 (optional, one line): wrapping the recommendation call in
+  `with engine.simulate.what_if(share_shifts=True):` simulates each rotation once for all of its starting years.
+  Measured on the build machine with six crops (1,296 rotations): 6.5 seconds without it, 1.9 seconds with it, the
+  same rotations picked, sometimes listed from a different starting year. It is off unless asked for, so Feature 3's
+  results are unchanged today. It applies only to the 500 bootstrap plans.
