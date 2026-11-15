@@ -65,6 +65,14 @@ def compute(site, inputs, sliders) -> dict:
     kept = st.session_state.get("_tipping_result")
     if kept and kept[0] == sig:
         return kept[1]
+    try:                                             # an example farm: the result was worked out ahead of time
+        from engine import tipping_precache
+        saved = tipping_precache.load(site, inputs, sliders)
+    except Exception:
+        saved = None
+    if saved is not None:
+        st.session_state["_tipping_result"] = (sig, saved)
+        return saved
     bar = st.progress(0.0, text="Checking what-if climates")
 
     def progress(done, total, text):
@@ -248,5 +256,9 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
             st.markdown(f"- {note}")
         st.markdown("- Planting dates and each crop's best possible yield stay as they are for your farm today; "
                     "only the weather and the water supply change.")
-        if method.get("seconds") is not None:
+        if method.get("precomputed"):
+            st.caption(f"Worked out ahead of time for this example farm ({method['precomputed']}), with the same code, data "
+                       "and settings and all the weather plans at every what-if point, so the page opens at once. "
+                       "Change any answer or slider and it is worked out again live.")
+        elif method.get("seconds") is not None:
             st.caption(f"Worked out in {method['seconds']:.0f} seconds.")

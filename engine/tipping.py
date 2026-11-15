@@ -326,13 +326,16 @@ def _crossings(xs, winners, vals, keys, weights, n_resample: int, seed: int) -> 
     return out
 
 
-def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, budget_s: float | None = None) -> dict:
+def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, budget_s: float | None = None,
+                   full_search: bool = False) -> dict:
     """Where the best plan changes with rainfall, heat and water supply. See the module docstring.
 
     recommend   the recommend(site, inputs, sliders) function to ask for the winner; default engine.api.recommend.
                 Pass False to skip it and use the module's own ranking.
     progress    optional progress(done, total, text) callback for the screen.
     budget_s    time to aim for (default rule tipping_time_budget_s).
+    full_search True = every what-if point uses all the weather plans, however long that takes (used when a
+                result is worked out ahead of time, see engine/tipping_precache.py).
     """
     t_start = time.perf_counter()
     budget = float(C.rule("tipping_time_budget_s") if budget_s is None else budget_s)
@@ -466,7 +469,7 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
         run(todo[:1], full.n)
         dt_full = time.perf_counter() - t0
         left = budget - (time.perf_counter() - t_start)
-        if s_w >= full.n or dt_full * (len(todo) - 1) <= min(float(C.rule("tipping_full_search_s")), max(left, 1.0)):
+        if full_search or s_w >= full.n or dt_full * (len(todo) - 1) <= min(float(C.rule("tipping_full_search_s")), max(left, 1.0)):
             s_w = full.n
             run(todo[1:], s_w)
         else:
