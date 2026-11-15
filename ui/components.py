@@ -26,12 +26,25 @@ def md(s: str) -> None:
     st.markdown(s, unsafe_allow_html=True)
 
 
+def indian(x) -> str:
+    """Whole number with Indian digit grouping: 1404547 -> 14,04,547 (thousands, then lakhs, then crores)."""
+    n = int(round(abs(float(x))))
+    s = str(n)
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        parts = []
+        while len(head) > 2:
+            parts.insert(0, head[-2:]); head = head[:-2]
+        if head:
+            parts.insert(0, head)
+        s = ",".join(parts + [tail])
+    return s
+
+
 def fmt_rs(x, lakh: bool = False) -> str:
     if x is None:
         return "n/a"
-    sign = "-" if x < 0 else ""
-    x = abs(float(x))
-    return f"{sign}Rs {x:,.0f}"
+    return f"{'-' if x < 0 else ''}Rs {indian(x)}"
 
 
 def stat(label, value, unit="", badge_kind="placeholder", note="") -> str:
@@ -87,7 +100,8 @@ def delta_html(v, fmt="{:,.0f}", unit="", good_when_up=True) -> str:
     up = v > 0
     good = up == good_when_up
     sign = "+" if up else "-"
-    return f'<span class="rl-delta {"up" if good else "dn"}">{sign}{fmt.format(abs(v))}{unit}</span>'
+    body = f"Rs {indian(v)}" if fmt == "Rs {:,.0f}" else fmt.format(abs(v))      # rupees use Indian digit grouping
+    return f'<span class="rl-delta {"up" if good else "dn"}">{sign}{body}{unit}</span>'
 
 
 def table(headers: list[str], rows: list[list[str]]) -> None:

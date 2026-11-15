@@ -6,3 +6,4 @@ __pycache__/
 .playwright-mcp/
 .streamlit/secrets.toml
 SUBMISSION_CHECKLIST.md
+data/cache/

@@ -71,6 +71,25 @@ configure()
 _SIM = None
 _SIM_CACHE: dict = {}
 _ARR_CACHE: dict = {}
+MAX_CACHE_MB = 250          # trim_cache() empties both caches past this, so a long session cannot grow memory without limit
+MAX_BATCH_SCEN = 800        # most scenarios simulated in one simulate_batch call (keeps peak memory low)
+_CACHE_BYTES = [0]
+
+
+def _note_bytes(entry: dict) -> None:
+    _CACHE_BYTES[0] += sum(v.nbytes for v in entry.values() if isinstance(v, np.ndarray))
+
+
+def cache_mb() -> float:
+    return _CACHE_BYTES[0] / 1e6
+
+
+def trim_cache(max_mb: float | None = None) -> bool:
+    """Empty the result caches when they hold more than max_mb. Call it between requests, never in the middle of one."""
+    if cache_mb() > (MAX_CACHE_MB if max_mb is None else max_mb):
+        clear_cache()
+        return True
+    return False
 SIM_PARAMS: dict = {}       # passed to simulate_batch (water_source, median_season_rain_mm, ...)
 
 
@@ -84,6 +103,7 @@ def set_simulator(fn):
 def clear_cache():
     _SIM_CACHE.clear()
     _ARR_CACHE.clear()
+    _CACHE_BYTES[0] = 0
 
 
 def _simulator():
@@ -123,18 +143,30 @@ def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
         return
     from engine.waterbalance import simulate_batch
     keys = ["et0", "precip", "tmax"] + [k for k in ("upstream_season_rain", "onset_doy") if all(k in ss.scen for ss in scensets)]
-    cat = {k: np.concatenate([ss.scen[k] for ss in scensets]) for k in keys}
-    if "onset_doy" in cat:          # one record-wide median, so concatenating what-if sets cannot move it
-        cat["onset_median"] = float(scensets[0].scen["onset_median"])
-    res = simulate_batch(cat, todo, float(awc), float(irr), params_for(irr))
-    off = 0
+    # Scenario sets are simulated in groups of at most MAX_BATCH_SCEN scenarios. Scenarios are independent, so the
+    # results are the same as one big call; the grouping only keeps peak memory low enough for a small server.
+    groups, cur, n_cur = [], [], 0
     for ss in scensets:
-        n = ss.n
-        for r, p in enumerate(todo):
-            _SIM_CACHE[_sim_key(p, ss, awc, irr)] = {
-                k: (v[r, off:off + n] if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
-                for k, v in res.items() if k not in ("plans", "daily")}
-        off += n
+        if cur and n_cur + ss.n > MAX_BATCH_SCEN:
+            groups.append(cur); cur, n_cur = [], 0
+        cur.append(ss); n_cur += ss.n
+    if cur:
+        groups.append(cur)
+    for grp in groups:
+        cat = {k: np.concatenate([ss.scen[k] for ss in grp]) for k in keys}
+        if "onset_doy" in cat:          # one record-wide median, so concatenating what-if sets cannot move it
+            cat["onset_median"] = float(grp[0].scen["onset_median"])
+        res = simulate_batch(cat, todo, float(awc), float(irr), params_for(irr))
+        off = 0
+        for ss in grp:
+            n = ss.n
+            for r, p in enumerate(todo):
+                entry = {k: (v[r, off:off + n].copy() if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
+                         for k, v in res.items() if k not in ("plans", "daily")}
+                _SIM_CACHE[_sim_key(p, ss, awc, irr)] = entry
+                _note_bytes(entry)
+            off += n
+        del res, cat
 
 
 SPLIT: dict = {}            # {"base_canal": .., "base_well": ..}: how the irrigation slider is split in canal_and_well mode
@@ -178,7 +210,10 @@ def sim_plan(plan, scenset, awc: float, irr: float) -> dict:
 
 
 def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dict:
-    key = (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4), round(float(price_mult), 4))
+    # SIM_PARAMS (water source, canal and well overrides, ...) must be part of the key: without it a changed water
+    # input returned the arrays computed for the previous one.
+    key = (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4), round(float(price_mult), 4),
+           tuple(sorted(SIM_PARAMS.items())))
     a = _ARR_CACHE.get(key)
     if a is None:
         sim = sim_plan(plan, scenset, awc, irr)
@@ -193,6 +228,8 @@ def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dic
              "irrig_canal": (np.asarray(sim["irrig_canal_mm"]).sum(1) if "irrig_canal_mm" in sim else None),
              "irrig_well": (np.asarray(sim["irrig_well_mm"]).sum(1) if "irrig_well_mm" in sim else None)}
         _ARR_CACHE[key] = a
+        _CACHE_BYTES[0] += a["profit"].nbytes + a["profit_year"].nbytes + sum(
+            v.nbytes for v in a["eco"].values() if isinstance(v, np.ndarray))
     return a
 
 
@@ -245,6 +282,27 @@ def breakeven_shortfall(plan, scenset, awc, irr, lam, w, price_mult=1.0, scale=N
         mid = 0.5 * (lo + hi)
         lo, hi = (mid, hi) if j(mid) > jb else (lo, mid)
     return {**out, "shortfall": 0.5 * (lo + hi)}
+
+
+def without_rotation_effects(plan, scenset, awc, irr, price_mult=1.0) -> dict | None:
+    """Profit of `plan` against rice every year if every rotation effect were zero: no yield change from the previous
+    crop and no nitrogen credit. The rotation effects are unsourced assumptions (Build Spec v3 section 5.5), so this
+    shows how much of the result rests on them. The yield multiplier is applied last in the yield model, so dividing
+    revenue by it removes it exactly. Returns None for rice every year."""
+    plan, base = list(plan), list(REF[BASELINE_ID])
+    if plan_id(plan) == plan_id(base):
+        return None
+    from engine.yieldmodel import rotation_factor
+
+    def prof(pl):
+        e = rotation_arrays(pl, scenset, awc, irr, price_mult)["eco"]
+        f = np.asarray(rotation_factor(pl, dict(SIM_PARAMS) or None), float)
+        return (np.asarray(e["revenue"]) / f[None, :] - np.asarray(e["op_cost"])).sum(1)
+
+    p, b = prof(plan), prof(base)
+    with_fx = rotation_arrays(plan, scenset, awc, irr, price_mult)["profit"].mean() - rotation_arrays(base, scenset, awc, irr, price_mult)["profit"].mean()
+    return {"d_mean_profit": float(p.mean() - b.mean()), "d_worst10_profit": float(worst_fraction_mean(p) - worst_fraction_mean(b)),
+            "d_mean_profit_with_effects": float(with_fx), "baseline_id": plan_id(base)}
 
 
 def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None, extra=()) -> pd.DataFrame:

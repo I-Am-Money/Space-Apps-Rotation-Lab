@@ -138,7 +138,10 @@ def norm_params(params=None) -> dict:
             "irrigation_mm": float(p["irrigation_mm"]) if p.get("irrigation_mm") is not None else default_irrigation(ws)[0],
             "awc_mm_per_m": p.get("awc_mm_per_m"), "soil": soil, "awc": float(p["awc_mm_per_m"]) if p.get("awc_mm_per_m") is not None else awc_d,
             "current_rotation": list(p.get("current_rotation") or opt.REF["A"]),
-            "price_mult": float(p.get("price_mult", 1.0))}
+            "price_mult": float(p.get("price_mult", 1.0)),
+            # optional overrides of two supply assumptions, used by the single-source water modes
+            "recharge_exponent_k": None if p.get("recharge_exponent_k") is None else float(p["recharge_exponent_k"]),
+            "canal_release_factor": None if p.get("canal_release_factor") is None else float(p["canal_release_factor"])}
 
 
 def _assump(name: str) -> float:
@@ -185,7 +188,8 @@ def _apply_sim_params(p):
         split = {"base_canal": _assump("base_canal"), "base_well": _assump("base_well")}
     opt.set_sim_params(split=split, water_source=p["water_source"], median_season_rain_mm=med, median_local_rain=med,
                        median_upstream_rain=sc.upstream_median(boot_set().scen),
-                       canal_supply_mm=p.get("canal_supply_mm"), well_supply_mm=p.get("well_supply_mm"))
+                       canal_supply_mm=p.get("canal_supply_mm"), well_supply_mm=p.get("well_supply_mm"),
+                       recharge_exponent_k=p.get("recharge_exponent_k"), canal_release_factor=p.get("canal_release_factor"))
 
 
 WATER_SOURCE_LABEL = {
@@ -231,6 +235,7 @@ def _table(p, n=None, extra=()):
     """Metrics table over the offered rotations, plus (not offered, never recommended) the user's current rotation
     and any `extra` rotation that the team rule blocks, so they can still be compared."""
     opt.configure()
+    opt.trim_cache()            # between requests only: keeps a long session inside a small server's memory
     _apply_sim_params(p)
     ss = boot_set(n)
     ex = [list(x) for x in [p["current_rotation"], *extra] if not opt.plan_allowed(x)]
@@ -495,7 +500,12 @@ def recommend(params=None) -> dict:
         "d_total_irrigation_m3", "d_total_water_m3"]
     pts = df[cols]
     be = opt.breakeven_shortfall(r["top"]["plan"], ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"], df.attrs["scale"])
+    nofx = opt.without_rotation_effects(r["top"]["plan"], ss, p["awc"], p["irrigation_mm"], p["price_mult"])
+    if nofx is not None:
+        nofx["effects"] = {k: _assump_any(f"rotation.{k}") for k in ("rice_after_rice", "rice_after_pigeonpea", "millet_after_pigeonpea",
+                                                                      "millet_after_millet", "n_credit_after_pigeonpea")}
     return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts, "breakeven": be,
+            "no_rotation_effects": nofx,
             "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today",
             "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "label": farm["label"],
                      "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"], "soil": p["soil"]},
@@ -528,8 +538,10 @@ def tipping_points(params=None) -> dict:
                    "rice_years": g["rice_years"], "boundary_band": g["boundary_band"], "current_irrigation_mm": float(irr),
                    "rice_shift_threshold_mm": g["rice_shift_threshold_mm"], "baseline_id": opt.BASELINE_ID,
                    "delta_mean_profit_vs_baseline": g["delta_mean_profit_vs_baseline"], "text": g["text"], "badge": "modeled"}
+    opt.clear_cache()           # each stage below needs only its own simulations; dropping the last stage's keeps memory low
     out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands)
     out["heat"] = bd.heat_curve(bs, awc, irr, p, scale, cands)
+    opt.clear_cache()
     si = soil_info()
     sa = p["soil"]
     lo, hi = si.get("awc_low_pm25"), si.get("awc_high_pm25")
@@ -555,7 +567,9 @@ def tipping_points(params=None) -> dict:
     e2["range_note"] = "irrigation uncertainty range +-50% of the input, assumption, team to verify"
     e2["text"] = bd.evpi_text_irr(e2, p["water_source"])
     out["evpi_awc"], out["evpi_irrigation"] = e1, e2
+    opt.clear_cache()
     out["grid_upstream_local"] = bd.upstream_local_grid(bs, awc, irr, p, scale, cands)
+    opt.clear_cache()
     a_ = farm["acres"]
     out["rainfall_crossover"]["delta_total_profit_vs_baseline"] = [x * a_ for x in out["rainfall_crossover"]["delta_vs_baseline"]]
     out["grid"]["delta_total_profit_vs_baseline"] = [[x * a_ for x in r] for r in g["delta_mean_profit_vs_baseline"]]

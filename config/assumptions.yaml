@@ -89,11 +89,11 @@ fallow:
   depletion_fraction: {value: 0.5, range: [0.3, 0.7], unit: "-", source: "team to verify. Fraction of evaporation-layer water that evaporates at full rate.", badge: placeholder}
 
 rotation:
-  rice_after_rice:        {value: 0.95, range: [0.90, 1.00], unit: "yield multiplier", source: "team to verify. Spec change sec.3: small penalty; magnitude not sourced.", badge: assumption}
-  millet_after_millet:    {value: 0.95, range: [0.90, 1.00], unit: "yield multiplier", source: "team to verify. Spec change sec.3: small penalty (jowar/bajra after jowar/bajra); magnitude not sourced.", badge: assumption}
+  rice_after_rice:        {value: 0.97, range: [0.92, 1.00], unit: "yield multiplier", source: "team to verify. Build Spec v3 section 5.5 starting point: minus 3 percent, range 0 to minus 8 percent. Not sourced. Applies to year 1 too, because the farm grew rice the year before (config/farm.yaml).", badge: assumption}
+  millet_after_millet:    {value: 0.95, range: [0.90, 1.00], unit: "yield multiplier", source: "team to verify. Build Spec v3 section 5.5 starting point: minus 5 percent, range 0 to minus 10 percent. Not sourced.", badge: assumption}
   pigeonpea_after_pigeonpea: {value: 0.92, range: [0.85, 1.00], unit: "yield multiplier", source: "team to verify. Not in the spec; added because a 4^4 candidate set contains P,P,P,P. Magnitude not sourced.", badge: placeholder}
-  rice_after_pigeonpea:   {value: 1.05, range: [1.00, 1.15], unit: "yield multiplier", source: "team to verify. Spec change sec.3: boost after pigeon pea; magnitude not sourced.", badge: assumption}
-  millet_after_pigeonpea: {value: 1.08, range: [1.00, 1.20], unit: "yield multiplier", source: "team to verify. Spec change sec.3: boost after pigeon pea; magnitude not sourced.", badge: assumption}
+  rice_after_pigeonpea:   {value: 1.08, range: [1.03, 1.15], unit: "yield multiplier", source: "team to verify. Build Spec v3 section 5.5 starting point: plus 8 percent, range plus 3 to plus 15 percent. Not sourced.", badge: assumption}
+  millet_after_pigeonpea: {value: 1.08, range: [1.03, 1.15], unit: "yield multiplier", source: "team to verify. Build Spec v3 section 5.5 starting point: plus 8 percent, range plus 3 to plus 15 percent. Not sourced.", badge: assumption}
   n_credit_after_pigeonpea: {value: 30, range: [0, 60], unit: "kg N/ha", source: "team to verify. Nitrogen credit to the following rice/millet crop; magnitude not sourced.", badge: assumption}
 
 rice_irrigation:

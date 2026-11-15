@@ -202,6 +202,11 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
     if dry:
         j0 = dry[0]
         text += f" In a monsoon at {rain_levels[j0]*100:.0f}% of normal the switch point rises to about {thr[j0]:.0f} mm."
+    all_rice = [(i, j) for i in range(len(irr_levels)) for j in range(len(rain_levels)) if rice_years[i][j] == 4]
+    if all_rice and len(all_rice) < len(irr_levels) * len(rain_levels):
+        text += (f" Rice every year is the best plan in {len(all_rice)} of {len(irr_levels) * len(rain_levels)} squares: "
+                 f"those with rainfall at or below {max(rain_levels[j] for _, j in all_rice):.2f} times usual and at least "
+                 f"{min(irr_levels[i] for i, _ in all_rice):,.0f} mm of irrigation water, where the rainfed crops suffer and irrigated rice does not.")
     text += f" Winners compared among {len(cands)} candidate rotations. {FRAME}."
     return {"rain_mult": list(map(float, rain_levels)), "irrigation_mm": list(map(float, irr_levels)),
             "winner": win, "rice_years": rice_years, "baseline_id": opt.BASELINE_ID, "delta_mean_profit_vs_baseline": dlt,
@@ -344,7 +349,7 @@ def upstream_local_grid(scenset, awc, irr, params, scale, cands, levels=UL_LEVEL
     text = (f"At normal upstream and local rain ({levels[i1]:.2f}x each) the winner is {_short(base)}. "
             f"With upstream rain at {levels[0]:.2f}x and local rain normal it {move(low_up, 'u')}; "
             f"with local rain at {levels[0]:.2f}x and upstream normal it {move(low_loc, 'l')}. "
-            f"Rice-majority rotations win in {n_rice} of {len(cells)} cells; {len(set(cells))} different rotations win somewhere. "
+            f"Rotations with at least two rice years win in {n_rice} of {len(cells)} cells; {len(set(cells))} different rotations win somewhere. "
             f"Upstream rain stands in for canal releases (a proxy, not a reservoir model). {FRAME}.")
     return {"available": True, "upstream_mult": L, "local_mult": L, "winner": win, "baseline_id": opt.BASELINE_ID,
             "delta_mean_profit_vs_baseline": dlt, "text": text, "n_scenarios": ss.n, "n_candidates": len(cands), "badge": "modeled"}

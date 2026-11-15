@@ -103,3 +103,28 @@ def test_assumptions_table_marks_rows_not_in_use():
     assert not t.loc["crops.jowar.kc_ini", "in_use"] and t.loc["crops.rice.ky", "in_use"]
     assert not t.loc["ym_kg_ha.rice", "in_use"]          # replaced by the district value in prices_india.yaml
     assert t.loc["n_cost_rs_per_kg", "badge"] == "assumption"
+
+
+def test_water_overrides_take_effect_after_a_default_run():
+    # Regression: the per-plan result cache ignored the water inputs, so "I know my canal supply" changed nothing
+    # once the default had been computed in the same session.
+    def rice_only(params):
+        m = api.recommend(params)["metrics"].set_index("id")
+        return float(m.loc["rice-rice-rice-rice", "irrigation_mm"]), float(m.loc["rice-rice-rice-rice", "mean_profit"])
+    irr0, prof0 = rice_only({})
+    irr1, prof1 = rice_only({"canal_supply_mm": 200.0})
+    assert irr1 < irr0 - 50 and prof1 < prof0                       # far less canal water: less irrigation, less profit
+    irr2, _ = rice_only({"canal_supply_mm": 200.0, "well_supply_mm": 0.0})
+    assert irr2 < irr1
+    assert rice_only({}) == (irr0, prof0)                           # and back again
+    irr3, _ = rice_only({"water_source": "canal"})
+    assert irr3 != irr0
+
+
+def test_single_source_supply_settings_reach_the_model():
+    # Regression: the recharge exponent and the canal release factor sent by the screen were dropped by the API.
+    def rice_irr(params):
+        m = api.recommend(params)["metrics"].set_index("id")
+        return float(m.loc["rice-rice-rice-rice", "irrigation_mm"])
+    assert rice_irr({"water_source": "borewell", "recharge_exponent_k": 1.0}) != rice_irr({"water_source": "borewell", "recharge_exponent_k": 0.0})
+    assert rice_irr({"water_source": "canal", "canal_release_factor": 0.4}) < rice_irr({"water_source": "canal"})
