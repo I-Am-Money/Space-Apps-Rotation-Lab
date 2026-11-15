@@ -4,7 +4,7 @@
     render(site=None, inputs=None, sliders=None, result=None)
 
 Plain Streamlit only: default theme, default chart colors, no CSS. Data labels go through badge() from
-ui/components.py; until the shared v4 badge() is on main, a plain-text stand-in is used (see _badge).
+ui/components.py (see _badge).
 
 The page shows numbers from engine/tipping.py and computes nothing itself except display formatting.
 If site, inputs or sliders are not passed, they are read from st.session_state under the same names.
@@ -22,17 +22,16 @@ _MODES = {"historical": "Historical", "recent": "Recent (last 20 years count dou
 
 
 def _badge(kind: str) -> str:
-    """Text of a data label. Uses the shared v4 badge() once it is on main. The badge() there today is the v3
-    one (HTML for the old theme, and it does not know the v4 kinds "estimated" and "your_input"), so until then
-    this local stand-in shows the label in code style."""
+    """A data label from the shared badge() in ui/components.py (a small HTML label with a hover note). If that
+    cannot be loaded, the same word in code style."""
     try:
         from ui.components import badge as shared
         out = shared(kind)
-        if isinstance(out, str) and out and "rl-badge" not in out:
-            return out
+        if isinstance(out, str) and out:
+            return f"Data label: {out}"
     except Exception:
         pass
-    return f"`{_WORDS.get(kind, str(kind))}`"
+    return f"Data label: `{_WORDS.get(kind, str(kind))}`"
 
 
 def _md(text: str) -> None:
@@ -170,7 +169,7 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
             st.error(f"The tipping points could not be worked out for this farm: {e}")
             return
     if _get(result, "example"):
-        st.error(f"{_badge('example')} These tipping points are placeholder values, not computed for this farm.")
+        st.error("EXAMPLE DATA. These tipping points are placeholder values, not computed for this farm.")
 
     for line in result.get("headlines", []):
         st.markdown(f"- {line}")
