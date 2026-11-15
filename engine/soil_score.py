@@ -28,7 +28,7 @@ from typing import Iterable, Sequence
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
-ASSUMPTIONS_PATH = ROOT / "config" / "assumptions.yaml"
+ASSUMPTIONS_PATH = ROOT / "config" / "assumptions" / "recommend.yaml"
 LABEL = "Rule-based score from NRCS soil health principles. Not a soil test."
 
 # Common names and earlier crop ids mapped to the ids in assumptions.yaml.
