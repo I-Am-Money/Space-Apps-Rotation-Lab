@@ -32,8 +32,12 @@ else:
     if 'v4_rec' not in st.session_state and st.session_state.get('v5_page') not in ('Farm setup', 'How good is this?'):
         st.session_state['v5_page'] = 'Farm setup'
     st.session_state.setdefault('v5_page', 'Recommendations' if 'v4_rec' in st.session_state else 'Farm setup')
-    with st.sidebar:
-        page = st.radio('Pages', ['Farm setup', 'Recommendations', 'Tipping points', 'What to measure next', 'How good is this?'], key='v5_page')
+    # The page list sits at the top of the page, not in a closed sidebar, so every page is one visible click away.
+    nav, again = st.container(key='rl_nav').columns([7, 1], vertical_alignment='center')
+    with nav:
+        page = st.radio('Pages', ['Farm setup', 'Recommendations', 'Tipping points', 'What to measure next', 'How good is this?'],
+                        key='v5_page', horizontal=True, label_visibility='collapsed')
+    with again:
         if st.button('Start again'):
             for key in list(st.session_state):
                 if key.startswith(('v4_', '_v4_', 'v5_', '_v5_', 'rec_', 'meas_')) or key in ('pin_lat', 'pin_lon', '_tipping_result'):
