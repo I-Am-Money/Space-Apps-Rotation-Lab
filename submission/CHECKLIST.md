@@ -1,4 +1,4 @@
-# Submission checklist (Person 3). Deck and project page work starts at 5:00 PM.
+# Submission checklist (Person 3)
 
 Source: NASA Space Apps "Project Submission Guide", https://www.spaceappschallenge.org/resources/project-submission-guide/
 (read 2026-11-15). Quotes are copied word for word.
@@ -25,3 +25,24 @@ the Local Lead decides, the deck uses **the team name only** (Build Spec v4 A9),
 - No village name. No emails.
 - Every number on a slide comes from the app or `config/validation/results.csv`. Anything unverified is marked "team to verify".
 - Nobody on Claude Code submits anything to the Space Apps portal. The team clicks Submit.
+
+## Status (2026-11-15, evening)
+
+Written and in this folder:
+
+- `deck.md`: text for 7 slides, the notes behind the validation slide, and the 30-second video script.
+- `project_page.md`: summary, description, NASA data, other data, use of AI, links.
+
+Still for the team to do (none of it can be done from the repo):
+
+1. Fill in the [square bracket] lines: team name, the exact challenge title from the portal, the hosted app
+   URL, the video and slide links.
+2. Decide the member-names question above with the Local Lead.
+3. Take new screenshots from the current app. `assets/screens/` still shows the earlier India build.
+4. Build the slides (7 or fewer) and record the video (30 seconds or less, screen and captions only, no voices).
+5. Check the repo is public and the hosted app opens without a login. Wake the app right before submitting.
+6. A team member clicks Submit before 11:59 p.m. local time.
+
+Last look before submitting: no faces, voices or names in the slides, the video or the screenshots (check
+browser tabs, bookmarks and account avatars in screen recordings), and no number that is not in
+`config/validation/results.csv` or on the app screen shown.

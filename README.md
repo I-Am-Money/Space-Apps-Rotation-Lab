@@ -68,8 +68,11 @@ the public Quick Stats website export; the results in the repo were made that wa
    Regions (`config/validation/sites.yaml`):
    modeled against NASS county yields, detrended, with the latest 8 years held out. A small linear correction
    for rain, heat and year is fitted on training years only, and results are shown with and without it
-   (`engine/hindcast.py`, `engine/correction.py`). Where there is no local yield data, the app says
-   "Not validated here".
+   (`engine/hindcast.py`, `engine/correction.py`). Results from the 2026-11-15 run are mixed: in mostly
+   rainfed counties the median held-out r is 0.42 (22 county and crop checks); in mostly irrigated counties it
+   is -0.04 (9 checks), so irrigated areas are not validated. One India district is checked against ICRISAT
+   yields the same way. Where there is no local yield data, or the local check did not pass, the app says
+   "Not validated here". See `LIMITATIONS.md` items 21 and 22.
 
 Every value carries a badge: Observed, Estimated, Your input, Assumption, or Placeholder ("team to verify").
 All assumptions, with sources and ranges, are in `config/assumptions.yaml` and `config/assumptions/*.yaml`. Limits are in `LIMITATIONS.md` and
