@@ -1,17 +1,17 @@
-# Validation config (Person 3)
+# Validation config (Person 3, Feature 4)
 
-- `sites.yaml`: 12 US counties across 9 regions for the hindcast (R20), with Census Gazetteer centroids and
-  the NASS Quick Stats query fields per crop.
-- `results.csv` (written by `python -m engine.hindcast`): the validation table the app shows through
+- `sites.yaml`: 14 US counties covering all 9 USDA ERS Farm Resource Regions, used for the hindcast (R20).
+  Lat/lon are county internal points from the Census 2023 Gazetteer; `ers_region` comes from ERS reglink.xls.
+- `precache_list.csv`: the same 14 sites as a flat list (id, fips, lat, lon, crops) for pre-caching.
+- `standin_crops.yaml`: settings for the stand-in yield model, used only until the real single-season yield function is available.
+- `results.csv` (written by `python -m engine.correction`): the validation table the app shows through
   `api.validation_summary()`. If it is missing, the app shows "validation not run yet".
 
-## Request to Person 2 (pre-cache)
+## Pre-cache request (to the cache owner, engine/cache.py)
 
-For every site in `sites.yaml`, please pre-cache:
-1. NASA POWER daily weather (community AG) at the site lat/lon, 1981 to latest full year.
-2. NASS Quick Stats county yields (SURVEY, COUNTY, YIELD, all years) for each listed crop, using the
-   `crop_nass` fields; use `nass_practice` where the county series is split by practice.
-
-The hindcast looks for a yield loader in `engine.fetch_nass` (`county_yields(fips, crop)` returning
-year, yield_kg_ha). If yours has another name, tell Person 3 and it will be wired in hindcast.py.
-India (ICRISAT) is not added: the v4 engine does not load it yet.
+For every row of `precache_list.csv`, please pre-cache with `refresh="auto", precache=True`:
+1. NASA POWER daily weather (community AG) at lat/lon, 1981 to the latest full year (`fetch_power`).
+2. NASS Quick Stats for all 14 counties, with `NASS_API_KEY` set:
+   `python -m engine.fetch_nass --precache-validation`. This writes `data/precache/nass/`, which can be committed (public data, the key is never stored).
+ERS costs and regions are already pre-cached in `data/precache/costs/` and `data/precache/geo/` (downloaded 2026-11-15).
+India (ICRISAT) is not part of the v4 validation.

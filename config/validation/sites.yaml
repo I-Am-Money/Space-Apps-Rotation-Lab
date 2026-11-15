@@ -10,13 +10,15 @@
 # water: "rain" counties are mostly rainfed for the listed crops; "irrigated" counties are mostly irrigated,
 #   so the water-limited model is expected to agree less there (reported, not hidden). Team to verify with
 #   NASS irrigated share once Person 2's fetcher has it.
+# ers_region: USDA ERS Farm Resource Region from ERS reglink.xls (engine.fetch_ers.region_for_county); the
+#   14 sites cover all 9 ERS regions. `region` is a plain-English label chosen by the team.
 # nass_practice: request this NASS prodn_practice_desc when the county series is split by practice.
 
 holdout_years: 8          # latest 8 years with both weather and yields are held out (R20)
 min_years: 20             # crops with fewer overlapping years are reported as "not enough data"
 first_year: 1981          # NASA POWER daily record start
 
-crop_nass:                # engine crop id -> NASS Quick Stats commodity / class / util / unit
+crop_nass:                # (kept for reference; engine.fetch_nass reads config/assumptions/us_data.yaml) engine crop id -> NASS Quick Stats commodity / class / util / unit
   maize:        {commodity_desc: CORN, util_practice_desc: GRAIN, unit_desc: BU / ACRE, kg_ha_per_unit: 62.77}
   soybean:      {commodity_desc: SOYBEANS, unit_desc: BU / ACRE, kg_ha_per_unit: 67.25}
   wheat_winter: {commodity_desc: WHEAT, class_desc: WINTER, unit_desc: BU / ACRE, kg_ha_per_unit: 67.25}
@@ -30,15 +32,17 @@ crop_nass:                # engine crop id -> NASS Quick Stats commodity / class
 #   Team to verify the bushel weights against the NASS units page before final numbers.
 
 sites:
-  - {id: IA-story,      fips: "19169", state: IA, county: Story County,      region: Corn Belt,          lat: 42.037538, lon: -93.466093,  water: rain,      crops: [maize, soybean]}
-  - {id: IL-mclean,     fips: "17113", state: IL, county: McLean County,     region: Corn Belt,          lat: 40.494559, lon: -88.844539,  water: rain,      crops: [maize, soybean]}
-  - {id: OH-darke,      fips: "39037", state: OH, county: Darke County,      region: Eastern Corn Belt,  lat: 40.131467, lon: -84.621191,  water: rain,      crops: [maize, soybean, wheat_winter]}
-  - {id: NE-lancaster,  fips: "31109", state: NE, county: Lancaster County,  region: Great Plains,       lat: 40.783547, lon: -96.688658,  water: rain,      crops: [maize, soybean], nass_practice: NON-IRRIGATED}
-  - {id: KS-sumner,     fips: "20191", state: KS, county: Sumner County,     region: Great Plains,       lat: 37.236662, lon: -97.493352,  water: rain,      crops: [wheat_winter, sorghum, soybean], nass_practice: NON-IRRIGATED}
-  - {id: ND-cass,       fips: "38017", state: ND, county: Cass County,       region: Northern Plains,    lat: 46.927003, lon: -97.252375,  water: rain,      crops: [wheat_spring, soybean, maize]}
-  - {id: TX-lubbock,    fips: "48303", state: TX, county: Lubbock County,    region: Southern Plains,    lat: 33.611469, lon: -101.819944, water: rain,      crops: [cotton, sorghum], nass_practice: NON-IRRIGATED}
-  - {id: WA-whitman,    fips: "53075", state: WA, county: Whitman County,    region: Pacific Northwest,  lat: 46.905944, lon: -117.53539,  water: rain,      crops: [wheat_winter, wheat_spring]}
-  - {id: PA-lancaster,  fips: "42071", state: PA, county: Lancaster County,  region: Northeast,          lat: 40.041992, lon: -76.250198,  water: rain,      crops: [maize, soybean]}
-  - {id: GA-mitchell,   fips: "13205", state: GA, county: Mitchell County,   region: Southeast,          lat: 31.228997, lon: -84.192038,  water: irrigated, crops: [cotton, peanut, maize]}
-  - {id: MS-washington, fips: "28151", state: MS, county: Washington County, region: Delta,              lat: 33.273174, lon: -90.944446,  water: irrigated, crops: [soybean, cotton, rice]}
-  - {id: AR-poinsett,   fips: "05111", state: AR, county: Poinsett County,   region: Delta,              lat: 35.56887,  lon: -90.681104,  water: irrigated, crops: [rice, soybean]}
+  - {id: IA-story,      fips: "19169", state: IA, county: Story County,      region: Corn Belt,          lat: 42.037538, lon: -93.466093,  water: rain,      crops: [maize, soybean], ers_region: Heartland}
+  - {id: IL-mclean,     fips: "17113", state: IL, county: McLean County,     region: Corn Belt,          lat: 40.494559, lon: -88.844539,  water: rain,      crops: [maize, soybean], ers_region: Heartland}
+  - {id: OH-darke,      fips: "39037", state: OH, county: Darke County,      region: Eastern Corn Belt,  lat: 40.131467, lon: -84.621191,  water: rain,      crops: [maize, soybean, wheat_winter], ers_region: Heartland}
+  - {id: NE-lancaster,  fips: "31109", state: NE, county: Lancaster County,  region: Great Plains,       lat: 40.783547, lon: -96.688658,  water: rain,      crops: [maize, soybean], nass_practice: NON-IRRIGATED, ers_region: Heartland}
+  - {id: KS-sumner,     fips: "20191", state: KS, county: Sumner County,     region: Great Plains,       lat: 37.236662, lon: -97.493352,  water: rain,      crops: [wheat_winter, sorghum, soybean], nass_practice: NON-IRRIGATED, ers_region: Prairie Gateway}
+  - {id: ND-cass,       fips: "38017", state: ND, county: Cass County,       region: Northern Plains,    lat: 46.927003, lon: -97.252375,  water: rain,      crops: [wheat_spring, soybean, maize], ers_region: Northern Great Plains}
+  - {id: TX-lubbock,    fips: "48303", state: TX, county: Lubbock County,    region: Southern Plains,    lat: 33.611469, lon: -101.819944, water: rain,      crops: [cotton, sorghum], nass_practice: NON-IRRIGATED, ers_region: Prairie Gateway}
+  - {id: WA-whitman,    fips: "53075", state: WA, county: Whitman County,    region: Pacific Northwest,  lat: 46.905944, lon: -117.53539,  water: rain,      crops: [wheat_winter, wheat_spring], ers_region: Basin and Range}
+  - {id: PA-lancaster,  fips: "42071", state: PA, county: Lancaster County,  region: Northeast,          lat: 40.041992, lon: -76.250198,  water: rain,      crops: [maize, soybean], ers_region: Northern Crescent}
+  - {id: GA-mitchell,   fips: "13205", state: GA, county: Mitchell County,   region: Southeast,          lat: 31.228997, lon: -84.192038,  water: irrigated, crops: [cotton, peanut, maize], ers_region: Southern Seaboard}
+  - {id: MS-washington, fips: "28151", state: MS, county: Washington County, region: Delta,              lat: 33.273174, lon: -90.944446,  water: irrigated, crops: [soybean, cotton, rice], ers_region: Mississippi Portal}
+  - {id: KY-warren,     fips: "21227", state: KY, county: Warren County,     region: Eastern Uplands,    lat: 36.995634, lon: -86.423579,  water: rain,      crops: [maize, soybean], ers_region: Eastern Uplands}
+  - {id: CA-colusa,     fips: "06011", state: CA, county: Colusa County,     region: Sacramento Valley,  lat: 39.177739, lon: -122.237563, water: irrigated, crops: [rice], ers_region: Fruitful Rim}
+  - {id: AR-poinsett,   fips: "05111", state: AR, county: Poinsett County,   region: Delta,              lat: 35.56887,  lon: -90.681104,  water: irrigated, crops: [rice, soybean], ers_region: Mississippi Portal}

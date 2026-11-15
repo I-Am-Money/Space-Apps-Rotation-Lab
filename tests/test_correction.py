@@ -76,7 +76,26 @@ def test_validation_summary_shape_without_data(tmp_path, monkeypatch):
     table = cr.run_validation(sites, weather_loader=lambda s: None, yield_loader=lambda f, c: None)
     assert len(table) == sum(len(s["crops"]) for s in sites)
     assert set(["site", "crop", "r", "mae", "r_corrected", "mae_corrected"]) <= set(table.columns)
-    assert (table.status == "no weather").all() and table.r.isna().all()
+    assert (table.status == "no NASS data").all() and table.r.isna().all()
+
+
+def test_no_yields_means_no_weather_fetch():
+    def boom(s):
+        raise AssertionError("weather fetched for a site with no yields")
+    table = cr.run_validation(hc.validation_sites()[:3], weather_loader=boom, yield_loader=lambda f, c: None)
+    assert (table.status == "no NASS data").all()
+
+
+def test_india_pack_holds_out_latest_8_years_and_reports_both():
+    """Real ICRISAT district yields and cached NASA POWER weather (Nalgonda), only if the loader works."""
+    sites = hc.india_sites()
+    if not sites:
+        pytest.skip("ICRISAT loader not available")
+    table = cr.run_validation(sites)
+    assert set(table.crop) == {"jowar", "bajra", "pigeonpea"}
+    ok = table[table.status == "ok"]
+    assert len(ok) == 3 and (ok.n_test == 8).all()
+    assert ok[["r", "mae", "r_corrected", "mae_corrected"]].notna().all().all()
 
 
 def test_validation_summary_reads_results_file(tmp_path, monkeypatch):
