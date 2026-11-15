@@ -205,27 +205,41 @@ def stress_tests(annual: dict) -> dict:
 
 
 # ----------------------------------------------------------------- what-ifs
+def delay_onset(precip: np.ndarray, onset_doy, n_days: int) -> np.ndarray:
+    """Later monsoon onset what-if: the monsoon starts n_days later than it really did in each year, and the
+    rain of those first n_days after the real onset does NOT arrive (it is lost, not moved). Rain before the
+    real onset (pre-monsoon showers) and after the delayed onset is unchanged.
+    precip [..., 365]; onset_doy [...] 1-based day-of-year of the real onset in each year."""
+    n = int(n_days)
+    if n <= 0:
+        return precip
+    day = np.arange(precip.shape[-1])
+    on0 = np.asarray(onset_doy)[..., None] - 1                    # 0-based index of the real onset day
+    lost = (day >= on0) & (day < on0 + n)
+    return np.where(lost, 0.0, precip)
+
+
 def shift_june_july(precip: np.ndarray, n_days: int) -> np.ndarray:
-    """Move Jun-Jul rain n_days later, conserving the total (rain lands in Aug if shifted past Jul)."""
+    """Fallback when the scenario carries no onset days: June-July rain of the first n_days is removed."""
     n = int(n_days)
     if n <= 0:
         return precip
     out = precip.copy()
-    lo, hi = JUN_JUL
-    window = precip[..., lo:hi].copy()
-    out[..., lo:hi] = 0.0
-    n = min(n, DAYS - hi)
-    out[..., lo + n:hi + n] += window
+    out[..., JUN1:min(JUN1 + n, DAYS)] = 0.0
     return out
 
 
 def apply_whatif(scen: dict, rain_mult: float = 1.0, dT: float = 0.0, shift_days: int = 0,
                  et0_per_degc: float = ET0_PER_DEGC, upstream_mult: float = 1.0) -> dict:
     """Return a copy with rain scaled, temperature raised by dT, ET0 scaled by (1+k*dT),
-    and the monsoon onset delayed by shift_days: Jun-Jul rain arrives that many days later (total conserved)
-    and the onset day moves with it, so sowing moves too (v3 section 6.2). Labelled as what-if, not forecast."""
+    and the monsoon onset delayed by shift_days: the rain of the first shift_days after the real onset is lost
+    and the onset day moves later by shift_days, so sowing moves too (v3 section 6.2).
+    Labelled as what-if, not forecast."""
     out = dict(scen)
-    p = shift_june_july(scen["precip"], shift_days) * float(rain_mult)
+    if "onset_doy" in scen:
+        p = delay_onset(scen["precip"], scen["onset_doy"], shift_days) * float(rain_mult)
+    else:
+        p = shift_june_july(scen["precip"], shift_days) * float(rain_mult)
     out["precip"] = p
     out["tmax"] = scen["tmax"] + float(dT)
     if "onset_doy" in scen and int(shift_days) > 0:

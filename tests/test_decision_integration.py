@@ -13,7 +13,7 @@ def real():
     opt.set_simulator(None); api.set_annual(None); api._scensets.clear()
     api.N_SCEN = 60; api.BOUNDARY_N_SCEN = 60
     yield
-    api.N_SCEN = 500; api.BOUNDARY_N_SCEN = 500; api._scensets.clear()
+    api.N_SCEN = 500; api.BOUNDARY_N_SCEN = 200; api._scensets.clear()
 
 
 def test_real_scenarios_derived_counts():
@@ -31,7 +31,8 @@ def test_real_recommend_invariants():
 
 def test_real_millet_uses_less_irrigation_than_rice():
     m = api.recommend({})["metrics"].set_index("id")
-    assert m.loc["-".join([opt.MILLETS[0]] * 4), "irrigation_mm"] <= m.loc["rice-rice-rice-rice", "irrigation_mm"]
+    assert m.loc[opt.plan_id(opt.REF["B"]), "irrigation_mm"] < m.loc["rice-rice-rice-rice", "irrigation_mm"]
+    assert m.loc[opt.plan_id(opt.REF["C"]), "irrigation_mm"] < m.loc["rice-rice-rice-rice", "irrigation_mm"]
 
 
 def test_real_compare_and_tipping_run():
@@ -53,7 +54,9 @@ def test_real_prices_use_yaml_msp_with_badges():
     from engine import economics
     pr = economics.load_prices()
     assert pr["price_rs_per_quintal"]["rice"] == 2441.0 and pr["badges"]["price_rice"] == "observed"
-    assert pr["badges"]["opcost_rice"] == "placeholder"
+    assert pr["badges"]["opcost_rice"] == "assumption" and "Telangana" in pr["operating_cost_source"]["rice"]
+    assert pr["milled_rice_per_paddy"] == 0.66 and abs(pr["sold_kg_per_yield_kg"]["rice"] - 1 / 0.66) < 1e-12
+    assert pr["badges"]["soil_test_cost_rs"] == "placeholder"        # no sourced quote yet: stays flagged
 
 
 def test_real_batch_matches_per_plan_and_is_fast():
@@ -81,6 +84,6 @@ def test_real_hindcast_status_labels():
 def test_real_selection_candidate_set():
     opt.configure()
     assert opt.MILLETS and set(opt.CROPS) == {"rice", "pigeonpea", *opt.MILLETS}
-    assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4
+    assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4 - (len(opt.CROPS) - 1)      # same non-rice crop x4 is blocked
     m = opt.MILLETS[0]
     assert opt.REF["B"] == ["rice", m, "rice", m] and opt.REF["C"] == ["rice", "pigeonpea", m, "rice"]

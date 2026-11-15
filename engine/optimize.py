@@ -214,13 +214,20 @@ def objective(mean, worst10, irrigation_mm, lam, w, water_price_proxy):
     return (1 - lam) * mean + lam * worst10 - w * irrigation_mm * water_price_proxy
 
 
-def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None) -> pd.DataFrame:
-    plans = plans or ALL_PLANS
+def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None, extra=()) -> pd.DataFrame:
+    """One row per rotation. `extra` = rotations the team rule does not offer (plan_allowed is False) but that the
+    user asked to see, e.g. their current rotation: they get offered=False, are never recommended and have rank 0."""
+    plans = [list(p) for p in (plans or ALL_PLANS)]
+    seen = {plan_id(p) for p in plans}
+    n_offered = len(plans)
+    for p in extra:
+        if plan_id(p) not in seen:
+            seen.add(plan_id(p)); plans.append(list(p))
     prefetch(plans, scenset, awc, irr)
     rows = []
-    for p in plans:
+    for i, p in enumerate(plans):
         m = metrics(rotation_arrays(p, scenset, awc, irr, price_mult))
-        rows.append({"id": plan_id(p), "plan": list(p), **m})
+        rows.append({"id": plan_id(p), "plan": list(p), "offered": i < n_offered, **m})
     df = pd.DataFrame(rows)
     scale = water_price_proxy_rs_per_mm_acre()
     df.attrs["scale"] = scale
@@ -232,9 +239,17 @@ def rescore(df: pd.DataFrame, lam, w, scale=None) -> pd.DataFrame:
     df = df.copy()
     df.attrs["scale"] = scale
     df["J"] = objective(df.mean_profit, df.worst10_profit, df.irrigation_mm, lam, w, scale)
-    df["rank"] = df.J.rank(ascending=False, method="first").astype(int)
-    df["on_frontier"] = pareto_mask(df.mean_profit.values, df.worst10_profit.values)
+    off = df["offered"].astype(bool) if "offered" in df else pd.Series(True, index=df.index)
+    df["rank"] = 0
+    df.loc[off, "rank"] = df.J[off].rank(ascending=False, method="first").astype(int)
+    df["on_frontier"] = False
+    df.loc[off, "on_frontier"] = pareto_mask(df.mean_profit[off].values, df.worst10_profit[off].values)
     return add_deltas(df)
+
+
+def offered(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows the tool may recommend (drops rotations shown only for comparison)."""
+    return df[df["offered"].astype(bool)] if "offered" in df else df
 
 
 DELTA_FIELDS = {"mean_profit": "d_mean_profit", "worst10_profit": "d_worst10_profit", "total_water_mm": "d_total_water_mm",
@@ -270,7 +285,7 @@ def pareto_mask(x, y) -> np.ndarray:
 
 
 def recommend_from_table(df: pd.DataFrame) -> dict:
-    d = df.sort_values("J", ascending=False)
+    d = offered(df).sort_values("J", ascending=False)
     return {"top": d.iloc[0].to_dict(), "runner_up": d.iloc[1].to_dict()}
 
 
@@ -282,7 +297,8 @@ def _count_pairs(plan, same):
 def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price_mult=1.0, prices=None) -> dict:
     """strategies: name -> plan. Text is generated from computed numbers and fixed rules only."""
     prices = prices or economics.load_prices()
-    top = df.sort_values("J", ascending=False).iloc[0]
+    n_off = int(len(offered(df)))
+    top = offered(df).sort_values("J", ascending=False).iloc[0]
     top_arr = rotation_arrays(top["plan"], scenset, awc, irr, price_mult, prices)
     a_arr = rotation_arrays(REF["A"], scenset, awc, irr, price_mult, prices)
     a_row = df[df.id == plan_id(REF["A"])].iloc[0]
@@ -293,18 +309,20 @@ def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price
         p_beat = float((arr["profit"] >= top_arr["profit"]).mean())
         p_loss = float((arr["profit"] < 0).mean())
         credit = float(np.sum(economics.n_credit_kg_ha(plan)))
-        ev = {"rank_of_256": int(row["rank"]), "rank": int(row["rank"]), "n_rotations": int(len(df)), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
+        ev = {"rank_of_256": int(row["rank"]), "rank": int(row["rank"]), "n_rotations": n_off, "offered": bool(row.get("offered", True)), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
               "worst10_profit_rs_acre": float(row.worst10_profit), "water_stress_mm": float(row.water_stress_mm),
               "irrigation_mm": float(row.irrigation_mm), "total_water_mm": float(row.total_water_mm),
               "share_of_scenarios_at_least_as_profitable_as_recommended": p_beat,
               "share_of_scenarios_with_loss": p_loss, "n_credit_kg_ha_over_plan": credit,
               "n_scenarios": int(scenset.n), "delta_vs_baseline": delta_vs_baseline(row), "baseline_id": BASELINE_ID}
         if row.id == top.id:
-            why = (f"Ranked 1 of {len(df)} on the objective J (lam={params['lam']:.2f}, w={params['w']:.2f}): "
+            why = (f"Ranked 1 of {n_off} on the objective J (lam={params['lam']:.2f}, w={params['w']:.2f}): "
                    f"mean {row.mean_profit:,.0f} Rs/acre, worst-10% {row.worst10_profit:,.0f} Rs/acre, "
                    f"irrigation {row.irrigation_mm:.0f} mm over the plan.")
         else:
-            why = (f"Ranked {int(row['rank'])} of {len(df)}. Versus the recommended rotation: mean profit "
+            lead = (f"Ranked {int(row['rank'])} of {n_off}. " if bool(row.get("offered", True)) else
+                    "Shown for comparison only: the tool does not offer the same non-rice crop in all 4 years (team rule). ")
+            why = (lead + "Versus the recommended rotation: mean profit "
                    f"{row.mean_profit - top.mean_profit:+,.0f} Rs/acre, worst-10% {row.worst10_profit - top.worst10_profit:+,.0f} Rs/acre, "
                    f"irrigation {row.irrigation_mm - top.irrigation_mm:+.0f} mm. "
                    f"It matches or beats the recommended plan in {p_beat*100:.0f}% of scenarios.")

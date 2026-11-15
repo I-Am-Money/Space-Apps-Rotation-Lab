@@ -30,6 +30,7 @@ def candidate_plans(df, extra=(), per_rice_count: int = 2):
         add(p)
     for p in extra:
         add(p)
+    df = opt.offered(df)
     nrice = df["plan"].map(lambda pl: list(pl).count("rice"))
     for n in range(5):
         sub = df[nrice == n]
@@ -54,12 +55,14 @@ def _J(profit, irrig, lam, w, scale):
     return opt.objective(profit.mean(-1), worst, irrig.mean(-1), lam, w, scale)
 
 
-def _first_crossover(winners, Jm, ms):
-    """winners [M] index; Jm [M,R]. Returns list of (m_cross, from, to) via linear interpolation."""
+def _first_crossover(winners, Jm, ms, group=None):
+    """winners [M] index; Jm [M,R]. Returns list of (m_cross, from, to) via linear interpolation.
+    With `group` (one label per rotation), only switches between different groups count: a switch between two
+    orderings of the same crops is not a tipping point."""
     out = []
     for i in range(1, len(winners)):
         a, b = winners[i - 1], winners[i]
-        if a != b:
+        if a != b and (group is None or group[a] != group[b]):
             d0 = Jm[i - 1, a] - Jm[i - 1, b]
             d1 = Jm[i, a] - Jm[i, b]
             t = d0 / (d0 - d1) if abs(d0 - d1) > 1e-12 else 0.5
@@ -82,31 +85,39 @@ def rainfall_crossover(scenset, awc, irr, params, scale, cands, n_boot=200, seed
     iA = names.index(opt.plan_id(opt.REF[opt.BASELINE_ID]))
     mp = P.mean(-1)
     delta_win = [float(mp[i, win[i]] - mp[i, iA]) for i in range(len(m_grid))]
-    cross = _first_crossover(win, Jm, m_grid)
+    names = [opt.plan_id(p) for p in cands]
+    nrice = [n.split("-").count("rice") for n in names]        # a tipping point = the number of rice years changes
+    cross = _first_crossover(win, Jm, m_grid, nrice)
     rng = np.random.default_rng(seed)
     S = P.shape[-1]
     firsts = []
     for _ in range(n_boot):
         idx = rng.integers(0, S, S)
         Jb = _J(P[..., idx], St[..., idx], lam, w, scale)
-        c = _first_crossover(Jb.argmax(1), Jb, m_grid)
+        c = _first_crossover(Jb.argmax(1), Jb, m_grid, nrice)
         firsts.append(c[0][0] if c else np.nan)
     firsts = np.array(firsts)
     ok = firsts[~np.isnan(firsts)]
     band = {"p10": float(np.percentile(ok, 10)) if len(ok) else None,
             "p90": float(np.percentile(ok, 90)) if len(ok) else None,
             "share_resamples_with_crossover": float(len(ok) / n_boot), "n_boot": n_boot}
-    crossovers = [{"rain_mult": c, "from": names[a], "to": names[b]} for c, a, b in cross]
+    crossovers = [{"rain_mult": c, "from": names[a], "to": names[b], "rice_years_from": nrice[a], "rice_years_to": nrice[b]}
+                  for c, a, b in cross]
+    i1 = int(np.argmin(np.abs(m_grid - 1.0)))
+    yrs = lambda n: f"{n} rice year{'s' if n != 1 else ''}"
+    text = (f"At normal rainfall the best rotation has {yrs(nrice[int(win[i1])])} ({names[int(win[i1])]}); at {m_grid[0]:.2f}x it has "
+            f"{yrs(nrice[int(win[0])])} ({names[int(win[0])]}) and at {m_grid[-1]:.2f}x {yrs(nrice[int(win[-1])])} ({names[int(win[-1])]}). ")
     if crossovers:
-        c0 = crossovers[0]
-        text = (f"As seasonal rainfall rises from {m_grid[0]:.2f}x, the best rotation switches from {c0['from']} to {c0['to']} "
-                f"near {c0['rain_mult']:.2f}x normal")
+        text += ("The number of rice years changes near " + ", ".join(f"{c['rain_mult']:.2f}x" for c in crossovers[:3])
+                 + (" and more" if len(crossovers) > 3 else "") + " of normal rainfall")
         if band["p10"] is not None:
-            text += f" (bootstrap 10th-90th percentile {band['p10']:.2f}x to {band['p90']:.2f}x, switch seen in {band['share_resamples_with_crossover']*100:.0f}% of {n_boot} resamples)"
+            text += (f" (first change: bootstrap 10th to 90th percentile {band['p10']:.2f}x to {band['p90']:.2f}x, "
+                     f"seen in {band['share_resamples_with_crossover']*100:.0f}% of {n_boot} resamples)")
         text += f". {FRAME}."
     else:
-        text = f"The same rotation ({names[int(win[0])]}) wins across the whole rainfall range {m_grid[0]:.2f}x to {m_grid[-1]:.2f}x. {FRAME}."
-    return {"rain_mult": m_grid.tolist(), "winner": [names[i] for i in win], "J": Jm.tolist(), "candidates": names,
+        text += f"The number of rice years does not change anywhere in that range. {FRAME}."
+    return {"rain_mult": m_grid.tolist(), "winner": [names[i] for i in win], "winner_rice_years": [nrice[i] for i in win],
+            "J": Jm.tolist(), "candidates": names,
             "mean_profit": mp.tolist(), "baseline_id": opt.BASELINE_ID,
             "baseline_mean_profit": mp[:, iA].tolist(), "delta_vs_baseline": delta_win, "crossovers": crossovers, "band": band, "text": text,
             "badge": "modeled", "n_candidates": len(cands)}
@@ -233,7 +244,7 @@ def late_monsoon_curve(scenset, awc, irr, params, scale, plans, days=LATE_DAYS, 
     first, last = names[int(Jm[0].argmax())], names[int(Jm[-1].argmax())]
     d = out["rotations"][first]
     tail = (f"the best rotation stays {first}" if first == last else f"the best rotation goes from {first} to {last}")
-    lead = (f"A monsoon onset {days[-1]} days later (June and July rain arrives later, total conserved, and sowing moves with it)"
+    lead = (f"A monsoon onset {days[-1]} days later (the rain of those first days is lost and sowing moves with it)"
             if kind == "onset" else f"Warming of +{days[-1]:g} degC (more crop water demand and more hot days at flowering)")
     out["text"] = (f"{lead} changes {first}'s mean profit by "
                    f"{d['mean_profit'][-1] - d['mean_profit'][0]:+,.0f} Rs/acre and its worst-10% profit by "
@@ -281,8 +292,13 @@ def evpi_text_awc(e):
             + _evpi_tail(e, "a soil test") + " This is an upper bound on any real test's value.")
 
 
-def evpi_text_irr(e):
-    lead = ("Measuring your canal and well supply could change the best plan: " if e["changes_plan"]
+SUPPLY_WORDS = {"canal_and_well": "canal and well supply", "canal": "canal supply", "borewell": "borewell supply",
+                "tank": "tank supply"}
+
+
+def evpi_text_irr(e, water_source=None):
+    what = SUPPLY_WORDS.get(water_source, "borewell, tank or canal supply")
+    lead = (f"Measuring your {what} could change the best plan: " if e["changes_plan"]
             else "Your best plan is the same across the likely range of water supply: ")
     return (lead + f"worth up to {e['value']:,.0f} Rs/acre over 4 years (expected value of perfect information, "
             f"uniform over {len(e['values'])} values from {min(e['values']):.0f} to {max(e['values']):.0f} mm a season). "

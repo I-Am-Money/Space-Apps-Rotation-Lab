@@ -21,7 +21,7 @@ from engine import scenarios as sc
 IS_MOCK = False
 ROOT = Path(__file__).resolve().parent.parent
 N_SCEN = sc.N_BOOT
-BOUNDARY_N_SCEN = 500
+BOUNDARY_N_SCEN = 200
 _ANNUAL = None          # tests may inject via set_annual()
 _AWC_FALLBACK = 140.0   # mm/m, UNVERIFIED dev placeholder used only if no soil data / assumptions value
 _IRR_FALLBACK = 500.0   # mm per season, UNVERIFIED dev placeholder if assumptions.yaml has no value
@@ -226,11 +226,14 @@ def _badges(p):
             "rotation_effects": "assumption", "econ_detail": economics.economics_badges(prices)}
 
 
-def _table(p, n=None):
+def _table(p, n=None, extra=()):
+    """Metrics table over the offered rotations, plus (not offered, never recommended) the user's current rotation
+    and any `extra` rotation that the team rule blocks, so they can still be compared."""
     opt.configure()
     _apply_sim_params(p)
     ss = boot_set(n)
-    return ss, opt.evaluate_table(ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"])
+    ex = [list(x) for x in [p["current_rotation"], *extra] if not opt.plan_allowed(x)]
+    return ss, opt.evaluate_table(ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"], extra=ex)
 
 
 def _resolve(rid, p):
@@ -379,7 +382,7 @@ def _stress_rows(plan, p, stress, base_rows=None):
 
 def compare(rotation_ids: list, params=None) -> dict:
     p = norm_params(params)
-    ss, df = _table(p)
+    ss, df = _table(p, extra=[_resolve(r, p) for r in rotation_ids])
     hist = hist_set()
     prices = economics.load_prices()
     stress = {k: v for k, v in sc.stress_tests(annual()).items()
@@ -401,7 +404,7 @@ def compare(rotation_ids: list, params=None) -> dict:
         resid = cover["index"]
         row = df[df.id == opt.plan_id(plan)].iloc[0]
         out["rotations"][rid] = {"plan": plan, "profit": a["profit"], "yield_kg_ha": a["yield"], "yield_mean": a["yield"].mean(0),
-            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(row.J),
+            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(row.J), "offered": bool(row.offered),
             "delta_vs_baseline": opt.delta_vs_baseline(row),
             "farm_totals": farm_totals({**m, "irrigation_canal_mm": None if a["irrig_canal"] is None else float(a["irrig_canal"].mean()),
                                         "irrigation_well_mm": None if a["irrig_well"] is None else float(a["irrig_well"].mean())}),
@@ -482,7 +485,7 @@ def recommend(params=None) -> dict:
     for v in rep.values():
         row = df[df.id == v["id"]].iloc[0]
         v["evidence"]["farm_totals"] = farm_totals(row.to_dict(), farm)
-    cols = ["id", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"] + list(opt.DELTA_FIELDS.values()) + [
+    cols = ["id", "offered", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"] + list(opt.DELTA_FIELDS.values()) + [
         "irrigation_canal_mm", "irrigation_well_mm", "total_profit_mean", "total_profit_worst10", "total_irrigation_m3",
         "irrigation_canal_m3", "irrigation_well_m3", "total_water_m3", "d_total_profit_mean", "d_total_profit_worst10",
         "d_total_irrigation_m3", "d_total_water_m3"]
@@ -520,8 +523,8 @@ def tipping_points(params=None) -> dict:
                    "rice_years": g["rice_years"], "boundary_band": g["boundary_band"], "current_irrigation_mm": float(irr),
                    "rice_shift_threshold_mm": g["rice_shift_threshold_mm"], "baseline_id": opt.BASELINE_ID,
                    "delta_mean_profit_vs_baseline": g["delta_mean_profit_vs_baseline"], "text": g["text"], "badge": "modeled"}
-    out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands[:6] if len(cands) > 6 else cands)
-    out["heat"] = bd.heat_curve(bs, awc, irr, p, scale, cands[:6] if len(cands) > 6 else cands)
+    out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands)
+    out["heat"] = bd.heat_curve(bs, awc, irr, p, scale, cands)
     si = soil_info()
     sa = p["soil"]
     lo, hi = si.get("awc_low_pm25"), si.get("awc_high_pm25")
@@ -545,7 +548,7 @@ def tipping_points(params=None) -> dict:
     e2 = bd.evpi(bs, p, scale, cands, "irr", irr_vals, awc, irr,
                  prices["water_measure_cost_rs"] / farm["acres"], prices["badges"]["water_measure_cost_rs"], "available irrigation water")
     e2["range_note"] = "irrigation uncertainty range +-50% of the input, assumption, team to verify"
-    e2["text"] = bd.evpi_text_irr(e2)
+    e2["text"] = bd.evpi_text_irr(e2, p["water_source"])
     out["evpi_awc"], out["evpi_irrigation"] = e1, e2
     out["grid_upstream_local"] = bd.upstream_local_grid(bs, awc, irr, p, scale, cands)
     a_ = farm["acres"]

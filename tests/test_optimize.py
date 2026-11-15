@@ -51,30 +51,52 @@ def test_recommend_and_report_structure():
     for v in r["three_strategy_report"].values():
         assert v["why"] and v["benefits"] and v["info_gaps"] and v["risks_for_local_review"] and v["evidence"]
     assert r["top"]["rank"] == 1
+    cur = r["three_strategy_report"]["current"]          # bajra x4 is blocked by the team rule: compared, never recommended
+    assert cur["evidence"]["offered"] is False and cur["evidence"]["rank"] == 0 and "comparison only" in cur["why"]
+    assert r["top"]["id"] != "bajra-bajra-bajra-bajra" and bool(r["top"]["offered"])
+    assert int(r["metrics"]["offered"].sum()) == len(opt.ALL_PLANS)
 
 
-def test_economics_units_and_irrigation_cost():
+def test_economics_units_and_no_water_charge():
     sim = fake_simulate_plan(api.boot_set().scen, ["rice"] * 4, 140, 500)
     pr = economics.load_prices()
     e = economics.plan_economics(["rice"] * 4, sim, 1.0, pr, n_credit=np.zeros(4))
-    expect = sim["yield_kg_ha"] * economics.HA_PER_ACRE * pr["price_rs_per_quintal"]["rice"] / 100
+    # rice yield is milled rice; it is sold as paddy (yield / milled_rice_per_paddy) at the paddy MSP
+    expect = sim["yield_kg_ha"] / pr["milled_rice_per_paddy"] * economics.HA_PER_ACRE * pr["price_rs_per_quintal"]["rice"] / 100
     assert np.allclose(e["revenue"], expect)
+    # v3 section 5.7: profit = revenue - operating cost (+ N saving); no irrigation or water charge
+    assert np.allclose(e["profit_year"], e["revenue"] - pr["operating_cost_rs_per_acre"]["rice"])
+    assert "irrigation_cost" not in e and "irrigation_cost_rs_per_m3" not in pr
     e2 = economics.plan_economics(["rice"] * 4, sim, 2.0, pr, n_credit=np.zeros(4))
     assert np.allclose(e2["revenue"], 2 * e["revenue"])
     ec = economics.plan_economics(["rice"] * 4, sim, 1.0, pr, n_credit=np.full(4, 30.0))
     assert np.all(ec["profit"] > e["profit"])
 
 
-def test_less_irrigation_cost_for_millet_plan():
+def test_millet_plan_uses_less_irrigation_than_rice_only():
     s, df = api._table(api.norm_params())
-    a = df[df.id == "rice-rice-rice-rice"].iloc[0]; m = df[df.id == "-".join([opt.MILLETS[0]] * 4)].iloc[0]
+    a = df[df.id == "rice-rice-rice-rice"].iloc[0]; m = df[df.id == opt.plan_id(opt.REF["B"])].iloc[0]
     assert m.irrigation_mm < a.irrigation_mm
+
+
+def test_water_slider_never_picks_a_thirstier_plan():
+    p = api.norm_params({"lam": 0.3})
+    ss, df = api._table(p)
+    irr = [opt.offered(opt.rescore(df, 0.3, w)).sort_values("J", ascending=False).iloc[0].irrigation_mm for w in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    assert all(b <= a + 1e-9 for a, b in zip(irr, irr[1:]))
+
+
+def test_objective_matches_v3_formula_by_hand():
+    # J = (1 - lam) * mean + lam * worst10 - w * irrigation * water_price_proxy
+    assert opt.objective(1000.0, 400.0, 500.0, 0.25, 0.5, 2.0) == 0.75 * 1000 + 0.25 * 400 - 0.5 * 500 * 2.0
 
 
 def test_candidate_set_follows_selection_and_refs():
     opt.configure(["ragi"])
     try:
-        assert len(opt.ALL_PLANS) == 81 and set(opt.CROPS) == {"rice", "pigeonpea", "ragi"}
+        # 3 crops, 4 years = 81 rotations, minus pigeonpea x4 and ragi x4 (team rule: same non-rice crop 4 years running)
+        assert len(opt.ALL_PLANS) == 79 and set(opt.CROPS) == {"rice", "pigeonpea", "ragi"}
+        assert ["rice"] * 4 in opt.ALL_PLANS and ["ragi"] * 4 not in opt.ALL_PLANS and ["pigeonpea"] * 4 not in opt.ALL_PLANS
         assert opt.REF["B"] == ["rice", "ragi", "rice", "ragi"] and opt.REF["C"] == ["rice", "pigeonpea", "ragi", "rice"]
     finally:
         opt.configure(None) if False else None

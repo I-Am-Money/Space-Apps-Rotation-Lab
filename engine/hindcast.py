@@ -130,9 +130,9 @@ def baseline_table(df, scenset, awc, irr, params, price_mult=1.0) -> list[dict]:
     d_rec = opt.rescore(df, params["lam"], params["w"], df.attrs.get("scale"))
     d_mean = opt.rescore(df, 0.0, 0.0, df.attrs.get("scale"))
     rows = []
-    for name, row in (("recommended", d_rec.sort_values("J", ascending=False).iloc[0]),
+    for name, row in (("recommended", opt.offered(d_rec).sort_values("J", ascending=False).iloc[0]),
                       ("always rice (A)", df[df.id == opt.plan_id(opt.REF["A"])].iloc[0]),
-                      ("mean-profit only (lam=0)", d_mean.sort_values("J", ascending=False).iloc[0])):
+                      ("mean-profit only (lam=0)", opt.offered(d_mean).sort_values("J", ascending=False).iloc[0])):
         rows.append({"strategy": name, "id": row["id"], "mean_profit": float(row.mean_profit),
                      "worst10_profit": float(row.worst10_profit),
                      "irrigation_mm": float(row.irrigation_mm)})

@@ -227,6 +227,11 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
     res["sowing_doy"] = np.zeros((R, S, 4))
     res["hot_days"] = np.zeros((R, S, 4))
     res["heat_factor"] = np.ones((R, S, 4))
+    # late-sowing penalty (assumption, toggle): each day a crop is sown after its median-year date cuts Ya
+    late_on = bool(A(params, "late_sowing.enabled"))
+    late_pen = float(A(params, "late_sowing.pen_per_day"))
+    res["late_days"] = np.zeros((R, S, 4))
+    res["late_factor"] = np.ones((R, S, 4))
 
     dayidx = np.arange(NDAY)
 
@@ -332,9 +337,13 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
                 hf = np.maximum(0.0, 1.0 - pen_day * hot)
                 res["hot_days"][idx, :, y] = hot
                 res["heat_factor"][idx, :, y] = hf
+            late = np.maximum(sow - min(c.sowing_doy, NDAY - n + 1), 0)       # days sown after the median-year date
+            lf = np.maximum(0.0, 1.0 - late_pen * late) if late_on else np.ones(S)
+            res["late_days"][idx, :, y] = late
+            res["late_factor"][idx, :, y] = lf
             ym = c.ym_kg_ha
             res["yield_kg_ha"][idx, :, y] = season_yield(ym, c.ky, res["eta_mm"][idx, :, y],
-                                                         res["etm_mm"][idx, :, y], fr[idx, y][:, None]) * hf[None, :]
+                                                         res["etm_mm"][idx, :, y], fr[idx, y][:, None]) * (hf * lf)[None, :]
             if rec_on:
                 for n_ in daily:
                     daily[n_][idx, :, y, :] = rec[n_]
