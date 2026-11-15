@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """NASA GIBS WMTS (EPSG:3857) layer discovery for map overlays (never used by the model).
 
 Layer IDs are parsed from the real GetCapabilities document (cached in

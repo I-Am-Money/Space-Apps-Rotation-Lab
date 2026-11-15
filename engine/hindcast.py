@@ -1,8 +1,9 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Hindcast (engine-decision): single-season model yield vs ICRISAT district yield, per crop.
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times
 (no prior-crop effect in year 1). Observed and modeled are linearly detrended before Pearson r.
-Held-out: the most recent 10 overlap years are never used to fit trends (detrend fit on earlier years only,
+Held-out: the most recent 8 overlap years are never used to fit trends (detrend fit on earlier years only,
 extrapolated to the held-out years); nothing is tuned on them.
 Rice note: district rice yields mix irrigated and rainfed fields, so weak r is expected.
 """
@@ -17,7 +18,7 @@ from engine import optimize as opt
 from engine import scenarios as sc
 
 ROOT = Path(__file__).resolve().parent.parent
-HELD_OUT_YEARS = 10
+HELD_OUT_YEARS = 8        # Build Spec v3 section 11.1: hold out the most recent 8 years
 CROP_MAP = {"rice": "rice", "paddy": "rice", "sorghum": "jowar", "jowar": "jowar", "pearl millet": "bajra",
             "pearl_millet": "bajra", "bajra": "bajra", "pigeonpea": "pigeonpea", "pigeon pea": "pigeonpea",
             "pigeon_pea": "pigeonpea", "tur": "pigeonpea"}
@@ -130,10 +131,10 @@ def baseline_table(df, scenset, awc, irr, params, price_mult=1.0) -> list[dict]:
     d_rec = opt.rescore(df, params["lam"], params["w"], df.attrs.get("scale"))
     d_mean = opt.rescore(df, 0.0, 0.0, df.attrs.get("scale"))
     rows = []
-    for name, row in (("recommended", d_rec.sort_values("J", ascending=False).iloc[0]),
-                      ("always rice (A)", df[df.id == opt.plan_id(opt.REF["A"])].iloc[0]),
-                      ("mean-profit only (lam=0)", d_mean.sort_values("J", ascending=False).iloc[0])):
+    for name, row in (("Picked for your priorities", opt.offered(d_rec).sort_values("J", ascending=False).iloc[0]),
+                      ("Rice every year (our farm today)", df[df.id == opt.plan_id(opt.REF["A"])].iloc[0]),
+                      ("Picked on average profit alone", opt.offered(d_mean).sort_values("J", ascending=False).iloc[0])):
         rows.append({"strategy": name, "id": row["id"], "mean_profit": float(row.mean_profit),
-                     "worst10_profit": float(row.worst10_profit), "water_stress_mm": float(row.water_stress_mm),
+                     "worst10_profit": float(row.worst10_profit),
                      "irrigation_mm": float(row.irrigation_mm)})
     return rows

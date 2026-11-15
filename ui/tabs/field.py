@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import html
 import json
 from pathlib import Path
@@ -8,7 +9,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from ui import charts, data
-from ui.components import REGIONAL, badge, md, section, srcline, stat, stats, tab_head
+from ui.components import REGIONAL, badge, fmt_rs, md, section, srcline, stat, stats, tab_head
 from ui.data import CROP_LABEL
 
 GIBS_FILE = Path(__file__).resolve().parents[2] / "data" / "gibs_layers.json"
@@ -32,11 +33,28 @@ def _gibs_layers():
 
 
 def render():
-    tab_head("My Field", "Our farm grows rice every year today. Set the water you can count on, then see what else could work.")
+    tab_head("Our Farm", "A rice farm in Nalgonda, Telangana. It grows rice every year today. Set the water you can count on, then see what else could work.")
     with st.spinner(data.MSG["get_field_summary"]):
         fs = data.field_summary()
     reg, cl, soil = fs["region"], fs["climate"], fs["soil"]
     V = data.V()
+
+    # --- baseline card: rotation A, rice every year (v3 section 9, tab 1)
+    p = data.params()
+    with st.spinner(data.MSG["recommend"]):
+        rec = data.recommend(p)
+    mb = "placeholder" if data.is_mock() else "modeled"
+    mdf = rec["metrics"]
+    a = mdf[mdf.id == "rice-rice-rice-rice"]
+    if len(a):
+        a = a.iloc[0]
+        section("Our farm today: rice every year (Rotation A)", mb, "This is the baseline. Every other plan in the tool is shown as a difference from it.")
+        stats([
+            stat("Average profit over 4 years", fmt_rs(a.mean_profit), "per acre", mb, f"{fmt_rs(data.farm_total(a.mean_profit))} for {data.ACRES:,.0f} acres" if data.ACRES else ""),
+            stat("In the worst 10% of weather sequences", fmt_rs(a.worst10_profit), "per acre", mb, f"{fmt_rs(data.farm_total(a.worst10_profit))} for {data.ACRES:,.0f} acres" if data.ACRES else ""),
+            stat("Irrigation water over 4 years", f"{a.irrigation_mm:,.0f}", "mm", mb, f"{data.m3(a.irrigation_mm):,.0f} m3 on the farm" if data.m3(1) else ""),
+        ])
+        md('<p class="rl-note">District-scale estimate from regional weather, district yields and state cost surveys. It is not a measurement of this farm. Prices are this season\'s minimum support prices and do not change between years.</p>')
 
     # --- rice irrigation supply: canal plus well
     section("Rice irrigation water", "assumption", "Rice gets canal water first. Wells cover what the canal does not, up to their limit. By default the model works both out from rainfall. Override either one with your own figure.")
@@ -83,7 +101,7 @@ def render():
     st.segmented_control("Soil used by the model", ["farm", "district"], format_func=lambda k: {"farm": "Farm soil (black soil)", "district": "District estimate (SoilGrids)"}[k],
                          default=V["soil_mode"], key="w_soil_mode", on_change=lambda: V.update(soil_mode=st.session_state.get("w_soil_mode") or "farm"))
 
-    c1, c2, c3 = st.columns([1, 1, 1.2], gap="large")
+    c2, c3 = st.columns([1, 1.2], gap="large")
     with c2:
         st.checkbox("I have a soil test for water holding capacity", value=V["use_soil_test"], **data.bind("use_soil_test"))
         if V["use_soil_test"]:
@@ -128,7 +146,8 @@ def render():
         md(f'<p class="rl-note">{REGIONAL}</p>')
     with right:
         section("What the record shows")
-        yrs = f'Regional estimate, mean of {cl["first_year"]} to {cl["last_year"]}'
+        n_yrs = int(cl["last_year"]) - int(cl["first_year"]) + 1
+        yrs = f'Regional estimate, mean of {n_yrs} years, {cl["first_year"]} to {cl["last_year"]}'
         stats([
             stat("Rain in a typical year", f'{cl["annual_rain_mm"]:,.0f}', "mm", cl.get("badge", "observed"), yrs),
             stat("Of which June to September", f'{cl["monsoon_rain_mm"]:,.0f}', "mm", cl.get("badge", "observed"), "Regional estimate"),
@@ -137,11 +156,26 @@ def render():
         if cl.get("note"):
             md(f'<p class="rl-note">{html.escape(cl["note"])}. {badge(cl.get("badge", "observed"))}</p>')
 
+    mon = fs.get("monsoon_onset")
+    if mon:
+        section("When the monsoon arrives", mon.get("badge", "modeled"),
+                "Every crop is sown when the monsoon arrives, so a late monsoon means late sowing. The onset date of each year is worked out from the daily rain record with one fixed rule.")
+        stats([
+            stat("Usual onset (median)", charts.doy_label(mon["median_doy"]), "", mon.get("badge", "modeled"), f'{len(mon["years"])} years of daily rain'),
+            stat("Earliest", charts.doy_label(mon["earliest_doy"]), "", mon.get("badge", "modeled"), f'in {mon["earliest_year"]}'),
+            stat("Latest", charts.doy_label(mon["latest_doy"]), "", mon.get("badge", "modeled"), f'in {mon["latest_year"]}'),
+        ])
+        charts.show(charts.onset_history(mon), "onset_hist")
+        nc = mon.get("no_clean_onset_years") or []
+        srcline(f'Daily rain from NASA POWER (regional estimate). Onset rule: {mon["rule"]}.'
+                + (f' No clean onset was found in {", ".join(str(y) for y in nc)}; 1 September is used for those years.' if nc else "")
+                + " The numbers in the rule are assumptions, team to verify.", "Source")
+
     yh = fs.get("yield_history")
     if yh:
         yh = pd.DataFrame(yh)
         section("District yield history", "placeholder" if data.is_mock() else "observed",
-                "Average yields for the district, all farms together. Rice here mixes irrigated and rainfed fields.")
+                "Average yields for the district, all farms together. Rice is reported as milled rice (paddy times 0.66) and mixes irrigated and rainfed fields.")
         charts.show(charts.yield_history(yh), "yh")
         srcline("District yields from a third-party panel built from ICRISAT data (Mendeley Data, doi 10.17632/ywp3y5j9vv.1), 1990 to 2015. The ICRISAT district tables themselves could not be downloaded. Crops with no district record are not drawn.", "Data source")
         with st.expander("Show these numbers as a table"):
@@ -150,3 +184,11 @@ def render():
     else:
         section("District yield history")
         md(f'<div class="rl-nodata">{badge("placeholder")} No district yield data is loaded yet, so nothing is drawn. Nothing has been made up.</div>')
+
+    fr = fs.get("farm_records")
+    section("Farm records", "local")
+    if fr and fr.get("rows"):
+        md('<p class="rl-note">Your own harvest records, as entered in data/raw/farm_records.csv.</p>')
+        st.dataframe(pd.DataFrame(fr["rows"]), hide_index=True, use_container_width=True)
+    else:
+        md('<p class="rl-note">No farm records have been added yet. Put past harvests in <code>data/raw/farm_records.csv</code> (year, crop, area_acres, yield_quintals) and they will show here and on the How Good Is This? tab as Local input.</p>')

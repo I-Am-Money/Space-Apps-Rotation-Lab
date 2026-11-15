@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """FAO-56 Chapter 4, Example 18: ET0 for 6 July at Uccle (Brussels), 50.80 N, 100 m.
 Inputs: Tmax 21.5, Tmin 12.3 C; RHmax 84, RHmin 63 %; u2 = 2.078 m/s;
 sunshine n = 9.25 h of N = 16.1 h. Published answer: ET0 = 3.9 mm/day

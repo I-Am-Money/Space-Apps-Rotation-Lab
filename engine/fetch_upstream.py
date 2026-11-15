@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Upstream (upper Krishna basin) Jun-Oct rainfall from NASA POWER points listed in config/region.yaml.
 
 The mean of a few ~0.5 degree grid points is a PROXY for basin rainfall, not catchment inflow.

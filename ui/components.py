@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Small HTML components. All numbers passed in come from the engine; nothing is computed here
 except display formatting."""
 from __future__ import annotations

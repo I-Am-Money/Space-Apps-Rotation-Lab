@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """FAO-33 yield response (Doorenbos & Kassam 1979): 1 - Ya/Ym = Ky (1 - ETa/ETm), plus rotation effects."""
 from __future__ import annotations
 

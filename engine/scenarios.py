@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Scenario construction (engine-decision).
 
 A scenario is one plan of 4 consecutive years of REAL weather (Feb 29 dropped):
@@ -54,16 +55,21 @@ class ScenSet:
 
     def subset(self, n: int) -> "ScenSet":
         n = min(n, self.n)
-        s = {k: (v[:n] if isinstance(v, np.ndarray) else v[:n]) for k, v in self.scen.items()}
+        s = {k: (v[:n] if isinstance(v, (np.ndarray, list)) else v) for k, v in self.scen.items()}
         return ScenSet(self.key + (("first", n),), s, self.note)
 
 
 # ---------------------------------------------------------------- annual data
 def annual_from_arrays(years, et0, precip, tmax, upstream=None) -> dict:
-    """upstream = Jun-Oct season rain (mm) upstream of Nagarjuna Sagar per year, or None if not available."""
+    """upstream = Jun-Oct season rain (mm) upstream of Nagarjuna Sagar per year, or None if not available.
+    Adds the monsoon onset day of every year (engine.monsoon, v3 section 6.2) and the record's median onset."""
+    from engine import monsoon
+    precip = np.asarray(precip, float)
+    onset = monsoon.onset_doy_years(precip)
     return {"years": np.asarray(years), "et0": np.asarray(et0, float),
-            "precip": np.asarray(precip, float), "tmax": np.asarray(tmax, float),
-            "upstream": None if upstream is None else np.asarray(upstream, float)}
+            "precip": precip, "tmax": np.asarray(tmax, float),
+            "upstream": None if upstream is None else np.asarray(upstream, float),
+            "onset": onset, "onset_median": float(np.median(onset))}
 
 
 def annual_from_daily(weather, et0_daily_arr) -> dict:
@@ -116,19 +122,18 @@ def monsoon_rain(annual: dict) -> np.ndarray:
     return annual["precip"][:, JUN1:OCT1].sum(1)
 
 
-def summer_tmax(annual: dict) -> np.ndarray:
-    return annual["tmax"][:, MAR1:JUN1].mean(1)
+GROWING = (JUN1, 304)           # June to October: the kharif growing season
 
 
-def onset_doy(precip_year: np.ndarray, window: int = 7, thresh_mm: float = 50.0) -> int:
-    """First day from 15 May where the trailing 7-day rain >= 50 mm (a documented
-    onset proxy). Returns OCT1 (273) if it never happens."""
-    c = np.concatenate([[0.0], np.cumsum(precip_year)])
-    for d in range(MAY15, OCT1):
-        lo = max(0, d - window + 1)
-        if c[d + 1] - c[lo] >= thresh_mm:
-            return d
-    return OCT1
+def season_tmax(annual: dict) -> np.ndarray:
+    """Mean daily maximum temperature over the growing season (June to October) of each year."""
+    return annual["tmax"][:, GROWING[0]:GROWING[1]].mean(1)
+
+
+def onset_doy(precip_year: np.ndarray) -> int:
+    """Monsoon onset day-of-year (1-based) by the documented rule in engine/monsoon.py (v3 section 6.2)."""
+    from engine import monsoon
+    return monsoon.onset_doy(precip_year)
 
 
 def _take(annual, idx) -> dict:
@@ -142,6 +147,9 @@ def make_scen(annual: dict, idx: np.ndarray, labels: list[str]) -> dict:
         s["upstream_season_rain"] = np.asarray(annual["upstream"])[np.asarray(idx)]      # [S,4] mm
     s["labels"] = list(labels)
     s["year_idx"] = np.asarray(idx)
+    if annual.get("onset") is not None:
+        s["onset_doy"] = np.asarray(annual["onset"])[np.asarray(idx)]                   # [S,4] day-of-year, 1-based
+        s["onset_median"] = float(annual["onset_median"])
     return s
 
 
@@ -170,16 +178,16 @@ def stress_tests(annual: dict) -> dict:
     three plan years are the median-monsoon year of the record (documented filler).
     Returns {name: {scen, source_year, plan_year, description}}."""
     yrs = annual["years"]
-    mr, tm = monsoon_rain(annual), summer_tmax(annual)
-    on = np.array([onset_doy(annual["precip"][i]) for i in range(len(yrs))])
+    mr, tm = monsoon_rain(annual), season_tmax(annual)
+    on = np.asarray(annual["onset"]) if annual.get("onset") is not None else np.array([onset_doy(annual["precip"][i]) for i in range(len(yrs))])
     med_year = int(np.argsort(np.abs(mr - np.median(mr)))[0])
     picks = [
-        ("driest monsoon in year 2", int(np.argmin(mr)), 2,
+        ("weakest monsoon in year 2", int(np.argmin(mr)), 2,
          lambda i: f"monsoon (Jun-Sep) rain {mr[i]:.0f} mm in {yrs[i]}, record median {np.median(mr):.0f} mm"),
-        ("hottest summer in year 3", int(np.argmax(tm)), 3,
-         lambda i: f"Mar-May mean Tmax {tm[i]:.1f} degC in {yrs[i]}, record median {np.median(tm):.1f} degC"),
         ("latest monsoon onset in year 1", int(np.argmax(on)), 1,
-         lambda i: f"onset proxy on day {on[i]+1} of {yrs[i]} (first 7-day rain >= 50 mm after 15 May), median day {int(np.median(on))+1}"),
+         lambda i: f"monsoon onset on day {on[i]} of {yrs[i]} by the rule in engine/monsoon.py, record median day {np.median(on):.0f}; sowing moves with it"),
+        ("hottest season in year 3", int(np.argmax(tm)), 3,
+         lambda i: f"June-October mean daily maximum {tm[i]:.1f} degC in {yrs[i]}, record median {np.median(tm):.1f} degC"),
     ]
     if annual.get("upstream") is not None:
         up = annual["upstream"]
@@ -198,28 +206,45 @@ def stress_tests(annual: dict) -> dict:
 
 
 # ----------------------------------------------------------------- what-ifs
+def delay_onset(precip: np.ndarray, onset_doy, n_days: int) -> np.ndarray:
+    """Later monsoon onset what-if: the monsoon starts n_days later than it really did in each year, and the
+    rain of those first n_days after the real onset does NOT arrive (it is lost, not moved). Rain before the
+    real onset (pre-monsoon showers) and after the delayed onset is unchanged.
+    precip [..., 365]; onset_doy [...] 1-based day-of-year of the real onset in each year."""
+    n = int(n_days)
+    if n <= 0:
+        return precip
+    day = np.arange(precip.shape[-1])
+    on0 = np.asarray(onset_doy)[..., None] - 1                    # 0-based index of the real onset day
+    lost = (day >= on0) & (day < on0 + n)
+    return np.where(lost, 0.0, precip)
+
+
 def shift_june_july(precip: np.ndarray, n_days: int) -> np.ndarray:
-    """Move Jun-Jul rain n_days later, conserving the total (rain lands in Aug if shifted past Jul)."""
+    """Fallback when the scenario carries no onset days: June-July rain of the first n_days is removed."""
     n = int(n_days)
     if n <= 0:
         return precip
     out = precip.copy()
-    lo, hi = JUN_JUL
-    window = precip[..., lo:hi].copy()
-    out[..., lo:hi] = 0.0
-    n = min(n, DAYS - hi)
-    out[..., lo + n:hi + n] += window
+    out[..., JUN1:min(JUN1 + n, DAYS)] = 0.0
     return out
 
 
 def apply_whatif(scen: dict, rain_mult: float = 1.0, dT: float = 0.0, shift_days: int = 0,
                  et0_per_degc: float = ET0_PER_DEGC, upstream_mult: float = 1.0) -> dict:
     """Return a copy with rain scaled, temperature raised by dT, ET0 scaled by (1+k*dT),
-    and Jun-Jul rain shifted later. Labelled as what-if, not forecast."""
+    and the monsoon onset delayed by shift_days: the rain of the first shift_days after the real onset is lost
+    and the onset day moves later by shift_days, so sowing moves too (v3 section 6.2).
+    Labelled as what-if, not forecast."""
     out = dict(scen)
-    p = shift_june_july(scen["precip"], shift_days) * float(rain_mult)
+    if "onset_doy" in scen:
+        p = delay_onset(scen["precip"], scen["onset_doy"], shift_days) * float(rain_mult)
+    else:
+        p = shift_june_july(scen["precip"], shift_days) * float(rain_mult)
     out["precip"] = p
     out["tmax"] = scen["tmax"] + float(dT)
+    if "onset_doy" in scen and int(shift_days) > 0:
+        out["onset_doy"] = np.asarray(scen["onset_doy"]) + int(shift_days)
     out["et0"] = scen["et0"] * (1.0 + et0_per_degc * float(dT))
     if "upstream_season_rain" in scen:      # independent of the local multiplier
         out["upstream_season_rain"] = np.asarray(scen["upstream_season_rain"]) * float(upstream_mult)

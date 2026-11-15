@@ -10,7 +10,7 @@ A farmer or a farm adviser in India, on a phone or a laptop, often outdoors in b
 
 ## Product purpose
 
-RotationLab compares four-year rotations of rice, jowar, bajra and pigeon pea against real weather records and shows the water level at which land should shift from rice to millets. It supports, and does not replace, farmer and local expert judgment. All outputs are modeled estimates for planning.
+RotationLab compares four-year rotations of rice, bajra and pigeon pea with rice every year, against real weather records, and shows the water level at which land should shift out of rice. It supports, and does not replace, farmer and local expert judgment. All outputs are modeled estimates for planning.
 
 ## Brand and tone
 

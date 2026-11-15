@@ -1,3 +1,5 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+"""Tab 3, Our Priorities (Build Spec v3 section 9): the two sliders, the Pareto chart and the recommendation card."""
 import html
 
 import streamlit as st
@@ -9,12 +11,23 @@ from ui.tabs import _farm
 from ui.components import delta_html, srcline, badge, fmt_rs, md, ribbon, section, stat, stats, tab_head
 
 
+CLOSE_CALL_RS = 500   # Rs per acre over 4 years; a smaller gap between the top two plans is shown as a tie
+
 def explain_inputs(rec, tp, p):
+    """Only computed numbers go to the explanation (v3 section 10): top rotation, baseline A, differences,
+    crossover thresholds and EVPI when the tipping points are already computed."""
     t, r = rec["top"], rec["runner_up"]
-    d = dict(top_rotation=plan_label(t["plan"]), runner_up=plan_label(r["plan"]), top_mean_profit=round(t["mean_profit"]),
-             top_worst10_profit=round(t["worst10_profit"]), top_water_stress_mm=round(t["water_stress_mm"]),
-             runner_up_mean_profit=round(r["mean_profit"]), runner_up_worst10_profit=round(r["worst10_profit"]),
-             bad_year_weight=p["lam"], water_stress_weight=p["w"], irrigation_input_mm=p["irrigation_mm"])
+    mdf = rec["metrics"]
+    a = mdf[mdf.id == "rice-rice-rice-rice"].iloc[0]
+    d = dict(top_rotation=plan_label(t["plan"]), runner_up=plan_label(r["plan"]),
+             top_mean_profit=round(t["mean_profit"]), top_worst10_profit=round(t["worst10_profit"]),
+             top_irrigation_mm=round(t["irrigation_mm"]),
+             baseline_rotation="Rice every year (our farm today)", baseline_mean_profit=round(a.mean_profit),
+             baseline_worst10_profit=round(a.worst10_profit), baseline_irrigation_mm=round(a.irrigation_mm),
+             diff_mean_profit=round(t["mean_profit"] - a.mean_profit), diff_worst10_profit=round(t["worst10_profit"] - a.worst10_profit),
+             diff_irrigation_mm=round(t["irrigation_mm"] - a.irrigation_mm),
+             same_as_today=bool(t["id"] == "rice-rice-rice-rice"),
+             bad_year_weight=p["lam"], water_saving_weight=p["w"])
     if tp:
         co = tp["rainfall_crossover"].get("crossovers") or []
         d["rain_crossover"] = co[0]["rain_mult"] if co else None
@@ -26,37 +39,63 @@ def explain_inputs(rec, tp, p):
 
 
 def render():
-    tab_head("My Priorities", "Say what matters to you. The recommendation moves with the sliders.")
+    tab_head("Our Priorities", "Say what matters to the farm. The recommendation moves with the two sliders.")
     c1, c2 = st.columns(2, gap="large")
     with c1:
         st.slider("What matters more to you?", 0, 100, value=data.V()["lam"], format="%d", **data.bind("lam"),
-                  help="Left: maximise the average result. Right: care most about the worst seasons.")
+                  help="Left: the best result in an average run of years. Right: the best result in the worst tenth of weather sequences.")
         md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Plan for an average year</span><span>Protect me in bad years</span></div>')
     with c2:
-        st.slider("How much do you care about water stress?", 0, 100, value=data.V()["w"], format="%d", **data.bind("w"))
-        md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Not much</span><span>A lot</span></div>')
+        st.slider("How much do you want to save irrigation water?", 0, 100, value=data.V()["w"], format="%d", **data.bind("w"),
+                  help="Left: water saving does not count. Right: every millimetre of irrigation water saved counts at the full water value set in the assumptions.")
+        md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Not at all</span><span>As much as possible</span></div>')
 
     p = data.params()
     with st.spinner(data.MSG["recommend"]):
         rec = data.recommend(p)
     mdf = rec["metrics"]
+    n_rot = int(mdf["offered"].sum()) if "offered" in mdf else len(mdf)
     base = mdf[mdf.id == "rice-rice-rice-rice"].iloc[0]
     t = rec["top"]
     b = "placeholder" if data.is_mock() else "modeled"
     ex = explain.explain(explain_inputs(rec, None, p))
-    src = "Written by Claude from the numbers above." if ex["source"] == "model" else "Written from a fixed template using the numbers above."
-    md(f'<div class="rl-hero"><p style="margin:0;font-size:.9rem;opacity:.85">Recommended for these priorities {badge(b)}</p>'
+    src = "Written by Claude from the numbers on this page." if ex["source"] == "model" else "Written from a fixed template using the numbers on this page."
+    same = t["id"] == "rice-rice-rice-rice"
+    md(f'<div class="rl-hero"><p style="margin:0;font-size:.9rem;opacity:.85">{"Recommended for these priorities: stay with rice every year" if same else "Recommended for these priorities"} {badge(b)}</p>'
        f'<h4>{html.escape(plan_label(t["plan"]))}</h4>{ribbon(t["plan"])}<p style="margin:.7rem 0 .3rem">{html.escape(ex["text"])}</p>'
        f'<p style="margin:0;font-size:.82rem;opacity:.8">{src} Modeled estimate, for planning only.</p></div>')
     stats([
         stat("Average over 4 years", fmt_rs(t["mean_profit"]), "per acre", b, delta_html(t["mean_profit"] - base.mean_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["mean_profit"])),
-        stat("Worst 10% of seasons", fmt_rs(t["worst10_profit"]), "per acre", b, delta_html(t["worst10_profit"] - base.worst10_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["worst10_profit"])),
-        stat("Water shortfall", f'{t["water_stress_mm"]:,.0f}', "mm", b, delta_html(t["water_stress_mm"] - base.water_stress_mm, "{:,.0f} mm", good_when_up=False) + " against our farm today"),
+        stat("Worst 10% of weather sequences", fmt_rs(t["worst10_profit"]), "per acre", b, delta_html(t["worst10_profit"] - base.worst10_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["worst10_profit"])),
+        stat("Irrigation water over 4 years", f'{t["irrigation_mm"]:,.0f}', "mm", b, delta_html(t["irrigation_mm"] - base.irrigation_mm, "{:,.0f} mm", good_when_up=False) + " against our farm today"
+             + (f' ({data.m3(t["irrigation_mm"] - base.irrigation_mm):+,.0f} m3 on the farm)' if data.m3(1) else "")),
     ])
+    ru = rec.get("runner_up") or {}
+    if ru and ru.get("J") is not None and t.get("J") is not None:
+        gap = float(t["J"]) - float(ru["J"])
+        if gap < CLOSE_CALL_RS:
+            md(f'<p class="rl-note"><strong>Close call.</strong> The second plan, {html.escape(plan_label(ru["plan"]))}, scores only Rs {gap:,.0f} per acre lower over four years. '
+               f'We treat any gap under Rs {CLOSE_CALL_RS:,} as a tie (a rule of thumb, not a statistical test), so choose between the two on what suits the farm.</p>')
+    be = rec.get("breakeven")
+    if be and not same:
+        crops = " and ".join(data.CROP_LABEL.get(c, c).lower() for c in be["crops"])
+        if be.get("shortfall") is None:
+            room = f"Even with no income at all from {crops}, this plan still scores higher than rice every year for these priorities, because of the weight put on saving water."
+        else:
+            room = (f"If {crops} brings in {be['shortfall'] * 100:.0f}% less money than assumed (a lower price or a lower yield), "
+                    f"rice every year scores higher than this plan for these priorities.")
+        md(f'<p class="rl-note"><strong>Room for error.</strong> {room} The model values {crops} at the full support price'
+           f'{", and pigeon pea has no district yield record" if "pigeonpea" in be["crops"] else ""}, so check both locally before acting. {badge("modeled")}</p>')
+    wp = rec.get("water_price_proxy") or {}
+    if wp.get("value_rs_per_mm_ha") is not None:
+        md(f'<p class="rl-note">How the score works: average profit and worst-10% profit are mixed by the first slider. The second slider then subtracts '
+           f'a value for the irrigation water a plan uses, up to Rs {wp["value_rs_per_mm_ha"]:g} per mm per hectare at the far right {badge("assumption")}. '
+           f'That value is a preference, not a bill: it is never taken off the profit shown.</p>')
 
-    section("Every possible rotation, plotted", b,
-            "Each dot is one of the 256 ways to fill four years. Higher and further right is better. Darker blue means more water stress.")
+    section("Every rotation, plotted", b,
+            f"Each dot is one of the {n_rot} four-year rotations. Further right is a better average, higher is a better bad-year result. Darker blue uses more irrigation water.")
     charts.show(charts.pareto(rec["metrics"], t["id"]), "pareto")
-    _farm.land_split_panel(t["id"], data.plan_label(t["plan"]), "pri", p)
-    srcline(f"Model output for all {len(mdf)} rotations over {rec['n_scenarios']:,} resampled weather sequences.", "Source")
+    srcline(f"Model output for all {n_rot} rotations over {rec['n_scenarios']:,} resampled weather sequences. Plans that grow the same non-rice crop in all four years are not offered (team rule).", "Source")
     md('<p class="rl-note">The white circle is our farm today. The diamond is the recommended rotation. The dotted line joins the rotations where you cannot raise the average without lowering the bad-year result.</p>')
+    if not same:
+        _farm.land_split_panel(t["id"], data.plan_label(t["plan"]), "pri", p)

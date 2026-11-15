@@ -34,14 +34,38 @@ msp:
     (all paid-out costs plus imputed family labour, i.e. A2+FL), projected for 2026-27.
     It is per quintal, not per acre, and is not state-specific.
 
-# Operating cost per acre: NOT found in a verifiable state-level (Telangana/AP) form.
-# CACP cost-of-cultivation state tables were not reachable. Team to fill from CACP
-# "Cost of Cultivation / Production" reports (cacp.da.gov.in), Cost A2+FL, Telangana or AP.
+# District statistics (ICRISAT DLD) report rice as MILLED rice; the MSP is paid per quintal of PADDY.
+# Sold paddy = milled rice yield / milled_rice_per_paddy. Used in engine/economics.py only (yields stay milled rice
+# everywhere else so the hindcast compares like with like).
+milled_rice_per_paddy:
+  value: 0.66
+  badge: observed
+  source: "ICRISAT VDSA 'all apportioned web document' (https://vdsa.icrisat.org/Include/document/all-apportioned-web-document.pdf, read 2026-11-15): 'For paddy crop production figures refer to rice production for all districts ... converted into rice by using 0.66 as the conversion factor.' The Mendeley panel used here is derived from the same database (unapportioned version); team to confirm the unapportioned document says the same."
+
+# Operating cost = cost of cultivation A2+FL (all paid-out costs plus imputed family labour), brought to 2026-27 rupees:
+#   cost_2026_27 (Rs/ha) = base cost (Rs/ha, base year) x [all-India A2+FL cost per quintal 2026-27 / 2020-21]
+#   Rs/acre = Rs/ha x 0.404686
+# The two all-India costs per quintal are the "Cost" column of the PIB kharif MSP releases:
+#   2026-27: PRID 2260617 (cached in data/raw/), 2020-21: https://pib.gov.in/PressReleasePage.aspx?PRID=1628349 (read 2026-11-15).
+# Badge assumption = an official figure scaled by the formula above (the scaling is ours, team to verify).
+cost_of_cultivation:
+  concept: "A2+FL"
+  inflation_ratio:
+    rice:      {cost_2020_21_rs_per_quintal: 1245, cost_2026_27_rs_per_quintal: 1627, ratio: 1.30683}
+    pigeonpea: {cost_2020_21_rs_per_quintal: 3796, cost_2026_27_rs_per_quintal: 5496, ratio: 1.44784}
+    bajra:     {cost_2020_21_rs_per_quintal: 1175, cost_2026_27_rs_per_quintal: 1858, ratio: 1.58128}
+    jowar:     {cost_2020_21_rs_per_quintal: 1746, cost_2026_27_rs_per_quintal: 2682, ratio: 1.53608}
+  base_rs_per_ha:
+    rice:      {value: 72353.64, year: "2020-21", area: Telangana, source: "Comprehensive Scheme for Studying the Cost of Cultivation of Principal Crops, Telangana (PJTSAU page, source Directorate of Economics and Statistics, GoI), Paddy A2+FL 2020-21. https://www.pjtau.edu.in/Cost_Cultivation_Crops.html, read 2026-11-15"}
+    pigeonpea: {value: 33341.27, year: "2020-21", area: Telangana, source: "Same page, Red Gram A2+FL 2020-21. https://www.pjtau.edu.in/Cost_Cultivation_Crops.html, read 2026-11-15"}
+    bajra:     {value: 32793, year: "TE 2021-22", area: all-India, used: false, source: "NOT USED for the operating cost (see operating_cost_rs_per_acre.bajra). SECONDARY source, team to verify against the CACP report: farmingcosmos.com article quoting CACP Price Policy for Kharif Crops 2023-24, all-India A2+FL for Bajra, average of 2019-20 to 2021-22. https://www.farmingcosmos.com/gross-returns-for-paddy-highest-among-kharif-cereal-crops-during-te-2021-22/, read 2026-11-15. No Telangana bajra survey was found; an all-India figure is probably too high for low-input rainfed bajra here."}
+    jowar:     {value: 37377, year: "TE 2021-22", area: all-India, source: "SECONDARY source, team to verify: same article, all-India A2+FL for Jowar, average of 2019-20 to 2021-22."}
+
 operating_cost_rs_per_acre:
-  rice:      {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  jowar:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  bajra:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  pigeonpea: {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+  rice:      {value: 38265, badge: assumption, source: "Telangana A2+FL 72,353.64 Rs/ha (2020-21, DES via PJTSAU) x 1.3068 (all-India cost per quintal 2026-27 / 2020-21, PIB) x 0.404686. See cost_of_cultivation."}
+  pigeonpea: {value: 19535, badge: assumption, source: "Telangana A2+FL 33,341.27 Rs/ha (2020-21, DES via PJTSAU) x 1.4478 (PIB cost ratio) x 0.404686. See cost_of_cultivation."}
+  bajra:     {value: 6561, badge: assumption, source: "No Telangana bajra cost survey was found. All-India A2+FL cost per quintal for 2026-27 (1,858 Rs, PIB PRID 2260617) x the district potential yield (872.6 kg/ha = 8.726 q/ha, ICRISAT) x 0.404686 = 6,561 Rs/acre. Cross-check of this method: for rice and pigeon pea it lands 12 and 16 percent BELOW the Telangana survey figures used above, so this bajra cost is probably low. The alternative (all-India cost per ha, 20,985 Rs/acre, see cost_of_cultivation) belongs to farms with about three times this district's bajra yield and would make bajra lose money in every year. Bajra profit is the least certain number in the tool; team to verify."}
+  jowar:     {value: 23235, badge: assumption, source: "Jowar is not in the crop list (no district yields), so this is not used. All-India A2+FL 37,377 Rs/ha (TE 2021-22, CACP via a secondary source, team to verify; not Telangana) x 1.5361 (PIB cost ratio) x 0.404686. See cost_of_cultivation."}
 
 # Potential yield Ym = 90th percentile of linearly detrended district yields (kg/ha),
 # computed by engine/fetch_icrisat.py for Nalgonda (pre-2016 undivided district).
@@ -53,7 +77,13 @@ potential_yield_kg_ha:
   bajra:     {value: 872.6, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Nalgonda 1990-2015 (26 yrs; 2014 and 2015 both exactly 500, check against the DLD CSV)"}
   jowar:     {value: null, badge: placeholder, source: "no jowar column in the fetched file; needs ICRISAT DLD sorghum CSV (docs/INDIA_DATA.md)"}
   ragi:      {value: null, badge: placeholder, source: "no ragi column in the fetched file; needs ICRISAT DLD finger millet CSV"}
-  pigeonpea: {value: null, badge: placeholder, source: "no pigeonpea column in the fetched file; needs ICRISAT DLD pigeonpea CSV"}
+  pigeonpea: {value: 741.4, badge: assumption, source: "NOT a district series. Telangana cost-of-cultivation survey (DES via PJTSAU, https://www.pjtau.edu.in/Cost_Cultivation_Crops.html, read 2026-11-15): A2+FL cost per ha / A2+FL cost per quintal = 33,341.27 / 4,497.36 = 7.41 q/ha in 2020-21, the best of three survey years (2.64 q/ha in 2018-19, 5.92 in 2019-20). State average of sample farms, slightly overstated because by-product value is ignored. No ICRISAT pigeon pea series could be fetched, so there is no validation data; replace with the P90 of the district series when the DLD CSV is in data/raw/icrisat_dld/."}
+
+# Price of fertiliser nitrogen, used only for the small saving after pigeon pea (N credit x this price).
+n_cost_rs_per_kg:
+  value: 11.7
+  badge: assumption
+  source: "Urea maximum retail price Rs 242 per 45 kg bag, statutorily notified, excluding neem-coating charges and taxes (written reply in the Lok Sabha, 28 July 2021, as reported by https://www.global-agriculture.com/national-news/urea-is-supplied-to-all-indian-farmers-at-subsidized-rates/, read 2026-11-15; secondary source, team to verify against the Department of Fertilizers). Urea is 46 percent nitrogen: 242 / (45 x 0.46) = 11.7 Rs per kg N."
 
 # Costs of information (EVPI cards). No source: team estimates only.
 soil_test_cost_rs:

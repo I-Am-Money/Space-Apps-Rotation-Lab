@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import html
 
 import pandas as pd
@@ -20,9 +21,9 @@ def render():
         rec = data.recommend(p)
     rots = cmp["rotations"]
     b = "placeholder" if data.is_mock() else "modeled"
-    tab_head("Compare Futures", f"Rotations B and C against our farm today (A, rice every year), each run through {cmp['n_scenarios']:,} possible four-year weather sequences drawn from the real record.")
+    tab_head("Compare Futures", f"Rotations B and C against our farm today (A, rice every year), each run through {cmp['n_scenarios']:,} four-year weather sequences drawn from the real record. Every result is shown as a difference from A.")
 
-    cols = st.columns(4, gap="small")
+    cols = st.columns(max(len(rots), 3), gap="small")
     for col, (rid, r) in zip(cols, rots.items()):
         with col:
             md(f'<div class="rl-panel" style="padding:.8rem .9rem"><div style="font-weight:700;margin-bottom:.35rem">{html.escape(ROT_NAME[rid])}</div>{ribbon(r["plan"], True)}</div>')
@@ -64,13 +65,19 @@ def render():
 
     c1, c2 = st.columns(2, gap="large")
     with c1:
-        section("Yield by year", b)
+        section("Yield by year", b, "Quintals per acre as the crop is sold: rice as paddy, the others as grain.")
         charts.show(charts.yearly_yield(rots), "yy")
-        srcline("Model output, average over weather sequences.", "Source")
+        hot = [(ROT_NAME[k], sum(r["hot_days_mean"])) for k, r in rots.items() if r.get("hot_days_mean")]
+        srcline("Model output, average over weather sequences. District-scale estimate, not a field measurement."
+                + (" Hot days at flowering over the plan, on average: " + "; ".join(f"{n} {v:.1f}" for n, v in hot) + "." if hot else ""), "Source")
     with c2:
-        section("Soil cover trend", b, "Higher means more crop growth left on the soil. This is a proxy, not a measured residue amount.")
+        section("Soil cover trend", "assumption", "A simple index from 0 to 1 of how much residue and ground cover each crop leaves. It is a ranking rule, not a measurement.")
         charts.show(charts.residue_lines(rots), "res")
-        srcline(rots[next(iter(rots))].get("residue_index_note", "Proxy, not measured."), "Note")
+        arrow = {"up": "&#8593; up", "down": "&#8595; down", "flat": "&#8594; no change"}
+        soc = [f'{html.escape(ROT_NAME[k])}: <strong>{arrow.get(r["soil_cover"]["soc_direction"], "n/a")}</strong>' for k, r in rots.items() if r.get("soil_cover")]
+        if soc:
+            md('<p class="rl-note" style="margin:.2rem 0"><strong>Soil organic carbon, direction only</strong> (too slow to quantify over 4 years): ' + "; ".join(soc) + f'. {badge("assumption")}</p>')
+        srcline(rots[next(iter(rots))].get("residue_index_note", "Proxy, not measured."), "Rule")
 
     section("Water use", b, "Rain and irrigation over the four-year plan, average sequence. Irrigation alone is on the right.")
     fig, split, names = charts.water_bars(rots)
@@ -83,15 +90,25 @@ def render():
         charts.show(charts.irrigation_only(names, irr, split), "wi")
     srcline("Model output. Canal water is a proxy based on upstream monsoon rain; well water is a simplified recharge proxy. Canal is used first, wells cover the shortfall.", "Note")
 
-    section("Stress tests", b, "A named bad-weather case, placed in a plan year with typical weather in the other years.")
+    section("Stress tests", b, "Each test takes one real bad year from the record and places it in one year of the plan, with a typical year in the other three.")
     tests = {}
     for rid, r in rots.items():
         for t in r["stress_tests"]:
-            tests.setdefault(t["test"], dict(label=t["label"], desc=t.get("description", ""), by={}))["by"][rid] = t["profit"]
+            tests.setdefault(t["test"], dict(label=t["label"], desc=t.get("description", ""), year=t.get("source_year"), badge=t.get("badge"), by={}))["by"][rid] = t["profit"]
     for name, t in tests.items():
         base_v = t["by"].get("A")
         lines = " ".join(f"{ROT_NAME[rid]} earns {fmt_rs(v)}" + ("" if rid == "A" or base_v is None else f" ({'+' if v - base_v >= 0 else '-'}Rs {abs(v - base_v):,.0f} against A)") + "." for rid, v in t["by"].items())
-        md(f'<p style="margin:.5rem 0;max-width:85ch"><strong>In a repeat of the {html.escape(t["label"])}:</strong> {html.escape(lines)} (per acre, 4 years) {badge(b)}</p>' + (f'<p class="rl-note" style="margin:-.3rem 0 .6rem">{html.escape(t["desc"])}</p>' if t["desc"] else ""))
+        yr = t.get("year")
+        if yr and " in year " in name:
+            head = f"In a repeat of {yr}, the {name.replace(' in year ', ', placed in year ')} of the plan"
+        elif yr:
+            head = f"In a repeat of {yr}, the {name}"
+        else:
+            head = f"In a {t['label']}"
+        md(f'<p style="margin:.5rem 0;max-width:85ch"><strong>{html.escape(head)}:</strong> {html.escape(lines)} (per acre, 4 years) {badge(t.get("badge") or b)}</p>' + (f'<p class="rl-note" style="margin:-.3rem 0 .6rem">{html.escape(t["desc"])}</p>' if t["desc"] else ""))
+    yrs_used = [t["year"] for t in tests.values() if t.get("year")]
+    if len(yrs_used) != len(set(yrs_used)):
+        md('<p class="rl-note">Some tests use the same year because one year of the record was the worst on more than one measure.</p>')
     with st.expander("Show stress tests as a table"):
         st.dataframe(pd.DataFrame([{"Case": t["label"], **{ROT_NAME[k]: round(v) for k, v in t["by"].items()}} for t in tests.values()]), hide_index=True, use_container_width=True)
 
@@ -104,9 +121,11 @@ def render():
         for col, k in zip(cols, keys[i:i + 2]):
             r = reps[k]
             ev = r["evidence"]
-            ev_lines = [f"Ranks {ev['rank_of_256']} of 256 for your priorities.",
+            rank_line = (f"Ranks {ev.get('rank', ev.get('rank_of_256'))} of {ev.get('n_rotations', 256)} for your priorities." if ev.get("offered", True)
+                         else "Shown for comparison only: the tool does not offer the same non-rice crop in all four years.")
+            ev_lines = [rank_line,
                         f"Average {fmt_rs(ev['mean_profit_rs_acre'])} per acre; worst 10% {fmt_rs(ev['worst10_profit_rs_acre'])}.",
-                        f"Water stress {ev['water_stress_mm']:,.0f} mm; irrigation {ev['irrigation_mm']:,.0f} mm over the plan."]
+                        f"Irrigation {ev['irrigation_mm']:,.0f} mm and total water {ev['total_water_mm']:,.0f} mm over the plan."]
             with col:
                 top = ' <span class="rl-badge" style="background:var(--ink);color:#fff">Model favourite</span>' if r["id"] == top_id else ""
                 md(f'<div class="rl-panel"><h4>{html.escape(ROT_NAME[k])}{top}</h4>{ribbon(r["plan"], True)}'

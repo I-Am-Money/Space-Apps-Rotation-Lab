@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Integration with the real physics modules (skipped if they are absent)."""
 import numpy as np
 import pytest
@@ -13,7 +14,7 @@ def real():
     opt.set_simulator(None); api.set_annual(None); api._scensets.clear()
     api.N_SCEN = 60; api.BOUNDARY_N_SCEN = 60
     yield
-    api.N_SCEN = 500; api.BOUNDARY_N_SCEN = 500; api._scensets.clear()
+    api.N_SCEN = 500; api.BOUNDARY_N_SCEN = 200; api._scensets.clear()
 
 
 def test_real_scenarios_derived_counts():
@@ -31,7 +32,8 @@ def test_real_recommend_invariants():
 
 def test_real_millet_uses_less_irrigation_than_rice():
     m = api.recommend({})["metrics"].set_index("id")
-    assert m.loc["-".join([opt.MILLETS[0]] * 4), "irrigation_mm"] <= m.loc["rice-rice-rice-rice", "irrigation_mm"]
+    assert m.loc[opt.plan_id(opt.REF["B"]), "irrigation_mm"] < m.loc["rice-rice-rice-rice", "irrigation_mm"]
+    assert m.loc[opt.plan_id(opt.REF["C"]), "irrigation_mm"] < m.loc["rice-rice-rice-rice", "irrigation_mm"]
 
 
 def test_real_compare_and_tipping_run():
@@ -53,7 +55,9 @@ def test_real_prices_use_yaml_msp_with_badges():
     from engine import economics
     pr = economics.load_prices()
     assert pr["price_rs_per_quintal"]["rice"] == 2441.0 and pr["badges"]["price_rice"] == "observed"
-    assert pr["badges"]["opcost_rice"] == "placeholder"
+    assert pr["badges"]["opcost_rice"] == "assumption" and "Telangana" in pr["operating_cost_source"]["rice"]
+    assert pr["milled_rice_per_paddy"] == 0.66 and abs(pr["sold_kg_per_yield_kg"]["rice"] - 1 / 0.66) < 1e-12
+    assert pr["badges"]["soil_test_cost_rs"] == "placeholder"        # no sourced quote yet: stays flagged
 
 
 def test_real_batch_matches_per_plan_and_is_fast():
@@ -81,6 +85,21 @@ def test_real_hindcast_status_labels():
 def test_real_selection_candidate_set():
     opt.configure()
     assert opt.MILLETS and set(opt.CROPS) == {"rice", "pigeonpea", *opt.MILLETS}
-    assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4
+    assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4 - (len(opt.CROPS) - 1)      # same non-rice crop x4 is blocked
     m = opt.MILLETS[0]
     assert opt.REF["B"] == ["rice", m, "rice", m] and opt.REF["C"] == ["rice", "pigeonpea", m, "rice"]
+
+
+def test_ui_soil_mode_names_select_the_right_soil():
+    # the UI sends "farm" / "district"; "farm" must use the farm's black soil, not silently fall back to SoilGrids
+    farm = api.norm_params({"soil_mode": "farm"})
+    assert farm["soil_mode"] == "farm_black_soil" and farm["awc"] == api.norm_params({})["awc"]
+    dist = api.norm_params({"soil_mode": "district"})
+    assert dist["soil_mode"] == "district_soilgrids" and dist["awc"] != farm["awc"]
+
+
+def test_assumptions_table_marks_rows_not_in_use():
+    t = api.assumptions_table().set_index("name")
+    assert not t.loc["crops.jowar.kc_ini", "in_use"] and t.loc["crops.rice.ky", "in_use"]
+    assert not t.loc["ym_kg_ha.rice", "in_use"]          # replaced by the district value in prices_india.yaml
+    assert t.loc["n_cost_rs_per_kg", "badge"] == "assumption"

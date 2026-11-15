@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """ICRISAT District Level Database (DLD) loader: district yield (kg/ha) and area.
 
 Primary source: ICRISAT/TCI DLD, http://data.icrisat.org/dld/src/crops.html
