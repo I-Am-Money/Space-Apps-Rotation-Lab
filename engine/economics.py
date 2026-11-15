@@ -1,6 +1,10 @@
 """Economics (engine-decision). Rupees per acre. The ONLY place kg/ha is converted to per-acre.
 
-profit/acre/year = yield * price - operating cost + N-credit fertiliser saving - irrigation cost
+Build Spec v3 section 5.7:
+  Profit_year = Ya * MSP - operating_cost - N_cost_adjustment      (N adjustment = saving after pigeon pea)
+There is NO irrigation or water charge in profit. Saving water is handled only by the water slider (section 7).
+Rice: district statistics report MILLED rice, while the MSP is paid per quintal of PADDY. The sold quantity is
+therefore yield / milled_rice_per_paddy (config/prices_india.yaml, 0.66 from the ICRISAT documentation).
 Plan profit = sum of the 4 yearly profits, undiscounted.
 Prices are FIXED across scenarios (no price model); the price multiplier slider scales them uniformly.
 """
@@ -30,7 +34,6 @@ PLACEHOLDER = {
     "price_rs_per_quintal": {"rice": 2369.0, "jowar": 3699.0, "bajra": 2775.0, "pigeonpea": 8000.0},
     "operating_cost_rs_per_acre": {"rice": 28000.0, "jowar": 11000.0, "bajra": 9000.0, "pigeonpea": 13000.0},
     "n_cost_rs_per_kg": 13.0,
-    "irrigation_cost_rs_per_m3": 3.0,
     "soil_test_cost_rs": 300.0,
     "water_measure_cost_rs": 1500.0,
     "farm_area_acres": 5.0,
@@ -110,7 +113,6 @@ def _load_prices(path) -> dict:
         else:
             out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = PLACEHOLDER["operating_cost_rs_per_acre"].get(c, PLACEHOLDER["operating_cost_rs_per_acre"]["bajra"]), "placeholder"
     for k, alts in {"n_cost_rs_per_kg": ("n_cost_rs_per_kg", "nitrogen_cost_rs_per_kg"),
-                    "irrigation_cost_rs_per_m3": ("irrigation_cost_rs_per_m3",),
                     "soil_test_cost_rs": ("soil_test_cost_rs",),
                     "water_measure_cost_rs": ("water_measure_cost_rs", "borewell_or_tank_capacity_measurement_cost_rs"),
                     "farm_area_acres": ("farm_area_acres",)}.items():
@@ -119,6 +121,21 @@ def _load_prices(path) -> dict:
             out[k], badges[k] = v, "assumption"
         else:
             out[k], badges[k] = PLACEHOLDER[k], "placeholder"
+    # badge and source of each operating cost come from the YAML entry itself when it has them
+    opnode = _find(raw, OPCOST_KEYS) or {}
+    out["operating_cost_source"] = {}
+    for c in list(out["operating_cost_rs_per_acre"]):
+        e = next((opnode[n] for n in ALIASES[c] if isinstance(opnode, dict) and isinstance(opnode.get(n), dict)), None)
+        if e and e.get("value") is not None:
+            badges[f"opcost_{c}"] = e.get("badge", "assumption")
+            out["operating_cost_source"][c] = e.get("source", "config/prices_india.yaml")
+        else:
+            out["operating_cost_source"][c] = PLACEHOLDER_NOTE
+    conv = _find(raw, ("milled_rice_per_paddy",))
+    f = _num(conv)
+    out["milled_rice_per_paddy"] = f if f else 1.0
+    badges["milled_rice_per_paddy"] = (conv.get("badge", "observed") if isinstance(conv, dict) and f else "placeholder")
+    out["sold_kg_per_yield_kg"] = {c: (1.0 / out["milled_rice_per_paddy"] if c == "rice" else 1.0) for c in CROPS}
     out["badges"] = badges
     out["fixed_prices_note"] = "Prices are fixed across all scenarios (no price model); the price slider scales all crops together."
     out["source_file_found"] = path.exists()
@@ -137,20 +154,27 @@ def plan_economics(plan, sim: dict, price_mult: float = 1.0, prices: dict | None
                    n_credit=None) -> dict:
     """sim = PlanResult. Returns per-year arrays [S,4] in rupees/acre and the plan profit [S]."""
     prices = prices or load_prices()
-    yld = np.asarray(sim["yield_kg_ha"], float)                       # [S,4] kg/ha
-    irr = np.asarray(sim["irrig_mm"], float)                          # [S,4] mm
-    S = yld.shape[0]
+    yld = np.asarray(sim["yield_kg_ha"], float)                       # [S,4] kg/ha (rice: milled rice)
+    sold = np.array([prices.get("sold_kg_per_yield_kg", {}).get(c, 1.0) for c in plan])   # rice is sold as paddy
     price_kg = np.array([prices["price_rs_per_quintal"][c] / 100.0 for c in plan]) * price_mult   # Rs/kg
     op = np.array([prices["operating_cost_rs_per_acre"][c] for c in plan])
-    kg_acre = yld * HA_PER_ACRE                                       # the single kg/ha -> per-acre conversion
+    kg_acre = yld * sold[None, :] * HA_PER_ACRE                       # the single kg/ha -> per-acre conversion
     revenue = kg_acre * price_kg[None, :]
     credit = n_credit_kg_ha(plan) if n_credit is None else np.asarray(n_credit, float)
     n_saving = np.broadcast_to(credit * HA_PER_ACRE * prices["n_cost_rs_per_kg"], yld.shape)
-    irr_cost = irr * M3_PER_MM_ACRE * prices["irrigation_cost_rs_per_m3"]
-    profit_year = revenue - op[None, :] + n_saving - irr_cost
+    profit_year = revenue - op[None, :] + n_saving
     return {"profit_year": profit_year, "profit": profit_year.sum(1), "revenue": revenue,
-            "op_cost": np.broadcast_to(op, yld.shape), "n_saving": n_saving, "irrig_cost": irr_cost,
+            "op_cost": np.broadcast_to(op, yld.shape), "n_saving": n_saving, "sold_kg_acre": kg_acre,
             "badges": economics_badges(prices)}
+
+
+def kg_ha_to_quintal_acre(kg_ha):
+    """Unit conversion used for display: 1 quintal = 100 kg, 1 acre = 0.404686 ha."""
+    return np.asarray(kg_ha, float) * HA_PER_ACRE / 100.0
+
+
+def rs_ha_to_rs_acre(rs_ha):
+    return np.asarray(rs_ha, float) * HA_PER_ACRE
 
 
 def economics_badges(prices: dict) -> dict:
@@ -158,4 +182,4 @@ def economics_badges(prices: dict) -> dict:
     return {"profit": "modeled",
             "prices": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("price_")) else "observed",
             "operating_cost": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("opcost_")) else "assumption",
-            "irrigation_cost": b["irrigation_cost_rs_per_m3"], "n_cost": b["n_cost_rs_per_kg"]}
+            "n_cost": b["n_cost_rs_per_kg"]}

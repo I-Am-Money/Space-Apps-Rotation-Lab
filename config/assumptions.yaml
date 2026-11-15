@@ -114,3 +114,57 @@ rice_irrigation:
 
 soil:
   black_soil_awc_mm_per_m: {value: 180, range: [120, 200], unit: mm per m, source: "FAO-56 Table 19, Clay: theta_FC - theta_WP = 0.12-0.20 m3/m3 (= 120-200 mm/m). https://www.fao.org/4/x0490e/x0490e0c.htm, accessed 2026-11-14. Table is for generic clay, not Indian vertisol specifically; value in the upper part of the range for black soil, vertisol-specific range team to verify. farm.yaml awc_range_mm_per_m was still null when checked.", badge: assumption}
+
+# ---------------------------------------------------------------------------------------------
+# Added for Build Spec v3 (Nalgonda). Each value is an Assumption unless a primary source is named.
+# ---------------------------------------------------------------------------------------------
+
+# v3 section 6.2: one simple, documented onset rule. Sowing of every crop follows onset (engine/monsoon.py).
+monsoon_onset:
+  start_doy:      {value: 152, range: [152, 152], unit: day-of-year, source: "Build Spec v3 section 6.2: onset is searched from 1 June (day 152 of a 365-day year).", badge: assumption}
+  window_days:    {value: 5, range: [3, 7], unit: days, source: "team to verify. Length of the wet window in the onset rule; chosen by the team, not read in a primary source.", badge: assumption}
+  threshold_mm:   {value: 25, range: [20, 50], unit: mm, source: "team to verify. Rain needed inside the wet window; chosen by the team, not read in a primary source.", badge: assumption}
+  dry_spell_days: {value: 10, range: [7, 15], unit: days, source: "team to verify. A wet window followed by this many dry days is a false start.", badge: assumption}
+  dry_spell_mm:   {value: 5, range: [2.5, 10], unit: mm, source: "team to verify. Rain total below which the spell counts as dry.", badge: assumption}
+  dry_search_days: {value: 30, range: [20, 40], unit: days, source: "team to verify. How far after the wet window a dry spell is looked for.", badge: assumption}
+  last_doy:       {value: 244, range: [213, 244], unit: day-of-year, source: "team to verify. If no clean onset by 1 September the year is flagged and this day is used.", badge: assumption}
+
+# v3 section 5.4: heat penalty (Assumption, toggle). Hot days = days in the flowering window with Tmax above the
+# crop threshold; each hot day cuts Ya by pen_per_day. Flowering window = the first flowering_days of the FAO-56
+# mid-season stage (the stage lengths are in crops.<crop>.stages_days). Thresholds are literature-typical values that
+# were NOT read in a primary source in this session: team to verify.
+heat:
+  enabled:     {value: true, range: [false, true], unit: "on/off", source: "Build Spec v3 section 5.4 (toggle).", badge: assumption}
+  pen_per_day: {value: 0.01, range: [0.0, 0.02], unit: "fraction of yield per hot day", source: "Build Spec v3 section 5.4: default 1 percent, range 0 to 2 percent.", badge: assumption}
+  tmax_c:
+    rice:      {value: 35, range: [33, 37], unit: degC, source: "team to verify. Tmax threshold at flowering, not read in a primary source.", badge: assumption}
+    jowar:     {value: 38, range: [36, 40], unit: degC, source: "team to verify. Tmax threshold at flowering, not read in a primary source.", badge: assumption}
+    bajra:     {value: 40, range: [38, 42], unit: degC, source: "team to verify. Tmax threshold at flowering, not read in a primary source.", badge: assumption}
+    ragi:      {value: 38, range: [36, 40], unit: degC, source: "team to verify. Tmax threshold at flowering, not read in a primary source.", badge: assumption}
+    pigeonpea: {value: 35, range: [33, 38], unit: degC, source: "team to verify. Tmax threshold at flowering, not read in a primary source.", badge: assumption}
+  flowering_days:
+    rice:      {value: 20, range: [10, 30], unit: days, source: "team to verify. Length of the flowering window from the start of the FAO-56 mid-season stage.", badge: assumption}
+    jowar:     {value: 20, range: [10, 30], unit: days, source: "team to verify. Same definition.", badge: assumption}
+    bajra:     {value: 15, range: [10, 25], unit: days, source: "team to verify. Same definition.", badge: assumption}
+    ragi:      {value: 15, range: [10, 25], unit: days, source: "team to verify. Same definition.", badge: assumption}
+    pigeonpea: {value: 30, range: [20, 45], unit: days, source: "team to verify. Same definition.", badge: assumption}
+
+# v3 section 7: J(r) = (1 - lam) * mean_profit + lam * worst10 - w * irrigation_water * water_price_proxy.
+objective:
+  water_price_proxy_rs_per_mm_ha: {value: 50, range: [0, 100], unit: "INR per mm per ha", source: "Assumption, team to set. NOT a charge the farmer pays and never taken off profit: it only converts the water-saving slider into rupees. 50 INR per mm per ha equals 5 INR per cubic meter.", badge: assumption}
+
+# v3 section 5.6: residue / soil-cover index (0 to 1), simple per-crop rule, shown as a trend line.
+# cover_index[year] = carry * cover_index[year-1] + (1 - carry) * score(crop grown that year); year 0 = rice (our farm today).
+soil_cover:
+  carry:       {value: 0.5, range: [0.3, 0.7], unit: "-", source: "team to verify. How much of last year's cover index carries over.", badge: assumption}
+  score:
+    rice:      {value: 0.40, range: [0.2, 0.6], unit: "0 to 1", source: "team to verify. Relative residue and ground-cover score for puddled paddy; a ranking, not a measurement.", badge: assumption}
+    jowar:     {value: 0.55, range: [0.4, 0.7], unit: "0 to 1", source: "team to verify. Relative score for sorghum stover.", badge: assumption}
+    bajra:     {value: 0.50, range: [0.3, 0.7], unit: "0 to 1", source: "team to verify. Relative score for pearl millet stover.", badge: assumption}
+    ragi:      {value: 0.50, range: [0.3, 0.7], unit: "0 to 1", source: "team to verify. Relative score for finger millet straw.", badge: assumption}
+    pigeonpea: {value: 0.75, range: [0.5, 0.9], unit: "0 to 1", source: "team to verify. Relative score for a long-season legume with leaf fall.", badge: assumption}
+
+# Team decision 2026-11-15 (Max): plans that grow the same non-rice crop in all 4 years are not offered.
+# Rice x4 stays because it is the baseline ("our farm today"). Set to false to return to all 256 sequences.
+plan_rules:
+  block_same_nonrice_crop_4_years: {value: true, range: [false, true], unit: "on/off", source: "Team decision, 2026-11-15: continuous pigeon pea or millet for 4 years is not a plan a farmer would follow (disease and pest build-up); agronomy reference team to verify.", badge: assumption}

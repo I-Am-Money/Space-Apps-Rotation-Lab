@@ -43,8 +43,15 @@ def scs_runoff(precip, cn, ia_ratio=0.2):
     return ex * ex / (ex + s)
 
 
-def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, off=0):
-    """Rainfed / fallow daily loop. Dr [g,S]; kcet0T, peT [n,S]. Returns Dr, sum ETa, sum drainage."""
+def _record(rec, name, day, v, val):
+    """Write one day's values into the daily record, only for the scenarios that are in this phase on that day."""
+    rec[name][:, v, day] = val[:, v]
+
+
+def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, day0=0, valid=None):
+    """Rainfed / fallow daily loop over calendar days day0, day0+1, ... Dr [g,S]; kcet0T, peT [n,S] are zero for the
+    scenarios that are not in this phase on that day (valid [n,S] False), and a zero day changes nothing.
+    Returns Dr, sum ETa, sum drainage."""
     se = np.zeros_like(Dr)
     sd = np.zeros_like(Dr)
     for i in range(kcet0T.shape[0]):
@@ -54,9 +61,9 @@ def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, off=0):
         pei = peT[i]
         np.minimum(eta, dcol - Dr + pei, out=eta)
         if rec is not None:
-            rec["dr"][:, :, off + i] = Dr
-            rec["ks"][:, :, off + i] = ks
-            rec["eta"][:, :, off + i] = eta
+            _record(rec, "dr", day0 + i, valid[i], Dr)
+            _record(rec, "ks", day0 + i, valid[i], ks)
+            _record(rec, "eta", day0 + i, valid[i], eta)
         Dr = Dr - pei + eta
         dp = np.maximum(-Dr, 0.0)
         np.maximum(Dr, 0.0, out=Dr)
@@ -65,15 +72,18 @@ def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, off=0):
     return Dr, se, sd
 
 
-def _rice_phase(Dr, et0T, rainT, supply, well, kc, perc, hmax, taw, inv, dcol, rec=None, off=0):
-    """Irrigated paddy daily loop. Returns Dr, and dict of season sums."""
+def _rice_phase(Dr, et0T, rainT, supply, well, kc, perc, hmax, taw, inv, dcol, rec=None, day0=0, valid=None):
+    """Irrigated paddy daily loop over calendar days day0, day0+1, ... kc, perc, et0T, rainT are [n,S] and are zero
+    for scenarios outside their rice season on that day; such a day changes nothing (no demand, no rain, and the
+    pond and the soil deficit are never both above zero). Returns Dr, and dict of season sums."""
     z = np.zeros_like(Dr)
     h = z.copy()
     out = {k: z.copy() for k in ("eta", "etm", "irr", "irr_c", "irr_w", "need", "dp", "ro", "rain")}
     for i in range(et0T.shape[0]):
         etc = kc[i] * et0T[i]
         rain = rainT[i]
-        demand = etc + perc
+        perc_i = perc[i]
+        demand = etc + perc_i
         need = np.maximum(demand + Dr - (h + rain), 0.0)
         irr_c = np.minimum(need, supply)            # canal first
         irr_w = np.minimum(need - irr_c, well)      # wells cover the shortfall only
@@ -90,15 +100,15 @@ def _rice_phase(Dr, et0T, rainT, supply, well, kc, perc, hmax, taw, inv, dcol, r
         np.clip(ks, 0.0, 1.0, out=ks)
         e2 = np.minimum((etc - e1) * ks, dcol - Dr)
         Dr = Dr + e2
-        pact = np.minimum(perc, W)
+        pact = np.minimum(perc_i, W)
         W = W - pact
         over = np.maximum(W - hmax, 0.0)
         h = W - over
         if rec is not None:
-            rec["dr"][:, :, off + i] = Dr
-            rec["ks"][:, :, off + i] = ks
-            rec["eta"][:, :, off + i] = e1 + e2
-            rec["need"][:, :, off + i] = need
+            _record(rec, "dr", day0 + i, valid[i], Dr)
+            _record(rec, "ks", day0 + i, valid[i], ks)
+            _record(rec, "eta", day0 + i, valid[i], e1 + e2)
+            _record(rec, "need", day0 + i, valid[i], need)
         out["eta"] += e1 + e2
         out["etm"] += etc
         out["irr"] += irr
@@ -203,32 +213,63 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
     Dr0 = Dr.copy()
     fr = np.stack([rotation_factor(p, params) for p in plans])       # [R,4]
 
+    # --- sowing follows monsoon onset (v3 section 6.2). scen["onset_doy"] [S,4] (1-based) comes from engine.scenarios;
+    # without it (synthetic test scenarios) every crop is sown on its median-year date.
+    from engine import monsoon
+    onset = scen.get("onset_doy")
+    med_onset = scen.get("onset_median")
+    if onset is not None and med_onset is None:
+        med_onset = float(np.median(onset))
+    cols = np.arange(S)
+    tmax = scen.get("tmax")
+    heat_on = bool(A(params, "heat.enabled")) and tmax is not None
+    pen_day = float(A(params, "heat.pen_per_day"))
+    res["sowing_doy"] = np.zeros((R, S, 4))
+    res["hot_days"] = np.zeros((R, S, 4))
+    res["heat_factor"] = np.ones((R, S, 4))
+
+    dayidx = np.arange(NDAY)
+
     for y in range(4):
+        et0_y, p_y = et0[:, y, :], precip[:, y, :]
+        pef_y, pec_y, rof_y, roc_y = pe_fall[:, y, :], pe_crop[:, y, :], ro_fall[:, y, :], ro_crop[:, y, :]
         for cid in np.unique(plan_arr[:, y]):
             idx = np.where(plan_arr[:, y] == cid)[0]
             c = crops[cid]
-            a = c.sowing_doy - 1
-            b = min(a + c.season_days, NDAY)
-            n = b - a
+            n = c.season_days
+            if onset is None:
+                sow = np.full(S, min(c.sowing_doy, NDAY - n + 1), int)
+            else:
+                sow = monsoon.sowing_doy(c.sowing_doy, n, np.asarray(onset)[:, y], med_onset)
+            a_s = sow - 1                                           # [S] 0-based first day of the season
+            b_s = a_s + n                                           # [S] first fallow day after harvest (<= 365)
+            amin, amax, bmin, bmax = int(a_s.min()), int(a_s.max()), int(b_s.min()), int(b_s.max())
             g = len(idx)
             d = Dr[idx].copy()
             rec = {n_: np.zeros((g, S, NDAY)) for n_ in ("dr", "ks", "eta", "need")} if rec_on else None
             eta_all = np.zeros((g, S)); dp_all = np.zeros((g, S)); ro_all = np.zeros((g, S))
             irr_all = np.zeros((g, S))
 
-            def fallow(d, lo, hi):
+            def fallow(d, lo, hi, valid):
+                """Fallow over calendar days lo..hi-1; valid [hi-lo, S] marks the scenarios that are fallow that day."""
                 if hi <= lo:
                     return d
-                e0 = (kc_f * et0[:, y, lo:hi]).T
-                pe = pe_fall[:, y, lo:hi].T
-                d, se, sd = _dry_phase(d, e0, pe, taw_f, inv_f, dcol, rec, lo)
+                e0 = kc_f * et0_y[:, lo:hi].T * valid
+                pe = pef_y[:, lo:hi].T * valid
+                d, se, sd = _dry_phase(d, e0, pe, taw_f, inv_f, dcol, rec, lo, valid)
                 eta_all[:] += se; dp_all[:] += sd
-                ro_all[:] += ro_fall[:, y, lo:hi].sum(axis=1)
+                ro_all[:] += (rof_y[:, lo:hi].T * valid).sum(axis=0)
                 return d
 
-            d = fallow(d, 0, a)
-            kc = c.kc_curve()[:n]
+            # each scenario: fallow on days [0, a_s), crop on [a_s, b_s), fallow on [b_s, 365). The three loops run over
+            # calendar days; a scenario that is not in the phase on a day gets zeros there, which change nothing.
+            d = fallow(d, 0, amax, dayidx[:amax, None] < a_s[None, :])
+            kc_pad = np.append(c.kc_curve(), 0.0)
             taw = awc * c.root_depth_m
+            sd_idx = dayidx[amin:bmax, None] - a_s[None, :]          # [L,S] day of the season, valid in 0..n-1
+            valid = (sd_idx >= 0) & (sd_idx < n)
+            kcT = kc_pad[np.where(valid, sd_idx, n)]                 # [L,S] Kc of each scenario on that calendar day
+            et0T = et0_y[:, amin:bmax].T
             if cid == "rice":
                 supply = np.broadcast_to(avail_c[:, y], (g, S)).copy()
                 well = np.broadcast_to(avail_w[:, y], (g, S)).copy()
@@ -243,8 +284,8 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
                 dp_all += irr_p - fill                               # puddling water beyond soil fill leaves as drainage
                 irr_all += irr_p
                 inv = 1.0 / ((1.0 - c.p) * taw)
-                d, o = _rice_phase(d, et0[:, y, a:b].T, precip[:, y, a:b].T, supply, well, kc, perc, hmax,
-                                   taw, inv, dcol, rec, a)
+                d, o = _rice_phase(d, et0T, p_y[:, amin:bmax].T * valid, supply, well, kcT, perc * valid, hmax,
+                                   taw, inv, dcol, rec, amin, valid)
                 eta_all += o["eta"]; dp_all += o["dp"]; ro_all += o["ro"]; irr_all += o["irr"]
                 res["eta_mm"][idx, :, y] = o["eta"]
                 res["etm_mm"][idx, :, y] = o["etm"]
@@ -259,27 +300,41 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
                 res["drainage_mm"][idx, :, y] = o["dp"] + (irr_p - fill)
             else:
                 inv = 1.0 / ((1.0 - c.p) * taw)
-                e0 = kc[:, None] * et0[:, y, a:b].T
-                pe = pe_crop[:, y, a:b].T
-                d, se, sd = _dry_phase(d, e0, pe, taw, inv, dcol, rec, a)
+                e0 = kcT * et0T
+                pe = pec_y[:, amin:bmax].T * valid
+                d, se, sd = _dry_phase(d, e0, pe, taw, inv, dcol, rec, amin, valid)
                 eta_all += se; dp_all += sd
-                rsum = ro_crop[:, y, a:b].sum(axis=1)
+                rsum = (roc_y[:, amin:bmax].T * valid).sum(axis=0)
                 ro_all += rsum
                 res["eta_mm"][idx, :, y] = se
                 res["etm_mm"][idx, :, y] = e0.sum(axis=0)
                 res["runoff_mm"][idx, :, y] = rsum
                 res["drainage_mm"][idx, :, y] = sd
-            res["rain_mm"][idx, :, y] = precip[:, y, a:b].sum(axis=1)
-            d = fallow(d, b, NDAY)
+            res["rain_mm"][idx, :, y] = (p_y[:, amin:bmax].T * valid).sum(axis=0)
+            d = fallow(d, bmin, NDAY, dayidx[bmin:, None] >= b_s[None, :])
             Dr[idx] = d
             res["rain_total_mm"][idx, :, y] = precip[:, y, :].sum(axis=1)
             res["eta_total_mm"][idx, :, y] = eta_all
             res["runoff_total_mm"][idx, :, y] = ro_all
             res["drainage_total_mm"][idx, :, y] = dp_all
             res["irrig_total_mm"][idx, :, y] = irr_all
+            res["sowing_doy"][idx, :, y] = sow
+            # heat penalty (v3 section 5.4): hot days in the flowering window cut the yield
+            hf = np.ones(S)
+            if heat_on:
+                f0 = int(c.stages_days[0] + c.stages_days[1])                 # flowering starts with the mid-season stage
+                nf = int(A(params, f"heat.flowering_days.{cid}"))
+                hotday = np.asarray(tmax, float)[:, y, :] > float(A(params, f"heat.tmax_c.{cid}"))      # [S,365]
+                ch = np.concatenate([np.zeros((S, 1)), np.cumsum(hotday, axis=1)], axis=1)              # hot days before each day
+                f_lo = np.minimum(a_s + f0, NDAY)
+                f_hi = np.minimum(f_lo + nf, NDAY)
+                hot = ch[cols, f_hi] - ch[cols, f_lo]
+                hf = np.maximum(0.0, 1.0 - pen_day * hot)
+                res["hot_days"][idx, :, y] = hot
+                res["heat_factor"][idx, :, y] = hf
             ym = c.ym_kg_ha
             res["yield_kg_ha"][idx, :, y] = season_yield(ym, c.ky, res["eta_mm"][idx, :, y],
-                                                         res["etm_mm"][idx, :, y], fr[idx, y][:, None])
+                                                         res["etm_mm"][idx, :, y], fr[idx, y][:, None]) * hf[None, :]
             if rec_on:
                 for n_ in daily:
                     daily[n_][idx, :, y, :] = rec[n_]
