@@ -39,7 +39,11 @@ Input for the team's LIMITATIONS.md, DATA_SOURCES.md and AI_USE.md. Named by fea
 
 Claude Code (Anthropic) wrote this code and its tests under the team's direction. `engine/explain.py` calls Claude (claude-sonnet-5-5) only for the plain-English explanation of each pick. It sends computed numbers only, rejects any reply containing a number or crop that is not in the input, and falls back to a deterministic template. The app works with no API key.
 
-## Interface assumptions to confirm
+## How the simulation is wired in
 
-- `simulate(site, inputs, rotation, scenarios)` is assumed to return arrays shaped [scenarios, 4 years]: `yields_kg_ha`, `irrigation_mm`, `total_water_mm`. `rotation` is `{"crops": [[crop] x 4], "cover_crops": [bool x 4]}`. If the simulation module returns something different, only `optimize._read_sim` needs to change.
+- `optimize.py` reads the simulation result through `_read_sim`: arrays shaped [scenarios, 4 years] named `yields_kg_ha`, `irrigation_mm`, `total_water_mm`, plus `weights`, `feasible` and `reason`. This matches the crop-simulation module's `SimResult`, and it uses its `simulate_many` batch call when present.
+- Scenario weights are respected: the mean and the worst-10% are weighted, so the Recent and Trend climate modes work once they hand over re-weighted scenarios.
+- A crop with no yield number comes back as NaN. A candidate crop like that is left out and listed as needing a yield; a crop in the current plan stops the money numbers and asks for the yield. A rotation marked infeasible is left out. Nothing is filled in.
+- Contract note: the rule is to go through `engine/api.py`. `api.simulate` does not exist yet, so the optimizer falls back to `engine.simulate` directly, then to a flagged stand-in. Switch to `api.simulate` when it lands; nothing else changes.
+- Speed on 81 rotations by 100 scenarios: about 4 s the first time (numba compiles), 0.1 s after. Moving a slider only re-runs the pick selection. `numba` must be installed (it is in requirements.txt); without it the simulation falls back to slow pure Python (about 45 s for the same run).
 - All per-plan numbers are averages per plan year, in metric units per hectare. The UI converts to acres for display.

@@ -569,9 +569,28 @@ def enumerate_rotations(crops, years: int = YEARS_IN_PLAN, allow_cover: bool = F
     return out
 
 
+def weighted_worst_fraction_mean(values, weights, frac: float) -> float:
+    """Mean of the lowest `frac` of the total weight (fractional weights allowed). With equal weights it equals
+    worst_fraction_mean when frac * S is a whole number."""
+    v = np.asarray(values, float); w = np.asarray(weights, float)
+    order = np.argsort(v, kind="stable"); v, w = v[order], w[order]
+    budget = frac * w.sum()
+    cum = np.cumsum(w)
+    take = np.clip(w - np.maximum(cum - budget, 0.0), 0.0, None)
+    return float((v * take).sum() / take.sum())
+
+
 def _read_sim(sim) -> dict:
+    """Arrays [S, Y] from a simulate() result (Feature 2 SimResult, or any dict/object with the same names).
+    `weights` [S] are the scenario weights (Recent and Trend climate modes re-weight real years)."""
     get = (lambda k: sim[k]) if isinstance(sim, dict) else (lambda k: getattr(sim, k))
-    return {k: np.asarray(get(k), dtype=float) for k in ("yields_kg_ha", "irrigation_mm", "total_water_mm")}
+    out = {k: np.asarray(get(k), dtype=float) for k in ("yields_kg_ha", "irrigation_mm", "total_water_mm")}
+    w = sim.get("weights") if isinstance(sim, dict) else getattr(sim, "weights", None)
+    out["weights"] = np.ones(out["yields_kg_ha"].shape[0]) if w is None else np.asarray(w, float)
+    feasible = sim.get("feasible", True) if isinstance(sim, dict) else getattr(sim, "feasible", True)
+    out["feasible"] = bool(feasible)
+    out["reason"] = (sim.get("reason", "") if isinstance(sim, dict) else getattr(sim, "reason", "")) or ""
+    return out
 
 
 def _kcal(crop: str) -> float:
@@ -586,26 +605,35 @@ def _kcal(crop: str) -> float:
     return float(node["value"]) if node else 0.0
 
 
-def _score_one(rotation: dict, sim: dict, econ: dict, history, frac: float, cover_cost_per_ha: float) -> dict:
-    y = sim["yields_kg_ha"]                                           # [S, Y]
+def _score_one(rotation: dict, sim: dict, econ: dict, history, frac: float, cover_cost_per_ha: float):
+    """Score one simulated rotation. Returns the result dict, or (None, reason) when it cannot be scored: the
+    rotation cannot be grown here, or a crop has no yield number (the farmer must enter one; never invented)."""
+    if not sim["feasible"]:
+        return None, f"cannot be grown here: {sim['reason']}"
+    y, w = sim["yields_kg_ha"], sim["weights"]                        # [S, Y], [S]
     crops = [yr[0] for yr in rotation["crops"]]
+    bad = [crops[i] for i in range(y.shape[1]) if np.isnan(y[:, i]).any()]
+    if bad:
+        return None, ("yield", sorted(set(bad)))
     profit = np.stack([economics.profit_per_ha(y[:, i], econ[c]["price_per_t"], econ[c]["cost_per_ha"])
                        for i, c in enumerate(crops)], axis=1)          # [S, Y]
     covers = rotation["cover_crops"]
     profit = profit - np.array([cover_cost_per_ha if cv else 0.0 for cv in covers])[None, :]
     plan_profit = profit.mean(axis=1)                                  # per scenario, per plan year
+    wmean = lambda a: float((a * w[:, None]).sum() / (w.sum() * a.shape[1]))
     kcal = np.array([_kcal(c) for c in crops])[None, :]
-    mean_y = [[float(v)] for v in y.mean(axis=0)]
+    mean_y = [[float(v)] for v in (y * w[:, None]).sum(axis=0) / w.sum()]
     ss = _ss3.soil_score(rotation["crops"], [COVER_CROP_ID if cv else None for cv in covers], mean_y, history)
     return {"crops": rotation["crops"], "cover_crops": list(covers),
-            "mean_profit": float(plan_profit.mean()), "worst10_profit": worst_fraction_mean(plan_profit, frac),
-            "calories": float((y * kcal).mean()), "irrigation_mm": float(sim["irrigation_mm"].mean()),
-            "total_water_mm": float(sim["total_water_mm"].mean()), "soil_score": float(ss.score),
-            "yields_by_year": [{c: float(v)} for c, v in zip(crops, y.mean(axis=0))], "deltas_vs_current": {},
+            "mean_profit": float((plan_profit * w).sum() / w.sum()),
+            "worst10_profit": weighted_worst_fraction_mean(plan_profit, w, frac),
+            "calories": wmean(y * kcal), "irrigation_mm": wmean(sim["irrigation_mm"]),
+            "total_water_mm": wmean(sim["total_water_mm"]), "soil_score": float(ss.score),
+            "yields_by_year": [{c: float(v[0])} for c, v in zip(crops, mean_y)], "deltas_vs_current": {},
             "badges": {"mean_profit": "estimated", "worst10_profit": "estimated", "calories": "estimated",
                        "irrigation_mm": "estimated", "total_water_mm": "estimated", "soil_score": "assumption",
                        "yields_by_year": "estimated"},
-            "soil_notes": list(ss.notes), "example": False}
+            "soil_notes": list(ss.notes), "example": False}, None
 
 
 def _norm01(v: np.ndarray) -> np.ndarray:
@@ -651,7 +679,7 @@ def _stand_in_simulate(site, inputs, rotation, scenarios):
     """STAND-IN, NOT DATA. Deterministic placeholder so the optimizer runs before Person 2's simulate() exists.
     Results carry example=True through recommend_picks."""
     rng = np.random.default_rng(42)
-    n = len(scenarios) if hasattr(scenarios, "__len__") else int(scenarios)
+    n = 41 if scenarios is None else (len(scenarios) if hasattr(scenarios, "__len__") else int(scenarios))
     rain = 0.6 + 0.8 * rng.random(n)
     crops = [yr[0] for yr in rotation["crops"]]
     base = {"maize": 9000.0, "soybean": 3000.0, "wheat_winter": 3500.0, "wheat_spring": 3000.0, "sorghum": 4000.0,
@@ -666,6 +694,16 @@ def _stand_in_simulate(site, inputs, rotation, scenarios):
     return {"yields_kg_ha": y, "irrigation_mm": irr, "total_water_mm": np.tile(300 + 200 * rain[:, None], (1, len(crops)))}
 
 
+def _default_many():
+    """Feature 2's batch simulator, if present (one call for every rotation). Transitional: the contract says to go
+    through engine.api, which does not expose simulate yet."""
+    try:
+        from engine import simulate as _sim
+        return getattr(_sim, "simulate_many", None)
+    except Exception:
+        return None
+
+
 def _default_simulate():
     try:
         from engine import api as _api
@@ -674,14 +712,31 @@ def _default_simulate():
             return fn, False
     except Exception:
         pass
+    try:
+        from engine import simulate as _sim
+        if getattr(_sim, "simulate", None) is not None:
+            return _sim.simulate, False
+    except Exception:
+        pass
     return _stand_in_simulate, True
 
 
 def score_rotations(rotations, site, inputs, sim_fn, scenarios, econ, history=None, frac: float = 0.10,
-                    cover_cost_per_ha: float = 0.0) -> list:
-    """Simulate and score each rotation (mean and worst-10% profit, calories, water, Soil Health Score)."""
-    return [_score_one(rot, _read_sim(sim_fn(site, inputs, rot, scenarios)), econ, history, frac, cover_cost_per_ha)
-            for rot in rotations]
+                    cover_cost_per_ha: float = 0.0, many_fn=None, skipped: list | None = None) -> list:
+    """Simulate and score each rotation (mean and worst-10% profit, calories, water, Soil Health Score).
+    `many_fn(site, inputs, rotations, scenarios)` simulates all rotations in one batch when available (much faster).
+    Rotations that cannot be scored are left out and appended to `skipped` as (rotation, reason)."""
+    sims = many_fn(site, inputs, rotations, scenarios) if many_fn is not None else \
+        [sim_fn(site, inputs, rot, scenarios) for rot in rotations]
+    out = []
+    for rot, sim in zip(rotations, sims):
+        res, why = _score_one(rot, _read_sim(sim), econ, history, frac, cover_cost_per_ha)
+        if res is None:
+            if skipped is not None:
+                skipped.append((rot, why))
+        else:
+            out.append(res)
+    return out
 
 
 def prepare_economics(site, inputs, pool, current_crops) -> tuple:
@@ -704,8 +759,8 @@ def score_candidates(site, inputs, crops=None, simulate=None, scenarios=None) ->
     cost for a current-plan crop is missing (never defaulted)."""
     from engine import candidates as cand
     frac = float(_f3_params()["worst_tail"]["value"])
-    sim_fn, is_stand_in = (simulate, False) if simulate is not None else _default_simulate()
-    scenarios = list(range(41)) if scenarios is None else scenarios
+    sim_fn, is_stand_in = (simulate, simulate is _stand_in_simulate) if simulate is not None else _default_simulate()
+    many_fn = _default_many() if (simulate is None and not is_stand_in) else None
     plan = [[c] if isinstance(c, str) else list(c) for c in inputs.current_plan]
     current_crops = {yr[0] for yr in plan}
     pool = list(crops) if crops is not None else cand.candidates(site, inputs)
@@ -719,10 +774,20 @@ def score_candidates(site, inputs, crops=None, simulate=None, scenarios=None) ->
     allow_cover = cover_cost is not None
     rotations = enumerate_rotations(pool, allow_cover=allow_cover, current_plan=plan)
     history = getattr(inputs, "history", None)
-    scored = score_rotations(rotations, site, inputs, sim_fn, scenarios, econ, history, frac, float(cover_cost or 0.0))
-    cur_crops = plan
-    idx_cur = next(i for i, r in enumerate(rotations) if r["crops"] == cur_crops and not any(r["cover_crops"]))
-    current = scored[idx_cur]
+    skipped: list = []
+    scored = score_rotations(rotations, site, inputs, sim_fn, scenarios, econ, history, frac, float(cover_cost or 0.0),
+                             many_fn=many_fn, skipped=skipped)
+    current = next((r for r in scored if r["crops"] == plan and not any(r["cover_crops"])), None)
+    if current is None:
+        why = next((w for rot, w in skipped if rot["crops"] == plan and not any(rot["cover_crops"])), "could not be simulated")
+        if isinstance(why, tuple):
+            return {"input_needed": [{"crop": c, "field": "yield"} for c in why[1]], "excluded_crops": excluded, "example": is_stand_in}
+        return {"current_plan_problem": str(why), "excluded_crops": excluded, "example": is_stand_in}
+    for rot, why in skipped:                        # candidates dropped for a missing yield number are reported, not guessed
+        if isinstance(why, tuple):
+            for c in why[1]:
+                if {"crop": c, "field": "yield"} not in excluded:
+                    excluded.append({"crop": c, "field": "yield"})
     for r in scored:
         r["deltas_vs_current"] = {k: float(r[k] - current[k]) for k in DELTA_KEYS}
         r["example"] = is_stand_in
@@ -737,7 +802,7 @@ def score_candidates(site, inputs, crops=None, simulate=None, scenarios=None) ->
 
 def assemble_recommendation(bundle: dict, sliders, most_food: bool = False, explain_text: bool = True) -> dict:
     """The fast part: apply the sliders to a scored bundle (vectorised, well under a second)."""
-    if "input_needed" in bundle:
+    if "input_needed" in bundle or "current_plan_problem" in bundle:
         return bundle
     scored, current = bundle["scored"], bundle["current"]
     picks = choose_picks(scored, current, sliders, most_food)

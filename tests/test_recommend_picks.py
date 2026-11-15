@@ -154,9 +154,9 @@ def test_results_are_deterministic():
 
 
 def test_stand_in_simulate_is_flagged_example():
-    r = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize", "sorghum"], scenarios=list(range(10)))
-    if r["example"]:                                  # only while Person 2's simulate() is not in engine.api
-        assert r["highest_profit"]["example"] and set(r["highest_profit"]["badges"].values()) == {"example"}
+    r = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize", "sorghum"], simulate=opt._stand_in_simulate, scenarios=list(range(10)))
+    assert r["example"] is True
+    assert r["highest_profit"]["example"] and set(r["highest_profit"]["badges"].values()) == {"example"}
 
 
 def test_enumeration_counts_and_always_includes_the_current_plan():
@@ -178,9 +178,56 @@ def test_sliders_respond_fast_and_a_new_pin_scores_within_budget():
     class S2(Site):
         us_defaults = {"prices": {c: 200.0 for c in crops}, "costs": {c: 300.0 for c in crops}}
     inp = Inputs(plan=("maize",) * 4)
-    t = time.time(); bundle = opt.score_candidates(S2(), inp, crops=crops, scenarios=list(range(41))); score_s = time.time() - t
+    t = time.time(); bundle = opt.score_candidates(S2(), inp, crops=crops, simulate=opt._stand_in_simulate, scenarios=list(range(41))); score_s = time.time() - t
     assert len(bundle["scored"]) == 6 ** 4 and score_s < 15.0
     t = time.time()
     for lam in (0.0, 0.5, 1.0):
         opt.assemble_recommendation(bundle, {"bad_year": lam, "soil": 0.5, "water": 0.0}, explain_text=False)
     assert (time.time() - t) / 3 < 1.0
+
+
+def test_weighted_worst_fraction_matches_hand_values():
+    v = [1.0, 2.0, 3.0, 4.0]
+    assert opt.weighted_worst_fraction_mean(v, [1, 1, 1, 1], 0.5) == pytest.approx(1.5)           # lowest two of four
+    assert opt.weighted_worst_fraction_mean(v, [1, 3, 1, 1], 0.5) == pytest.approx(5.0 / 3.0)     # weight 3 of 6: 1 (w1) + 2 (w2)
+    assert opt.weighted_worst_fraction_mean(v, [2, 1, 1, 1], 0.25) == pytest.approx(1.0)          # 1.25 of 5 fits inside the first value
+    assert opt.weighted_worst_fraction_mean(np.arange(1.0, 21.0), np.ones(20), 0.10) == pytest.approx(opt.worst_fraction_mean(np.arange(1.0, 21.0), 0.10))
+
+
+def test_scenario_weights_change_mean_and_worst10_as_expected():
+    w = np.array([5.0] + [1.0] * 9)                       # the driest scenario (f = 0.2) counts five times
+    def sim(site, inputs, rotation, scenarios):
+        r = fake_simulate(site, inputs, rotation, scenarios); r["weights"] = w; return r
+    cur = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize", "sorghum", "soybean"], simulate=sim, scenarios=list(range(10)))["current_plan_result"]
+    prof = 425 + 75 * F
+    assert cur["mean_profit"] == pytest.approx((prof * w).sum() / w.sum())
+    assert cur["mean_profit"] < 425 + 75 * F.mean()        # more weight on the bad year lowers the mean
+
+
+def test_nan_yield_leaves_the_crop_out_and_asks_for_a_yield():
+    def sim(site, inputs, rotation, scenarios):
+        r = fake_simulate(site, inputs, rotation, scenarios)
+        if any(yr[0] == "soybean" for yr in rotation["crops"]):
+            r["yields_kg_ha"] = np.where(np.array([[yr[0] == "soybean" for yr in rotation["crops"]]] * 10), np.nan, r["yields_kg_ha"])
+        return r
+    r = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize", "sorghum", "soybean"], simulate=sim, scenarios=list(range(10)))
+    assert {"crop": "soybean", "field": "yield"} in r["excluded_crops"]
+    assert all(c[0] != "soybean" for x in r["all_results"] for c in x["crops"])
+
+
+def test_current_plan_with_no_yield_number_asks_for_input():
+    def sim(site, inputs, rotation, scenarios):
+        r = fake_simulate(site, inputs, rotation, scenarios); r["yields_kg_ha"] = r["yields_kg_ha"] * np.nan; return r
+    r = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize"], simulate=sim, scenarios=list(range(10)))
+    assert r["input_needed"] == [{"crop": "sorghum", "field": "yield"}]
+
+
+def test_infeasible_rotation_is_left_out():
+    class Sim:
+        def __init__(self, ok, y): self.feasible, self.reason, self.yields_kg_ha = ok, "season too short", y
+        irrigation_mm = np.zeros((10, 4)); total_water_mm = np.full((10, 4), 400.0); weights = None
+    def sim(site, inputs, rotation, scenarios):
+        y = fake_simulate(site, inputs, rotation, scenarios)["yields_kg_ha"]
+        return Sim(not any(yr[0] == "maize" for yr in rotation["crops"]), y)
+    r = opt.recommend_picks(Site(), Inputs(), {}, crops=["maize", "sorghum", "soybean"], simulate=sim, scenarios=list(range(10)))
+    assert all(c[0] != "maize" for x in r["all_results"] for c in x["crops"]) and r["all_results"]

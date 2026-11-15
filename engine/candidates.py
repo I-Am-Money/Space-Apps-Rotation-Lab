@@ -37,6 +37,13 @@ def _standin() -> dict:
     return yaml.safe_load(STANDIN.read_text()).get("crops", {})
 
 
+def _g(obj, key, default=None):
+    if obj is None:
+        return default
+    v = obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
+    return default if v is None else v
+
+
 def _norm(crop: str) -> str:
     from engine import soil_score
     return soil_score.norm(crop) or str(crop).lower()
@@ -91,15 +98,15 @@ def climate_fit(weather: pd.DataFrame, crop: str) -> dict:
 
 def candidate_report(site, inputs) -> list[dict]:
     """One row per crop considered: fit, share of years, whether the county grows it (US), and why kept or dropped."""
-    current = {_norm(c) for y in _years(inputs.current_plan) for c in y}
+    current = {_norm(c) for y in _years(_g(inputs, "current_plan")) for c in y}
     county = None
-    ud = getattr(site, "us_defaults", None)
+    ud = _g(site, "us_defaults")
     if ud is not None:
         county = {_norm(c) for c in (ud.get("crops") if isinstance(ud, dict) else ud.crops) or []}
     pool = sorted(set(_params()["crops"]) & set(_standin()) | current)
     rows = []
     for crop in pool:
-        fit = climate_fit(site.weather, crop)
+        fit = climate_fit(_g(site, "weather"), crop)
         in_county = None if county is None else crop in county
         keep = bool(fit["fits"]) and (in_county is not False)
         note = fit["reason"]

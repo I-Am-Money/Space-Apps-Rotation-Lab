@@ -103,6 +103,12 @@ def tradeoff_chart(result: dict, currency: str, area_unit: str):
     return fig
 
 
+def cache_extra(crops, simulate, scenarios) -> str:
+    """Part of the cache key: which crops, which simulation function and which scenarios were used."""
+    n = getattr(scenarios, "n", None) or (len(scenarios) if hasattr(scenarios, "__len__") else scenarios)
+    return f"{crops}|{getattr(simulate, '__module__', None)}.{getattr(simulate, '__qualname__', None)}|{type(scenarios).__name__}:{n}"
+
+
 def _site_key(site, inputs, extra="") -> str:
     blob = json.dumps({"lat": getattr(site, "lat", None), "lon": getattr(site, "lon", None), "plan": inputs.current_plan,
                        "ov": getattr(inputs, "crop_overrides", None), "hist": getattr(inputs, "history", None),
@@ -142,11 +148,15 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
         if recommend_fn is not None:
             result = recommend_fn(sliders, most_food)
         else:
-            bundle = _scored_bundle(_site_key(site, inputs, str(crops)), site, inputs, crops, simulate, scenarios)
+            bundle = _scored_bundle(_site_key(site, inputs, cache_extra(crops, simulate, scenarios)), site, inputs, crops, simulate, scenarios)
             result = opt.assemble_recommendation(bundle, sliders, most_food, explain_text=True)
     if "input_needed" in result:
         need = "; ".join(f"your {n['field']} for {crop_label(n['crop'])}" for n in result["input_needed"])
         st.warning(f"Input needed. Enter {need} before money numbers can be shown. Nothing is filled in for you.")
+        return result
+    if "current_plan_problem" in result:
+        st.warning(f"Your current plan could not be simulated here: {result['current_plan_problem']}. "
+                   "Check the crops and the site, then try again.")
         return result
     ex = bool(result.get("example"))
     if ex:
@@ -154,6 +164,11 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
         st.warning("EXAMPLE DATA. The crop simulation is not connected yet, so these results come from a stand-in. "
                    "Do not use them for decisions.")
     texts = result["explanations"]
+    cur = result["current_plan_result"]
+    head = result["headline"]
+    if head is not None and head["crops"] == cur["crops"] and head["cover_crops"] == cur["cover_crops"]:
+        st.info("Your current plan is already the best match for your priorities under your profit guardrail. "
+                "No other rotation keeps your average profit at or above it and scores higher.")
     pick_card("headline", result["headline"], texts.get("headline", ""), currency, area_unit, True, ex)
     a, b = st.columns(2)
     with a:

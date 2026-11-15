@@ -16,7 +16,7 @@ from __future__ import annotations
 import streamlit as st
 
 from engine import evpi, optimize as opt
-from ui.recommendations import DISCLAIMER, _site_key, show_badge
+from ui.recommendations import DISCLAIMER, _site_key, cache_extra, show_badge
 
 UPPER_BOUND = ("Value of perfect information is an upper bound: the most it could be worth to know the number exactly. "
                "A real test is never perfect, so it is worth less.")
@@ -59,10 +59,10 @@ def render(site, inputs, sliders=None, currency: str = "USD", area_unit: str = "
             if v is not None:
                 costs[name] = float(v)
     bad = float((sliders or {}).get("bad_year", 0.3)) if isinstance(sliders, dict) else float(getattr(sliders, "bad_year", 0.3) or 0.3)
-    is_example = bool(simulate is None and opt._default_simulate()[1])
+    is_example = bool(simulate is opt._stand_in_simulate or (simulate is None and opt._default_simulate()[1]))
     with st.spinner("Checking which unknowns could change your answer..."):
         rows = question_fn(costs) if question_fn is not None else _question_rows(
-            _site_key(site, inputs, str(crops)), round(bad, 2), repr(sorted(costs.items())), site, inputs, crops, simulate, scenarios, costs)
+            _site_key(site, inputs, cache_extra(crops, simulate, scenarios)), round(bad, 2), repr(sorted(costs.items())), site, inputs, crops, simulate, scenarios, costs)
     if is_example and question_fn is None:
         show_badge("example")
         st.warning("EXAMPLE DATA. The crop simulation is not connected yet, so these values come from a stand-in. "
