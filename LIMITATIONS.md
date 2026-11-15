@@ -120,6 +120,14 @@ forecast. These limits are shown in the app and listed here.
   then land one step away (for example 0.85x rainfall instead of 0.75x). The three example farms are worked out
   ahead of time with all 500 plans (`data/precache/tipping/`), and that saved result is shown only while the
   engine code, the assumptions and the farm's data are exactly the ones it was made with.
+- **Food calories ("most food").** Calories per kg come from USDA FoodData Central (read 2026-11-15) for maize,
+  soybean, winter and spring wheat, barley, sorghum, rice, chickpea, lentil and potato. The lookup was rate-limited
+  before the rest could be read. Oats, dry bean, pea, pigeonpea and sunflower therefore count as zero food
+  calories, and so do canola, sugar beet and cotton. Pearl millet and peanut fall back to recalled, unverified
+  values (3,610 and 5,670 kcal per kg, marked placeholder in `config/assumptions/recommend.yaml`); the peanut value
+  is for shelled kernels but is applied to in-shell yield, so it overstates. The "most food" pick is biased against
+  the zero-calorie crops and toward peanut. Profit, soil and tipping results do not use calories. Details:
+  `docs/notes/person2.md`.
 - **NASA map layers.** SMAP soil moisture and MODIS vegetation index tiles are shown for context and need an
   internet connection. They are never model inputs.
 

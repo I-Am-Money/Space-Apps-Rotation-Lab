@@ -55,6 +55,10 @@ Simulation
   not counted, and canola and sugar beet are counted as zero, because the edible share of the harvested product was
   not verified. Cotton is a fibre crop and counts as zero. A plan that grows one of these crops shows fewer food
   calories than it really produces, so the "most food" pick is biased against them.
+- Where this file has no calorie value for a crop, the recommendation engine falls back to its own table in
+  `config/assumptions/recommend.yaml`. That table has recalled, unverified values for pearl millet (3,610 kcal per
+  kg) and peanut (5,670, for shelled kernels but applied to in-shell yield), so those two crops are counted with
+  placeholder values; the other empty crops count as zero.
 
 Climate shift (R8). All three modes are what-ifs, not forecasts.
 - Recent: the 500 bootstrap plans are drawn again with the last 20 calendar years of the record twice as likely.
