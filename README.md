@@ -1,53 +1,81 @@
 # RotationLab
 
-A four-year kharif crop-rotation planner for a 40-acre rice farm in Nalgonda, Telangana. It evaluates 253 offered sequences of rice, bajra, kharif sorghum and pigeon pea, using real NASA weather and a continuous daily water balance. Results support farmer and local-expert judgment; they are modeled estimates, not guarantees.
+NASA Space Apps 2026, challenge **Field Shift: Adapting Farms with NASA Data**.
 
-## Run
+RotationLab uses NASA data to show any farmer how their climate is already changing, and which crop rotation
+will strengthen their soil and hold up as it keeps changing, without losing money.
 
-Python 3.11-3.13 is supported. Native wheels are pinned for the numerical compiler.
+Results are modeled estimates for planning. They are not a guarantee of yield or profit.
+
+> **Status (2026-11-15).** The team is building version 4 (any pin on Earth, with US auto-fill) to Build Spec
+> v4. Until the v4 merge, `main` runs the earlier India build (one farm district in Telangana, kharif season).
+> This README describes v4. The India build is described in `docs/INDIA_DATA.md` and `docs/NASA_DATA.md`.
+
+## Setup
+
+Use Python 3.11 (the numerical compiler, numba, does not support 3.14).
 
 ```sh
-python3 -m venv .venv
+python3.11 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m engine check-data
 .venv/bin/python -m pytest -q
 .venv/bin/python -m streamlit run app.py
 ```
 
-The first numerical call compiles or loads the native kernel. No API key is needed. Streamlit 1.58 or newer is required; releases with lazy tabs use native tabs.
+Optional keys go in environment variables or Streamlit secrets, never in the repo:
 
-## What works
+- `NASS_API_KEY`: USDA NASS Quick Stats, for US yields, prices and crops grown.
+- `ANTHROPIC_API_KEY`: Claude explanations. Without it the app uses a fixed template.
 
-- Five screens: farm inputs, rotation comparison, priorities, tipping points, and validation.
-- Detected rainfall onset drives planting. A documented false-start check rejects a wet window followed by a long dry spell. Sowing follows the onset shift relative to the weather record median, capped so the crop matures within the calendar year. Years without a clean onset are flagged.
-- Paddy accounting separates canal and well supply, draws canal first, caps wells, and carries soil moisture between crops and fallow periods. Rainfed crops use FAO-56 depletion stress and FAO-33 yield response.
-- Flowering heat sensitivity can be disabled. Rotation effects and nitrogen savings remain explicit assumptions.
-- Risk and irrigation-saving preferences, Pareto frontier, farm totals and a shared-weather land split. The water preference is an editable monetary value, never deducted from displayed profit.
-- Rainfall/supply and upstream/local-rain decision maps, 200 bootstrap resamples, onset-delay curves, and perfect-information upper bounds. Interactive maps use 150 seeded sequences; the full option uses 500. Recommendations always use 500.
-- Anonymous CSV farm-record import, local cost overrides, result/assumption CSV downloads, and a cached offline district outline. Online NASA GIBS layers remain available.
+To rebuild the validation table once NASS yields are cached: `.venv/bin/python -m engine.correction`
+(writes `config/validation/results.csv`).
 
-## Data and honesty
+## How it works
 
-NASA POWER provides the cached 1984-2025 district weather record and five upstream Krishna-basin points. ICRISAT/TCI's apportioned district crop table was recovered from the World Bank reproducibility archive: 52 Nalgonda years, 1966-2017, for all selected crops. The source member and extracted file have recorded checksums. Ragi has only 17 positive-yield years and is not selected. Kharif sorghum is used without blending it with the annual sorghum column.
+1. **You answer a few questions.** Current crops, water (rain only or irrigated, normal-year and dry-year
+   supply), farm size, and optionally a soil test and field history. Then you drop a pin on the map.
+2. **NASA weather.** Daily NASA POWER weather from 1981 to the latest year at your pin. The climate card
+   compares the last 20 years with 1981 to 2000: season rain, rain variability, heat days and rainy-season start.
+3. **Soil and local data.** In the US, soil comes from USDA SSURGO and county crops, yields, prices and costs
+   come from USDA NASS and ERS. Elsewhere, soil comes from ISRIC SoilGrids and you enter yield, price and cost.
+4. **Crop science, not a black box.** A daily FAO-56 water balance and FAO-33 yield response to water run on
+   real weather years: 4-year historical blocks, 500 bootstrap plans (seed 42) and named stress years.
+5. **Every 4-year rotation is scored.** Mean profit, bad-year profit (worst 10%), food calories, irrigation
+   and total water, and a **Soil Health Score** (0 to 100). The score is rule-based, from NRCS soil health
+   principles: soil cover, living roots, diversity and legumes, residue carbon, a penalty for repeating the same
+   crop, and tillage and field history. It is not a soil test (`engine/soil_score.py`).
+6. **Three picks.** Best for soil and climate (never loses money against your current plan, unless you
+   change the tolerance), Highest profit, and Best for your soil. Each shows the change from your current
+   plan and a short plain-English explanation.
+7. **Tipping points and what to measure next.** The rainfall, heat or water supply at which the best plan
+   changes, and which unknown (water supply, soil water capacity, organic matter) would be most worth measuring.
+8. **How good is this?** A hindcast in 12 US counties across 8 regions (`config/validation/sites.yaml`):
+   modeled against NASS county yields, detrended, with the latest 8 years held out. A small linear correction
+   for rain, heat and year is fitted on training years only, and results are shown with and without it
+   (`engine/hindcast.py`, `engine/correction.py`). Where there is no local yield data, the app says
+   "Not validated here".
 
-Official 2026-27 MSPs and national A2+FL costs per quintal are cached from PIB. Rice and pigeon-pea budgets use verified Telangana A2+FL cultivation costs scaled to 2026-27 with national cost ratios; millet budgets use national unit-cost proxies multiplied by district potential yields. Both methods remain assumptions, not farm budgets. Rice district yields are milled rice and are converted to paddy only when calculating sales. No separate water charge is deducted from profit. Measurement quotes remain unknown until entered.
+Every value carries a badge: Observed, Estimated, Your input, Assumption, or Placeholder ("team to verify").
+All assumptions, with sources and ranges, are in `config/assumptions.yaml`. Limits are in `LIMITATIONS.md` and
+data sources in `DATA_SOURCES.md`.
 
-The team rule excludes the same non-rice crop in all four years. Such a plan can still be compared as the current rotation, but cannot be recommended. Rotation effects include the previous crop on the farm; the app shows a sensitivity check with those effects removed.
+## Repo layout
 
-Validation estimates potential yield and trend lines from training years only and holds out the latest eight overlapping years. Weak correlations remain visible. See `LIMITATIONS.md`, `docs/INDIA_DATA.md`, and `docs/NASA_DATA.md`.
+| Path | What it is |
+|---|---|
+| `engine/api.py` | The only interface between parts (Build Spec v4, A5) |
+| `engine/fetch_*.py`, `cache.py`, `crops.py`, `et0.py`, `waterbalance.py`, `yieldmodel.py`, `economics.py` | Data and crop science |
+| `engine/scenarios.py`, `optimize.py`, `tipping.py`, `evpi.py`, `climate.py` | Scenarios, scoring and picks |
+| `engine/soil_score.py`, `hindcast.py`, `correction.py`, `explain.py` | Soil score, validation, explanations |
+| `app.py`, `ui/` | Streamlit app |
+| `config/` | Assumptions, validation sites |
+| `tests/` | pytest tests for every module |
 
-## Commands and deployment
+## AI use
 
-```sh
-.venv/bin/python -m engine report --output output/planning-report.json
-.venv/bin/python -m engine benchmark --scenarios 500 --include-tipping
-.venv/bin/python scripts/prepare_deploy.py
-```
+Claude Code (Anthropic) wrote most of the code, tests and docs under the team's direction. In the app,
+Claude (`claude-sonnet-5-5`) writes the plain-English explanations. It sees only computed numbers, and a guard
+rejects any reply with a number or crop that is not in the results, falling back to a fixed template. AI made
+up no data. Details are in `AI_USE.md`, and every code file has an AI-use header comment.
 
-`output/rotationlab-deploy.zip` contains source, tests and required public data, with a SHA-256 manifest. It excludes secrets, virtual environments and personal farm-record files. See `docs/DEPLOYMENT.md` for Streamlit Community Cloud and Docker. GitHub Actions runs offline data checks and tests.
-
-## Optional explanation and AI use
-
-The default explanation is deterministic. To enable optional Claude explanations, configure `ANTHROPIC_API_KEY`; `ANTHROPIC_MODEL` optionally overrides the default model. Each user must opt in before computed totals are sent. Explanations are cached in bounded process memory, not written to disk. Never commit keys; `.env` and Streamlit secrets are ignored.
-
-Code was built with Claude Code assistance and subsequently completed and tested with OpenAI Codex assistance. See `AI_USE.md`. The toy preview engine has been removed. Calculation failures never switch to invented data. NASA data use does not imply NASA endorsement.
+NASA data use does not imply NASA endorsement.
