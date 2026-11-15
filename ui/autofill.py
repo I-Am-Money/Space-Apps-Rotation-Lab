@@ -95,7 +95,7 @@ def _confirm(f: dict) -> None:
 
 
 def render() -> None:
-    with st.expander("Find my land from a US address", expanded=bool(st.session_state.get("v4_found"))):
+    with st.expander("Find my land from a US address", expanded=bool(st.session_state.get("v4_found")) or "v4_site" not in st.session_state):
         st.caption("Your address is sent to the US Census geocoder to find the spot. It is not saved. "
                    "Outside the US, or if the lookup misses, click your field on the map instead.")
         addr = st.text_input("Street address, town and state", placeholder="123 County Road 5, Ames, IA", key="v4_addr")

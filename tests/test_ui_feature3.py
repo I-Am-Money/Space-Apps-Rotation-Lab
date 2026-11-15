@@ -59,9 +59,10 @@ def test_recommendations_page_renders_three_picks_and_a_chart():
     assert not at.exception
     t = _text(at)
     assert "Best for soil and climate" in t and "Highest profit" in t and "Best for your soil" in t
-    assert "vs current" in t and "EXAMPLE DATA" not in t
+    assert "Your plan today" in t and "Difference" in t and "EXAMPLE DATA" not in t
+    assert "Compared with what you grow today" in t and "Year 1" in t
     assert len(at.slider) == 4 and "Not a guarantee of yield or profit" in t
-    assert len(at.metric) >= 15 and not any("Do not use them" in w.value for w in at.warning)
+    assert not any("Do not use them" in w.value for w in at.warning)
 
 
 def test_moving_a_slider_reruns_without_error_and_keeps_the_guardrail():
@@ -75,7 +76,8 @@ def test_moving_a_slider_reruns_without_error_and_keeps_the_guardrail():
 def test_area_unit_acre_changes_the_money_unit_shown():
     ha = _text(AppTest.from_function(_rec_app, default_timeout=60).run())
     ac = _text(AppTest.from_function(_rec_acre_app, default_timeout=60).run())
-    assert "/ha/yr" in ha and "/acre/yr" in ac and "/acre/yr" not in ha
+    assert "per ha " in ha and "per acre " in ac and "per acre " not in ha
+    assert "inches a year" in ac and "mm a year" in ha        # water in the units the farmer uses
 
 
 def test_stand_in_simulation_shows_the_red_example_badge_and_warning():
@@ -96,7 +98,7 @@ def test_measure_page_ranks_questions_in_plain_words():
     at = AppTest.from_function(_measure_app, default_timeout=90).run()
     assert not at.exception
     t = _text(at)
-    assert "What to measure next" in t and "upper bound" in t
+    assert "What to check first" in t and "upper bound" in t
     assert "Could change your answer" in t or "Probably won't change your answer" in t
     assert "organic matter" in t.lower() and "team to verify" in t
 

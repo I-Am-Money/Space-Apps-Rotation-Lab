@@ -127,5 +127,5 @@ def test_validation_failure_does_not_remove_recommendations(providers,monkeypatc
     app=results_app(providers)
     assert not app.exception
     assert any('Validation records could not be loaded' in w.value for w in app.warning)
-    assert any('Highest profit' in s.value for s in app.subheader)
+    assert any('Highest profit' in s.value for s in list(app.subheader) + list(app.markdown))
     assert not any('secret internal' in e.value for e in app.error)

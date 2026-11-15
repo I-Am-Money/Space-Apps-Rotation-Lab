@@ -1,0 +1,62 @@
+{
+  "source": "https://www.farmers.gov",
+  "tokens": {
+    "spacing": { "scale": [5, 10, 20, 30, 45, 80], "base_unit": 5 },
+    "typography": {
+      "families": ["Public Sans"],
+      "scale": [
+        { "role": "hero", "size": "38px", "weight": "700", "family": "Public Sans" },
+        { "role": "h2", "size": "28px", "weight": "700", "family": "Public Sans" },
+        { "role": "h3", "size": "23px", "weight": "700", "family": "Public Sans" },
+        { "role": "h4", "size": "20px", "weight": "700", "family": "Public Sans" },
+        { "role": "body", "size": "18px", "weight": "400", "family": "Public Sans" },
+        { "role": "small", "size": "14px", "weight": "400", "family": "Public Sans" }
+      ]
+    },
+    "colors": [
+      { "role": "background", "value": "#F7F7F7" },
+      { "role": "surface", "value": "#FFFFFF" },
+      { "role": "text-primary", "value": "#212121" },
+      { "role": "accent-and-links", "value": "#006546" },
+      { "role": "alert", "value": "#E31C3D" },
+      { "role": "rule", "value": "#E0E0E0" }
+    ],
+    "radius": ["2px", "4px"],
+    "shadows": ["0 3px 14px 0 #D8D8D8", "0 1px 4px 0 #BBBBBB"],
+    "image_ratios": [
+      { "usage": "hero", "ratio": "2.67:1" },
+      { "usage": "thumbnail", "ratio": "1.97:1" }
+    ],
+    "grid": { "max_width": "1060px", "columns": 3, "gutter": "20px" }
+  },
+  "taste": [
+    {
+      "name": "Green means you can press it",
+      "trigger": "When the designers had a brand green and a page full of links, alerts and dates",
+      "decision": "Chose to spend the green only on navigation and links over spreading it across headings, icons and backgrounds as decoration",
+      "reason": "A reader who is unsure of a website needs one dependable rule. If green always means this goes somewhere, they stop testing things with the cursor.",
+      "evidence": ["#006546 on 44 interactive elements and 37 link texts", "headings stay #212121", "neutrals cover 92% of painted area", "red #E31C3D kept for one service alert"]
+    },
+    {
+      "name": "Say the action in a sentence",
+      "trigger": "When the designers needed calls to action on eleven cards",
+      "decision": "Chose underlined text links that name the result over filled buttons with short labels, and left out button fills, icon-only controls and hover effects",
+      "reason": "A person filling in a government form on a slow connection trusts words more than shapes. A sentence cannot be misread the way a Submit button or an icon can.",
+      "evidence": ["12+ underlined 700-weight links with a circled arrow", "button radius 0px", "only two filled buttons on the page, both in forms"]
+    },
+    {
+      "name": "Make the reading size the big size",
+      "trigger": "When the designers set the type scale",
+      "decision": "Chose an 18px body with a modest 38px headline over a small body under a very large display headline",
+      "reason": "The audience reads the paragraph, not the slogan, often outdoors or past fifty, so the size goes into ordinary sentences.",
+      "evidence": ["18px is the most frequent size (37 uses) with 28px line-height", "h1 38px is 2.1x body", "4 heading sizes, all weight 700"]
+    },
+    {
+      "name": "One container, learned once",
+      "trigger": "When the designers had news, dates, tools, topics and blog posts to hold",
+      "decision": "Chose one white card with a 2px corner and a single gray shadow for all of them over a different treatment per content type",
+      "reason": "Every new kind of box is something to work out. With one box, attention goes to what is inside it.",
+      "evidence": ["0 3px 14px #D8D8D8 on 10 cards", "2px radius on 15 elements", "no card inside a card", "only variation is an 80x6px colored bar on two cards"]
+    }
+  ]
+}

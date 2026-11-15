@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import re
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -226,16 +227,53 @@ def site_points(summary) -> pd.DataFrame:
     return df.dropna(subset=["lat", "lon"]).drop_duplicates("site")[["site", "lat", "lon"]].reset_index(drop=True)
 
 
+_NOT_US = re.compile(r"india|nalgonda|telangana|icrisat|rupee|krishna|monsoon|paddy|bajra|jowar|pigeon|kharif|rabi\b|\bMSP|v3\b", re.I)
+
+
+def us_only_text(text: str) -> str:
+    """The app is for US farms right now, so the pages show only the parts of the team documents that apply to it.
+    Drops any section whose heading names the earlier single-farm version, and any list item or paragraph about it.
+    The documents themselves are unchanged."""
+    out, skip_level, block = [], None, []
+
+    def flush():
+        if block and not _NOT_US.search(" ".join(block)):
+            out.extend(block)
+        block.clear()
+    for line in text.splitlines():
+        line = re.sub(r"\d{4}-\d{2}-\d{2} \(India points\); ", "", line)      # keep the US download date of a shared dataset
+        head = re.match(r"^(#+)\s", line)
+        if head:
+            flush()
+            level = len(head.group(1))
+            if skip_level is not None and level <= skip_level:
+                skip_level = None
+            if skip_level is None and _NOT_US.search(line):
+                skip_level = level
+            if skip_level is None:
+                out.append(line)
+            continue
+        if skip_level is not None:
+            continue
+        if not line.strip() or re.match(r"^\s{0,3}(\d+\.|[-*]|\|)\s?", line):  # a blank line, a list item or a table row starts a new block
+            flush()
+            if not line.strip():
+                out.append(line)
+                continue
+        block.append(line)
+    flush()
+    return "\n".join(out)
+
+
 def render() -> None:
     import streamlit as st
 
-    st.header("How good is this?")
-    st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, and in "
-             "one India district with ICRISAT yield records, then compared it with what farmers actually "
-             "harvested. The latest 8 years of each record were never used to tune anything, so those numbers "
-             "show how the model does on years it has not seen.")
+    st.header("Can I trust this?")
+    st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, then compared it "
+             "with what farmers actually harvested. The latest 8 years of each record were never used to tune anything, "
+             "so those numbers show how the model does on years it has not seen.")
     summary = load_validation()
-    rows = validation_rows(summary)
+    rows = [r for r in validation_rows(summary) if r["Country"] == "US"]        # US farms only for now
     st.subheader("Validation (hindcast)")
     us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
     if not us_ok:
@@ -251,22 +289,19 @@ def render() -> None:
                    "is rough. The model tracks water stress, so it is expected to do worse where most fields are "
                    "irrigated. Details are under Limitations below.")
     shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
-    for country, title in (("US", "United States (USDA NASS county yields)"),
-                           ("India", "India (ICRISAT district yields; record ends 2017)")):
-        part = shown[shown["Country"] == country] if len(shown) else shown
-        if len(part):
-            st.caption(title)
-            st.dataframe(part.drop(columns=["Country"]), hide_index=True)
-    other = shown[~shown["Country"].isin(["US", "India"])] if len(shown) else shown
-    if len(other):
-        st.dataframe(other, hide_index=True)
+    if len(shown):
+        st.caption("United States (USDA NASS county yields)")
+        st.dataframe(shown.drop(columns=["Country"]), hide_index=True)
     pts = site_points(summary)
+    if len(pts):
+        pts = pts[pts["lat"].between(24, 50) & pts["lon"].between(-125.5, -66)]
     if len(pts):
         st.caption("Validation sites")
         st.map(pts)
 
     st.subheader("Assumptions")
-    a = pd.DataFrame(assumption_rows())
+    a = pd.DataFrame([r for r in assumption_rows()
+                      if not _NOT_US.search(" ".join(str(v) for v in r.values())) and "assumptions.yaml" not in str(r.get("File", ""))])
     if not a.empty:
         n_ph = int((a["Badge"] == "placeholder").sum())
         st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
@@ -276,7 +311,7 @@ def render() -> None:
         st.dataframe(a, hide_index=True)
     for name in DOCS:
         with st.expander(name, expanded=(name == "Limitations")):
-            st.markdown(doc_text(name))
+            st.markdown(us_only_text(doc_text(name)))
 
 
 if __name__ == "__main__":

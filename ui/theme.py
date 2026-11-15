@@ -190,3 +190,102 @@ def inject() -> None:
         l_ph=oklch(0.70, 0.12, 90), d_up=oklch(0.40, 0.11, 150), d_dn=oklch(0.43, 0.15, 30),
     )
     st.markdown("<style>" + (CSS % vals) + "</style>", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Farmer layer for the global planner (v5 pages). Same tokens as above. Direction from docs/design/farmers.gov.md:
+# the accent color only on things you can press, the reading size is the big size (18px body), one container
+# recipe, and actions named in plain words.
+V5_CSS = """
+.block-container{max-width:1080px;padding:1.4rem 1.25rem 5rem}
+h1{font-size:2.4rem!important;line-height:1.1!important;letter-spacing:-0.01em!important;margin:.2rem 0 .6rem!important;padding:0!important}
+h2{font-size:1.75rem!important;line-height:1.15!important;margin:1.6rem 0 .4rem!important;padding:0!important}
+h3{font-size:1.3rem!important;line-height:1.2!important;margin:1.4rem 0 .3rem!important;padding:0!important}
+.stMarkdown p,.stMarkdown li{font-size:1.125rem;line-height:1.55}
+[data-testid="stCaptionContainer"],[data-testid="stCaptionContainer"] p{font-size:.95rem!important;line-height:1.45;color:var(--ink2)!important;opacity:1!important;max-width:75ch}
+[data-testid="stWidgetLabel"] p,label p{font-size:1.02rem!important}
+
+/* one container */
+[data-testid="stVerticalBlockBorderWrapper"]{background:var(--surface);border-radius:8px!important}
+[data-testid="stExpander"]{background:var(--surface)!important}
+[data-testid="stExpander"] details{border:0!important;background:transparent!important}
+[data-testid="stExpander"] summary{padding:.75rem 1rem;min-height:44px}
+[data-testid="stExpander"] summary p{font-size:1.05rem!important}
+[data-testid="stAlert"]{border-radius:8px;border:1px solid var(--line)}
+[data-testid="stAlert"] p{font-size:1.02rem;max-width:80ch}
+
+/* things you can press */
+.stButton>button,.stDownloadButton>button{min-height:46px;border-radius:6px;font-family:var(--sans);border:1.5px solid var(--accent);background:var(--surface);color:var(--accent);padding:.45rem 1.1rem;transition:background-color .16s ease-out,color .16s ease-out}
+.stButton>button p,.stDownloadButton>button p{font-size:1.05rem!important;font-weight:700;max-width:none;color:inherit!important}
+.stButton>button:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.stButton>button:active{transform:translateY(1px)}
+.stButton>button[kind="primary"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.stButton>button[kind="primary"]:hover{background:%(accent_dark)s;border-color:%(accent_dark)s;color:#fff}
+.stButton>button:disabled{background:var(--sunken);color:var(--ash);border-color:var(--line)}
+input,textarea,div[data-baseweb="select"]>div{font-size:1.05rem!important;min-height:44px}
+[data-testid="stNumberInput"] button{min-height:44px}
+
+/* page steps */
+.st-key-rl_nav{border-bottom:1px solid var(--line);margin:.2rem 0 1.2rem}
+.st-key-rl_nav [role="radiogroup"]{gap:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.st-key-rl_nav [role="radiogroup"] label{margin:0;padding:.7rem .95rem .6rem;border-bottom:3px solid transparent;white-space:nowrap;min-height:44px;cursor:pointer}
+.st-key-rl_nav [role="radiogroup"] label>div>div:first-child:not([data-testid]){display:none}
+.st-key-rl_nav_start{display:none}
+.st-key-rl_nav [role="radiogroup"] label p{font-size:1.05rem!important;font-weight:600;color:var(--ink2)}
+.st-key-rl_nav [role="radiogroup"] label:hover p{color:var(--accent)}
+.st-key-rl_nav [role="radiogroup"] label:has(input:checked){border-bottom-color:var(--accent)}
+.st-key-rl_nav [role="radiogroup"] label:has(input:checked) p{color:var(--ink);font-weight:700}
+.st-key-rl_nav [role="radiogroup"] label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:-3px}
+.rl-top{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.rl-top .rl-brand{margin:0;font-size:1.15rem}
+.rl-top span{font-size:.95rem;color:var(--ink2)}
+
+/* plan cards */
+.rl-panel.lead{border:2px solid var(--accent);padding:1.3rem 1.5rem}
+.rl-panel h4{font-size:1.3rem;margin:0 0 .6rem}
+.rl-panel.lead h4{font-size:1.6rem}
+.rl-years{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:.2rem 0 1rem}
+.rl-year{background:var(--sunken);border-radius:6px;padding:.5rem .7rem;min-width:0}
+.rl-year b{display:block;font-size:.84rem;font-weight:600;color:var(--ink2)}
+.rl-year span{font-size:1.12rem;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.rl-big{font-family:var(--serif);font-size:2.3rem;font-weight:600;line-height:1.08;font-variant-numeric:tabular-nums;color:var(--ink)}
+.rl-panel.lead .rl-big{font-size:2.8rem}
+.rl-bigsub{font-size:1.05rem;color:var(--ink2);margin:.15rem 0 .8rem}
+.rl-say{font-size:1.125rem;line-height:1.5;max-width:68ch;margin:.2rem 0 .9rem}
+table.rl-t td,table.rl-t th{font-size:1rem;border-left:0!important;border-right:0!important;border-top:0!important}
+table.rl-t tr:last-child td{border-bottom:0!important}
+table.rl-t th:first-child{width:46%%}
+table.rl-t th{font-size:.92rem}
+[data-testid="stMetricLabel"] p{white-space:normal!important;font-size:1rem!important}
+[data-testid="stMetricValue"]{font-family:var(--serif);font-size:2rem!important;font-variant-numeric:tabular-nums}
+[data-testid="stTable"] td,[data-testid="stTable"] th{font-size:1rem!important}
+
+@media (max-width:760px){
+ .block-container{padding:1rem .9rem 4rem}
+ h1{font-size:1.9rem!important} h2{font-size:1.45rem!important}
+ .rl-years{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rl-big{font-size:2rem} .rl-panel.lead .rl-big{font-size:2.2rem}
+ .rl-panel.lead{padding:1rem}
+ .stButton>button{width:100%%}
+}
+"""
+
+
+def inject_v5() -> None:
+    """Shared theme plus the farmer layer. Every v5 page calls this once (ui/setup.style)."""
+    inject()
+    st.markdown("<style>" + (V5_CSS % {"accent_dark": oklch(0.37, 0.085, 205)}) + "</style>", unsafe_allow_html=True)
+
+
+CROP_NAMES = {
+    "maize": "Corn", "soybean": "Soybeans", "wheat_winter": "Winter wheat", "wheat_spring": "Spring wheat", "sorghum": "Sorghum",
+    "cotton": "Cotton", "rice": "Rice", "peanut": "Peanuts", "barley": "Barley", "oats": "Oats", "canola": "Canola",
+    "sunflower": "Sunflower", "potato": "Potatoes", "sugarbeet": "Sugar beets", "dry_bean": "Dry beans", "chickpea": "Chickpeas",
+    "lentil": "Lentils", "pea": "Peas", "pearl_millet": "Pearl millet", "pigeonpea": "Pigeon pea", "fallow": "Fallow",
+}
+
+
+def crop_name(crop) -> str:
+    """The name a farmer uses: maize -> Corn, wheat_winter -> Winter wheat. Unknown ids are shown readably."""
+    c = str(crop or "").strip()
+    return CROP_NAMES.get(c.lower(), c.replace("_", " ").capitalize())

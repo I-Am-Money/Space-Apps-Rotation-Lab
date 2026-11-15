@@ -18,8 +18,8 @@ import streamlit as st
 from engine import evpi, optimize as opt
 from ui.recommendations import DISCLAIMER, _site_key, cache_extra, show_badge
 
-UPPER_BOUND = ("Value of perfect information is an upper bound: the most it could be worth to know the number exactly. "
-               "A real test is never perfect, so it is worth less.")
+UPPER_BOUND = ("Some things about your farm are not known exactly. This page shows which of them could change your best plan. "
+               "The money figure is an upper bound: the most a perfect answer could be worth. A real test is never perfect, so it is worth less.")
 LABELS = {"soil_water": "Soil water capacity", "water_supply": "Irrigation water supply", "organic_matter": "Soil organic matter"}
 
 
@@ -37,22 +37,25 @@ def _money(per_acre: float, per_ha: float, currency: str, area_unit: str) -> str
 def show_row(rank: int, r: dict, currency: str, area_unit: str, example: bool) -> None:
     with st.container(border=True):
         st.subheader(f"{rank}. {r['question']}")
-        show_badge("example" if example else r["badge"])
+        if example:
+            show_badge("example")
         st.write(r["plain"])
         if r["computed"]:
-            st.metric("Most it could be worth to know this exactly", _money(r["evpi_per_acre"], r["evpi_per_ha"], currency, area_unit))
+            st.metric("The most it could be worth to know this exactly", _money(r["evpi_per_acre"], r["evpi_per_ha"], currency, area_unit))
+            show_badge(r["badge"])
         if r.get("worth_it") is not None and r.get("test_cost_per_ha") is not None:
             st.write("Your test quote: " + ("worth getting." if r["worth_it"] else "costs more than the most it could save."))
-        st.caption(r["note"])
+        if r["note"] and r["note"] != r["plain"]:
+            st.caption(r["note"])
 
 
 def render(site, inputs, sliders=None, currency: str = "USD", area_unit: str = "ha", key: str = "meas", simulate=None,
            scenarios=None, crops=None, question_fn=None) -> list | None:
-    st.header("What to measure next")
+    st.header("What to check first")
     st.caption(DISCLAIMER)
     st.caption(UPPER_BOUND)
     costs = {}
-    with st.expander("I have quotes for these tests"):
+    with st.expander("I have a price quote for a test"):
         st.caption("Enter a quote per hectare in your currency to see whether knowing is worth it. Leave blank if you have none.")
         for name, label in LABELS.items():
             v = st.number_input(f"{label}: quote per ha ({currency})", min_value=0.0, value=None, step=10.0, key=f"{key}_{name}")

@@ -104,9 +104,9 @@ def plain_words(row: dict) -> str:
     if not row.get("computed", True):
         return row["note"]
     if row["could_change_answer"]:
-        base = "Could change your answer: the best rotation is not the same across the plausible range."
+        base = "Could change your answer: a different plan comes out best at the low end of the likely range than at the high end."
     else:
-        base = "Probably won't change your answer: the same rotation wins across the plausible range."
+        base = "Probably won't change your answer: the same plan comes out best across the whole likely range."
     if row.get("worth_it") is True:
         base += " Knowing it exactly is worth more than the test you entered."
     elif row.get("worth_it") is False:
@@ -184,13 +184,13 @@ def question_value(site, inputs, sliders, crops=None, simulate=None, scenarios=N
                         test_cost=tc.get("water_supply")))
     else:
         out.append(_row("water_supply", "How much irrigation water can you count on?", None, 0.0, ha_per_acre, sub,
-                        "You farm on rain only, so your water supply is the rain at your site.", computed=False, applicable=False))
+                        "Not needed here. You farm on rain only, so your water supply is the rain at your site.", computed=False, applicable=False))
     # organic matter
     coef = (p["awc_mm_per_m_per_om_pct"] or {}).get("value")
     om = _g(soil, "organic_matter_pct")
     if coef is None or om is None or not awc:
         out.append(_row("organic_matter", "What is your soil's organic matter?", None, 0.0, ha_per_acre, sub,
-                        "Not judged yet: this needs a verified link between organic matter and water-holding capacity (team to verify).",
+                        "Not worked out yet. We need a verified link between organic matter and how much water the soil holds (team to verify).",
                         computed=False))
     else:
         d = float(p["organic_matter_range_pct"]["value"])

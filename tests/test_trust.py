@@ -117,3 +117,19 @@ def test_validation_headline_is_computed_from_rows():
     lines = trust.validation_headline(rows)
     assert lines[0].startswith("Mostly rainfed US counties: median held-out r = 0.20 across 3") and "1 of them" in lines[0]
     assert lines[1].startswith("India districts: median held-out r = 0.40 across 1")
+
+
+def test_pages_show_only_us_material():
+    """The app is for US farms right now: nothing about the earlier single-farm version is displayed."""
+    from ui import trust as T
+    for name in T.DOCS:
+        shown = T.us_only_text(T.doc_text(name))
+        assert not T._NOT_US.search(shown), name
+        assert len(shown.splitlines()) > 10
+    ds = T.us_only_text(T.doc_text("Data sources"))
+    assert "NASA POWER" in ds and "USDA NASS" in ds                   # the datasets the US app uses stay listed
+    sample = "\n".join(["# A", "", "1. Keep this.", "2. Nalgonda only.", "   continued line", "3. Keep too.", "",
+                        "## Earlier India version", "", "old text", "", "## Next", "", "kept"])
+    out = T.us_only_text(sample)
+    assert "Keep this." in out and "Keep too." in out and "kept" in out and "## Next" in out
+    assert "Nalgonda" not in out and "continued line" not in out and "Earlier" not in out and "old text" not in out
