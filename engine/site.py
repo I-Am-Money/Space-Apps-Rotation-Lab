@@ -73,10 +73,15 @@ def get_site(lat, lon, *, precache=False, offline=False):
     site = api.Site(float(lat), float(lon), geo['country'], state, geo.get('fips'), weather, info,
                     weather.attrs.get('elevation_m'), trend, us, weather.attrs.get('data_as_of'),
                     badges={'weather': 'estimated' if any(weather.attrs.get('filled_days', {}).values()) else 'observed',
-                            'soil': info.badge, 'elevation_m': 'estimated', 'us_defaults': 'estimated' if us else 'your_input'},
+                            'soil': info.badge, 'elevation_m': 'estimated', 'us_defaults': ('estimated' if defaults.get('available', True) and defaults.get('crops') else 'assumption') if us else 'your_input'},
                     example=False)
     site.currency = 'USD' if us is not None else None
+    if us is not None:
+        for key in ('notes', 'available', 'data_as_of', 'source'):
+            setattr(us, key, defaults.get(key))
     site.source_dates = {'weather': weather.attrs.get('data_as_of'), 'soil': soil.get('data_as_of'),
                          'us_defaults': None if us is None else defaults.get('data_as_of')}
     site.notes = ([geo['note']] if geo.get('note') else []) + ([] if us is None else rules['notes'])
+    if us is not None:
+        site.notes += [str(v) for v in defaults.get('notes', {}).values() if isinstance(v, str) and str(v) not in site.notes]
     return site

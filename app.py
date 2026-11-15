@@ -36,7 +36,7 @@ else:
         page = st.radio('Pages', ['Farm setup', 'Recommendations', 'Tipping points', 'What to measure next', 'How good is this?', 'Field zones'], key='v5_page')
         if st.button('Start again'):
             for key in list(st.session_state):
-                if key.startswith(('v4_', '_v4_', 'v5_', '_v5_')) or key in ('pin_lat', 'pin_lon'):
+                if key.startswith(('v4_', '_v4_', 'v5_', '_v5_', 'rec_', 'meas_')) or key in ('pin_lat', 'pin_lon', '_tipping_result'):
                     del st.session_state[key]
             st.rerun()
     try:

@@ -387,8 +387,12 @@ def crop_economics(crop: str, us_defaults=None, crop_overrides: dict | None = No
         v, badge = ov.get(key), "your_input"
         if v is None:
             v = (_pick(us_defaults, bucket) or {}).get(crop)
-            badge = "observed"
-        if v is None:
+            badge = (_pick(us_defaults, "badges") or {}).get(f"{field}:{crop}", "observed")
+        try:
+            valid = v is not None and not isinstance(v, bool) and np.isfinite(float(v)) and float(v) >= 0
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
             raise InputNeeded(crop, field)
         out[f"{field}_per_t" if field == "price" else "cost_per_ha"] = float(v)
         out[f"{field}_badge"] = badge
@@ -399,4 +403,4 @@ def profit_per_ha(yield_kg_ha, price_per_tonne: float, cost_per_ha: float):
     """Profit per hectare = yield (kg/ha) / 1000 * price per tonne - cost per ha. Works on numbers or numpy arrays.
     Yields are never negative; a zero yield loses the whole cost."""
     y = np.maximum(np.asarray(yield_kg_ha, dtype=float), 0.0)
-    return y / _u("kg_per_tonne") * price_per_tonne - cost_per_ha
+    return profit_per_hectare(y, _nonnegative(price_per_tonne, 'price (currency/tonne)') / _u("kg_per_tonne"), cost_per_ha)

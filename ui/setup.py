@@ -52,6 +52,9 @@ def stamp(value=None, badges=None):
     from ui.components import badge
     st.markdown(' '.join(badge(label) for label in labels), unsafe_allow_html=True)
     st.caption('Data as of ' + str(asof or 'not supplied by engine'))
+    for note in record(value).get('notes') or []:
+        if isinstance(note, str):
+            st.warning(note)
 
 
 def style():
@@ -183,6 +186,8 @@ def farm():
     current_currency = st.text_input('Currency code', value=getattr(site, 'currency', None) or '', key='v4_currency',
                                      help='Display label only. Enter all prices and costs in this same currency; no exchange conversion is performed.').strip().upper()
     site.currency = current_currency or None
+    if getattr(site, 'us_defaults', None) is not None and current_currency not in ('', 'USD'):
+        st.info('USDA prices and costs are in USD. Enter every price and cost in your selected currency; no automatic exchange conversion is available.')
     # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
     crops = list(record(record(site).get('us_defaults')).get('crops') or [])
     if crops:
@@ -213,6 +218,7 @@ def farm():
     soil, history = None, None
     with st.expander('Soil test · optional'):
         if st.checkbox('Add a soil test', key='v4_add_soil'):
+            st.caption('Recorded for your reference. These measurements do not change simulated water capacity or yield; a verified relation is not available yet.')
             soil = dict(organic_matter_pct=st.number_input('Organic matter (%)', 0., 100., value=None, key='v4_organic_matter'),
                         ph=st.number_input('pH', 0., 14., value=None, key='v4_ph'), texture=st.text_input('Texture', key='v4_texture'))
     with st.expander('Field history · optional'):

@@ -12,7 +12,7 @@ DEMO_SITES = (
 
 def record(value):
     if is_dataclass(value):
-        return {f.name: getattr(value, f.name) for f in fields(value)}
+        return dict(vars(value))
     return value if isinstance(value, dict) else {}
 
 def area_value(per_hectare, metric=False):
@@ -54,7 +54,8 @@ def input_errors(site, crops, acres, mode, source, normal, dry, overrides):
             continue
         for field, default_key in (('yield', 'yields'), ('price', 'prices'), ('cost', 'costs')):
             val = overrides.get(crop, {}).get(field)
-            if val is None and us:
+            same_currency = not s.get('currency') or str(s['currency']).upper() == 'USD' or field == 'yield'
+            if val is None and us and same_currency:
                 val = (defaults.get(default_key) or {}).get(crop)
             if isinstance(val, dict):
                 val = val.get('value')
