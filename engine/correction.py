@@ -147,7 +147,8 @@ def run_validation(sites: list[dict] | None = None, weather_loader=None, yield_l
                 e = CorrectedResult(s["id"], crop, 0, 0, None, None, None, None, None, None, False,
                                     hc.yield_function()[1], "no weather", ["NASA POWER weather not cached"])
             else:
-                y = yield_loader(str(s["fips"]), crop)
+                y = (yield_loader(str(s["fips"]), crop, s.get("nass_practice")) if yield_loader is hc.load_county_yields
+                     else yield_loader(str(s["fips"]), crop))
                 if y is None:
                     y = pd.DataFrame(columns=["year", "yield_kg_ha"])
                 e = evaluate(hc.hindcast_county(s, crop, weather=w, yields=y))

@@ -1,5 +1,6 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
-# TODO (partial): v4 US hindcast runs on a stand-in yield model until engine.yieldmodel.season_relative_yield exists, and needs NASS yields (engine.fetch_nass + NASS_API_KEY) before it produces real results. See HANDOFF_P3.md.
+# TODO (partial): uses a stand-in yield model until Person 2's engine.yieldmodel.season_relative_yield is on main;
+# real numbers need NASS county yields cached (python -m engine.fetch_nass --precache-validation, needs NASS_API_KEY).
 """Hindcast (engine-decision): single-season model yield vs ICRISAT district yield, per crop.
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times
@@ -358,36 +359,40 @@ def hindcast_series(site: str, crop: str, years, actual, rel_yield, season_rain=
 
 # ---------------------------------------------------------------- data loading (Person 2's loaders)
 
-def load_county_yields(fips: str, crop: str) -> pd.DataFrame | None:
-    """DataFrame [year, yield_kg_ha] of NASS county yields from Person 2's engine.fetch_nass, or None.
-    Never invents yields: if the loader is missing or returns nothing, the site is reported as no data."""
+def load_county_yields(fips: str, crop: str, practice: str | None = None) -> pd.DataFrame | None:
+    """DataFrame [year, yield_kg_ha] of NASS COUNTY yields (engine.fetch_nass), or None.
+    County only: a suppressed county is reported as "no NASS data", never validated against a state number.
+    Never invents yields: no key and no cached copy -> None."""
     try:
         from engine import fetch_nass
+        df = fetch_nass.county_yields(fips, crop, practice=practice)
     except Exception:
         return None
-    for name in ("county_yields", "load_county_yields", "county_yield_history"):
-        fn = getattr(fetch_nass, name, None)
-        if callable(fn):
-            try:
-                df = fn(fips, crop)
-            except Exception:
-                return None
-            if df is None or len(df) == 0:
-                return None
-            df = pd.DataFrame(df)
-            col = "yield_kg_ha" if "yield_kg_ha" in df else next((c for c in df.columns if "yield" in c), None)
-            if col is None or "year" not in df:
-                return None
-            return df[["year", col]].rename(columns={col: "yield_kg_ha"}).dropna()
-    return None
+    if df is None or len(df) == 0:
+        return None
+    return df[["year", "yield_kg_ha"]].dropna()
 
 
 def load_site_weather(site: dict) -> pd.DataFrame | None:
+    """Daily NASA POWER weather for a site: the v4 loader (load_site_weather, cached) if present, else v3."""
     try:
         from engine import fetch_power
-        return fetch_power.load_weather(float(site["lat"]), float(site["lon"]))
     except Exception:
         return None
+    for name, kw in (("load_site_weather", {"refresh": "never"}), ("load_weather", {})):
+        fn = getattr(fetch_power, name, None)
+        if callable(fn):
+            try:
+                return fn(float(site["lat"]), float(site["lon"]), **kw)
+            except Exception:
+                continue
+    return None
+
+
+def validation_summary(recompute: bool = False):
+    """A5 validation_summary() for api.py: hindcast + correction table (see engine.correction)."""
+    from engine import correction
+    return correction.validation_summary(recompute=recompute)
 
 
 def hindcast_county(site: dict, crop: str, weather: pd.DataFrame | None = None,
@@ -402,14 +407,14 @@ def hindcast_county(site: dict, crop: str, weather: pd.DataFrame | None = None,
     else:
         badge = "Estimated"
     weather = load_site_weather(site) if weather is None else weather
-    yields = load_county_yields(str(site.get("fips")), crop) if yields is None else yields
+    yields = load_county_yields(str(site.get("fips")), crop, site.get("nass_practice")) if yields is None else yields
     empty = dict(years=[], actual=[], modeled=[], train_mask=[], season_rain_mm=[], heat_days=[], ym_kg_ha=None,
                  r_train=None, r_test=None, mae_train=None, mae_test=None, mae_anom_test=None)
     if weather is None:
         return CountyHindcast(sid, crop, badge=badge, status="no weather", notes=["NASA POWER weather not cached"], **empty)
     if yields is None or len(yields) == 0:
         return CountyHindcast(sid, crop, badge=badge, status="no NASS data",
-                              notes=["No NASS county yields loaded (needs Person 2's fetch_nass and NASS_API_KEY)"], **empty)
+                              notes=["No NASS county yields (NASS_API_KEY not set and nothing cached, or county data withheld)"], **empty)
     y = yields.groupby("year")["yield_kg_ha"].mean()
     w_years = set(weather.index.year)
     years = [int(t) for t in sorted(y.index) if int(t) in w_years]

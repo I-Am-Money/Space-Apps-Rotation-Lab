@@ -100,3 +100,32 @@ def test_validation_sites_cover_regions():
     assert len(sites) >= 10
     assert len({s["region"] for s in sites}) >= 6
     assert all(len(s["fips"]) == 5 and -125 < s["lon"] < -66 and 24 < s["lat"] < 50 for s in sites)
+
+
+def test_hindcast_reads_county_yields_through_fetch_nass(tmp_path, monkeypatch):
+    """SYNTHETIC NASS records (not real values) flow through fetch_nass into hindcast_county, using the
+    site's NON-IRRIGATED practice; the latest 8 years are the test years."""
+    from engine import cache, fetch_nass
+    monkeypatch.setattr(cache, "RUNTIME_DIR", tmp_path)
+    monkeypatch.setenv("NASS_API_KEY", "test-key-not-real")
+    recs = []
+    for y in range(1990, 2024):
+        for practice, v in (("ALL PRODUCTION PRACTICES", 150 + y - 1990), ("NON-IRRIGATED", 120 + y - 1990)):
+            recs.append({"year": y, "Value": str(v), "commodity_desc": "CORN", "util_practice_desc": "GRAIN",
+                         "unit_desc": "BU / ACRE", "prodn_practice_desc": practice, "reference_period_desc": "YEAR",
+                         "class_desc": "ALL CLASSES"})
+    monkeypatch.setattr(fetch_nass, "_get", lambda p: recs)
+    df = hc.load_county_yields("31109", "maize", "NON-IRRIGATED")
+    assert len(df) == 34 and df["yield_kg_ha"].iloc[0] == pytest.approx(120 * fetch_nass.kg_ha_per_unit("maize"))
+    rng = np.random.default_rng(42)
+    idx = pd.date_range("1989-01-01", "2023-12-31", freq="D")
+    weather = pd.DataFrame({"tmax": 28 + rng.normal(0, 3, len(idx)), "tmin": 15 + rng.normal(0, 3, len(idx)),
+                            "precip": rng.gamma(0.5, 6, len(idx))}, index=idx)
+    site = {"id": "NE-lancaster", "fips": "31109", "lat": 40.78, "lon": -96.69, "nass_practice": "NON-IRRIGATED"}
+    h = hc.hindcast_county(site, "maize", weather=weather)
+    assert h.status == "ok" and h.test_years == list(range(2016, 2024))
+
+
+def test_hindcast_exposes_validation_summary():
+    v = hc.validation_summary()
+    assert hasattr(v, "table") and hasattr(v, "sites") and len(v.sites) == 14
