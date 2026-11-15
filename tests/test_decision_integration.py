@@ -87,3 +87,18 @@ def test_real_selection_candidate_set():
     assert len(opt.ALL_PLANS) == len(opt.CROPS) ** 4 - (len(opt.CROPS) - 1)      # same non-rice crop x4 is blocked
     m = opt.MILLETS[0]
     assert opt.REF["B"] == ["rice", m, "rice", m] and opt.REF["C"] == ["rice", "pigeonpea", m, "rice"]
+
+
+def test_ui_soil_mode_names_select_the_right_soil():
+    # the UI sends "farm" / "district"; "farm" must use the farm's black soil, not silently fall back to SoilGrids
+    farm = api.norm_params({"soil_mode": "farm"})
+    assert farm["soil_mode"] == "farm_black_soil" and farm["awc"] == api.norm_params({})["awc"]
+    dist = api.norm_params({"soil_mode": "district"})
+    assert dist["soil_mode"] == "district_soilgrids" and dist["awc"] != farm["awc"]
+
+
+def test_assumptions_table_marks_rows_not_in_use():
+    t = api.assumptions_table().set_index("name")
+    assert not t.loc["crops.jowar.kc_ini", "in_use"] and t.loc["crops.rice.ky", "in_use"]
+    assert not t.loc["ym_kg_ha.rice", "in_use"]          # replaced by the district value in prices_india.yaml
+    assert t.loc["n_cost_rs_per_kg", "badge"] == "assumption"

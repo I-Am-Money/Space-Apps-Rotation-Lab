@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from engine import explain as ex
 
 INPUTS = dict(top_rotation="Rice, Jowar, Rice, Jowar", runner_up="Rice x4", top_mean_profit=91000, top_worst10_profit=52000,
-              top_water_stress_mm=120, irrigation_shift_mm=600)
+              top_irrigation_mm=1240, irrigation_shift_mm=600)
 
 
 def test_fallback_without_key(monkeypatch, tmp_path):

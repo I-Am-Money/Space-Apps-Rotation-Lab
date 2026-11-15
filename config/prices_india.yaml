@@ -79,6 +79,12 @@ potential_yield_kg_ha:
   ragi:      {value: null, badge: placeholder, source: "no ragi column in the fetched file; needs ICRISAT DLD finger millet CSV"}
   pigeonpea: {value: 741.4, badge: assumption, source: "NOT a district series. Telangana cost-of-cultivation survey (DES via PJTSAU, https://www.pjtau.edu.in/Cost_Cultivation_Crops.html, read 2026-11-15): A2+FL cost per ha / A2+FL cost per quintal = 33,341.27 / 4,497.36 = 7.41 q/ha in 2020-21, the best of three survey years (2.64 q/ha in 2018-19, 5.92 in 2019-20). State average of sample farms, slightly overstated because by-product value is ignored. No ICRISAT pigeon pea series could be fetched, so there is no validation data; replace with the P90 of the district series when the DLD CSV is in data/raw/icrisat_dld/."}
 
+# Price of fertiliser nitrogen, used only for the small saving after pigeon pea (N credit x this price).
+n_cost_rs_per_kg:
+  value: 11.7
+  badge: assumption
+  source: "Urea maximum retail price Rs 242 per 45 kg bag, statutorily notified, excluding neem-coating charges and taxes (written reply in the Lok Sabha, 28 July 2021, as reported by https://www.global-agriculture.com/national-news/urea-is-supplied-to-all-indian-farmers-at-subsidized-rates/, read 2026-11-15; secondary source, team to verify against the Department of Fertilizers). Urea is 46 percent nitrogen: 242 / (45 x 0.46) = 11.7 Rs per kg N."
+
 # Costs of information (EVPI cards). No source: team estimates only.
 soil_test_cost_rs:
   value: null

@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Plain-English explanation of a recommendation.
 
 Only computed numbers are sent to the model, as JSON. If there is no ANTHROPIC_API_KEY, or anything
@@ -31,19 +32,29 @@ def template_explanation(inputs: dict) -> str:
     g = inputs.get
     s = []
     if g("top_rotation"):
-        line = f"For the settings you chose, the model ranks {g('top_rotation')} first"
+        if g("same_as_today"):
+            line = "For the settings you chose, the model keeps rice every year, the same as the farm today"
+        else:
+            line = f"For the settings you chose, the model ranks {g('top_rotation')} first"
         if g("runner_up"):
             line += f", with {g('runner_up')} second"
         s.append(line + ".")
     if g("top_mean_profit") is not None and g("top_worst10_profit") is not None:
         s.append(f"Over four years it averages {_rs(g('top_mean_profit'))} per acre, and about {_rs(g('top_worst10_profit'))} per acre "
                  "in the worst tenth of weather sequences.")
-    if g("top_water_stress_mm") is not None:
-        s.append(f"The model expects a water shortfall of about {float(g('top_water_stress_mm')):,.0f} mm over the plan.")
+    if not g("same_as_today") and g("diff_mean_profit") is not None and g("diff_irrigation_mm") is not None:
+        dm, dw, di = float(g("diff_mean_profit")), g("diff_worst10_profit"), float(g("diff_irrigation_mm"))
+        line = (f"Against rice every year that is {_rs(abs(dm))} per acre {'more' if dm >= 0 else 'less'} on average")
+        if dw is not None:
+            line += f", {_rs(abs(float(dw)))} {'more' if float(dw) >= 0 else 'less'} in bad years"
+        line += f", and {abs(di):,.0f} mm {'less' if di <= 0 else 'more'} irrigation water."
+        s.append(line)
+    elif g("top_irrigation_mm") is not None:
+        s.append(f"It uses about {float(g('top_irrigation_mm')):,.0f} mm of irrigation water over the plan.")
     if g("irrigation_shift_mm") is not None:
-        s.append(f"At normal rainfall, the model switches from rice on every plot to a mix with millets around {float(g('irrigation_shift_mm')):,.0f} mm of irrigation water.")
+        s.append(f"At normal rainfall, plans with two or more rice years start to win once about {float(g('irrigation_shift_mm')):,.0f} mm of irrigation water is available in a season.")
     elif g("rain_crossover") is not None:
-        s.append(f"The rice and millet choices cross over near {float(g('rain_crossover')):.2f} times the usual monsoon rainfall.")
+        s.append(f"The number of rice years in the best plan changes near {float(g('rain_crossover')):.2f} times the usual monsoon rainfall.")
     if not s:
         s.append("The model has no numbers to explain yet.")
     return " ".join(s[:4])

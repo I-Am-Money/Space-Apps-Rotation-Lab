@@ -1,20 +1,13 @@
-"""Engine access. Uses engine.api; falls back to engine.mock_api per call when the real module (or one of its
-own imports or data files) is missing, and records that so the app can show a visible banner."""
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+"""Engine access. Every number on screen comes from engine.api (the real model run on downloaded data).
+There is no stand-in engine: if the model cannot run, the app shows the error instead of made-up numbers."""
 from __future__ import annotations
+
+import re
 
 import streamlit as st
 
-from engine import mock_api
-
-import os
-import re
-
-try:
-    if os.environ.get("ROTATIONLAB_MOCK") == "1":
-        raise ImportError("mock forced for design review")
-    from engine import api  # type: ignore
-except ImportError:
-    api = mock_api
+from engine import api
 
 CROPS = ["rice", "jowar", "bajra", "pigeonpea"]
 try:  # the engine decides which crops are candidates (iteration 2: selected millets only)
@@ -78,10 +71,10 @@ SOURCE_LABELS = {"canal_and_well": "Canal and well", "unset": "Not sure yet", "c
 CANAL_LABEL = "Proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations."
 WELL_LABEL = "Simplified recharge proxy."
 DEFAULTS = dict(irrigation_mm=BASE_IRR, use_soil_test=False, soil_awc=140, rot0="rice", rot1="rice", rot2="rice", rot3="rice",
-                lam=30, w=30, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
+                lam=30, w=10, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
                 canal_override=False, canal_supply=None, well_override=False, well_supply=None, soil_mode="farm", split_acres=None)
 ROT_NAME = {"A": "A: our farm today", "B": "Rotation B", "C": "Rotation C", "current": "Your rotation"}
-ROT_SHORT = {"A": "A: all rice", "B": "B: rice and jowar", "C": "C: rice, pigeon pea, jowar"}
+ROT_SHORT = {"A": "A: all rice", "B": "B: rice and millet", "C": "C: rice, pigeon pea, millet"}
 
 
 def plan_label(plan) -> str:
@@ -96,7 +89,6 @@ def plan_label(plan) -> str:
 def init_state():
     """User inputs live in session_state['_v'] so they survive tabs whose widgets are not rendered (lazy tabs)."""
     st.session_state.setdefault("_v", dict(DEFAULTS))
-    st.session_state["_mock"] = False
 
 
 def V() -> dict:
@@ -114,7 +106,10 @@ def bind(name) -> dict:
 
 def params() -> dict:
     s = V()
-    return dict(lam=s["lam"] / 100, w=s["w"] / 100, irrigation_mm=float(s["irrigation_mm"]),
+    # canal_and_well (the default) takes its supply from base_canal + base_well in assumptions.yaml, or from the two
+    # overrides below; the single "water available" number belongs to the older single-source modes only.
+    return dict(lam=s["lam"] / 100, w=s["w"] / 100,
+                irrigation_mm=None if s["water_source"] == "canal_and_well" else float(s["irrigation_mm"]),
                 awc_mm_per_m=float(s["soil_awc"]) if s["use_soil_test"] else None,
                 current_rotation=[s["rot0"], s["rot1"], s["rot2"], s["rot3"]], price_mult=1.0,
                 water_source=s["water_source"], soil_mode=s["soil_mode"],
@@ -125,20 +120,18 @@ def params() -> dict:
 
 
 def is_mock() -> bool:
-    return bool(st.session_state.get("_mock")) or api is mock_api or bool(getattr(api, "IS_MOCK", False))
+    """Always False: the toy stand-in engine was removed so the app can never show invented numbers."""
+    return False
 
 
 def _call(name, *args):
-    try:
-        return getattr(api, name)(*args), False
-    except (ImportError, FileNotFoundError, AttributeError):
-        return getattr(mock_api, name)(*args), True
+    return getattr(api, name)(*args), False
 
 
 MSG = {"get_field_summary": "Loading the field record.",
-       "compare": "Running four rotations through the weather record.",
+       "compare": "Running the rotations through the weather record.",
        "recommend": "Scoring all rotations for your priorities. The first run takes about 10 seconds; later runs are instant.",
-       "tipping_points": "Finding the tipping points. The first run takes up to 30 seconds; later runs are instant.",
+       "tipping_points": "Finding the tipping points. The first run takes about 20 seconds; later runs are instant.",
        "hindcast": "Checking the model against district yields.", "assumptions_table": "Loading assumptions."}
 
 
@@ -150,10 +143,7 @@ def _wrap(name):
     cached = st.cache_data(show_spinner=False, max_entries=64, ttl=900)(raw)
 
     def outer(*args):
-        val, mock = cached(*args)
-        if mock:
-            st.session_state["_mock"] = True
-        return val
+        return cached(*args)[0]
     return outer
 
 
@@ -201,11 +191,17 @@ def land_split(alt_id, p):
     return _land_split(alt_id, p)
 
 
+def supply_words(p) -> str:
+    """How to name the farm's irrigation supply in a sentence, from the chosen water source."""
+    return {"canal_and_well": "canal and well supply", "canal": "canal supply", "borewell": "borewell supply",
+            "tank": "tank supply"}.get((p or {}).get("water_source"), "borewell, tank or canal supply")
+
+
 def placeholder_inputs() -> list:
     """Names of model inputs still badged Placeholder (no verified source). Empty if none."""
     try:
         t = assumptions()
         rows = t.to_dict("records") if hasattr(t, "to_dict") else list(t)
-        return [str(r.get("name")) for r in rows if str(r.get("badge", "")).lower() == "placeholder"]
+        return [str(r.get("name")) for r in rows if str(r.get("badge", "")).lower() == "placeholder" and r.get("in_use", True)]
     except Exception:
         return []

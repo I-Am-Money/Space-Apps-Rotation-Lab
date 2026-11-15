@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Economics (engine-decision). Rupees per acre. The ONLY place kg/ha is converted to per-acre.
 
 Build Spec v3 section 5.7:
@@ -36,7 +37,6 @@ PLACEHOLDER = {
     "n_cost_rs_per_kg": 13.0,
     "soil_test_cost_rs": 300.0,
     "water_measure_cost_rs": 1500.0,
-    "farm_area_acres": 5.0,
 }
 PLACEHOLDER_NOTE = "unverified dev placeholder, no source; team to verify / replace via config/prices_india.yaml"
 
@@ -114,8 +114,7 @@ def _load_prices(path) -> dict:
             out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = PLACEHOLDER["operating_cost_rs_per_acre"].get(c, PLACEHOLDER["operating_cost_rs_per_acre"]["bajra"]), "placeholder"
     for k, alts in {"n_cost_rs_per_kg": ("n_cost_rs_per_kg", "nitrogen_cost_rs_per_kg"),
                     "soil_test_cost_rs": ("soil_test_cost_rs",),
-                    "water_measure_cost_rs": ("water_measure_cost_rs", "borewell_or_tank_capacity_measurement_cost_rs"),
-                    "farm_area_acres": ("farm_area_acres",)}.items():
+                    "water_measure_cost_rs": ("water_measure_cost_rs", "borewell_or_tank_capacity_measurement_cost_rs")}.items():
         v = _num(_find(raw, alts))
         if v is not None:
             out[k], badges[k] = v, "assumption"

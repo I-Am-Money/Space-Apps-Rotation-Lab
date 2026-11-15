@@ -52,12 +52,12 @@ crops:
     ky:       {value: 0.9, range: [0.7, 1.1], unit: "-", source: "team to verify. Finger millet is not in FAO-66 Table 1 (FAO-33 values); sorghum 0.9 used as a flagged stand-in.", badge: placeholder}
     sowing_doy: {value: 180, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~29 June, kharif).", badge: assumption}
   pigeonpea:
-    kc_ini:   {value: 0.40, range: [0.30, 0.50], unit: "-", source: "team to verify. Pigeon pea is not in FAO-56 Table 12; 0.4 is the FAO-56 'Beans, dry and Pulses' Kc ini, used as a flagged stand-in.", badge: placeholder}
-    kc_mid:   {value: 1.15, range: [1.00, 1.15], unit: "-", source: "team to verify. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' Kc mid 1.15 (Chick pea 1.00 gives the low end).", badge: placeholder}
-    kc_end:   {value: 0.35, range: [0.30, 0.35], unit: "-", source: "team to verify. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' / Chick pea Kc end 0.35.", badge: placeholder}
+    kc_ini:   {value: 0.40, range: [0.30, 0.50], unit: "-", source: "team to verify. Stand-in from the closest listed legume, as Build Spec v3 section 5.4 allows. Pigeon pea is not in FAO-56 Table 12; 0.4 is the FAO-56 'Beans, dry and Pulses' Kc ini, used as a flagged stand-in.", badge: assumption}
+    kc_mid:   {value: 1.15, range: [1.00, 1.15], unit: "-", source: "team to verify. Stand-in from the closest listed legume, as Build Spec v3 section 5.4 allows. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' Kc mid 1.15 (Chick pea 1.00 gives the low end).", badge: assumption}
+    kc_end:   {value: 0.35, range: [0.30, 0.35], unit: "-", source: "team to verify. Stand-in from the closest listed legume, as Build Spec v3 section 5.4 allows. Stand-in: FAO-56 Table 12 'Beans, dry and Pulses' / Chick pea Kc end 0.35.", badge: assumption}
     stages_days: {value: [25, 35, 70, 40], range: [[20, 30], [30, 45], [50, 90], [30, 50]], unit: days, source: "team to verify. No pigeon pea row in FAO-56 Table 11; 170-day total is a flagged guess for medium-duration kharif tur.", badge: placeholder}
-    root_depth_m: {value: 1.0, range: [0.6, 1.5], unit: m, source: "team to verify. Not in FAO-56 Table 22 (Beans/pulses 0.6-0.9, Chick pea 0.6-1.0 are the nearest rows).", badge: placeholder}
-    p:        {value: 0.50, range: [0.45, 0.55], unit: "-", source: "team to verify. Not in FAO-56 Table 22; Chick pea p = 0.50 and Beans/Pulses 0.45 are the nearest rows.", badge: placeholder}
+    root_depth_m: {value: 1.0, range: [0.6, 1.5], unit: m, source: "team to verify. Stand-in from the closest listed legume, as Build Spec v3 section 5.4 allows. Not in FAO-56 Table 22 (Beans/pulses 0.6-0.9, Chick pea 0.6-1.0 are the nearest rows).", badge: assumption}
+    p:        {value: 0.50, range: [0.45, 0.55], unit: "-", source: "team to verify. Stand-in from the closest listed legume, as Build Spec v3 section 5.4 allows. Not in FAO-56 Table 22; Chick pea p = 0.50 and Beans/Pulses 0.45 are the nearest rows.", badge: assumption}
     ky:       {value: 0.9, range: [0.7, 1.2], unit: "-", source: "team to verify. Pigeon pea is not in FAO-66 Table 1.", badge: placeholder}
     sowing_doy: {value: 175, range: [160, 196], unit: day-of-year, source: "team to verify (assumed ~24 June, kharif).", badge: assumption}
 
@@ -79,7 +79,7 @@ hydrology:
   cn_fallow_group_B: {value: 86, range: [83, 86], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group B = 86 (CR Good 83). Same URL.", badge: assumption}
   cn_fallow_group_C: {value: 91, range: [88, 91], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group C = 91 (CR Good 88). Same URL.", badge: assumption}
   cn_fallow_group_D: {value: 94, range: [90, 94], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group D = 94 (CR Good 90). Same URL.", badge: assumption}
-  hydrologic_group: {value: B, range: [A, D], unit: "group", source: "team to verify. Replace with the soil survey value for the district (india-data soil file).", badge: placeholder}
+  hydrologic_group: {value: D, range: [C, D], unit: "group", source: "team to verify. The farm reports black soil (a cracking clay). Group D is the NRCS group for clay soils with high swelling potential; that definition was not read in the NRCS text in this session. The SoilGrids texture at the district centroid (clay loam) would give group C. Replace with the soil survey value for the farm.", badge: assumption}
   ia_ratio: {value: 0.2, range: [0.05, 0.2], unit: "-", source: "team to verify. Standard SCS initial abstraction ratio 0.2 (NEH-4); not read in this session.", badge: assumption}
   init_depletion_frac: {value: 0.5, range: [0.0, 1.0], unit: "fraction of column TAW", source: "team to verify. Spin-up state on 1 Jan of plan year 1 (dry season, so half depleted).", badge: assumption}
 

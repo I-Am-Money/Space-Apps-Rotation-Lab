@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Decision API (engine-decision) exactly as in engine/CONTRACT.md.
 
 Scenario set for optimisation: 500 bootstrap plans of 4 random real years (seed 42).
@@ -133,7 +134,7 @@ def norm_params(params=None) -> dict:
     if no_up:      # physics needs upstream rain for this mode; degrade visibly to the local-rainfall proxy
         ws = "unset"
     return {"water_source": ws, "water_source_requested": requested, "soil_mode": soil["mode"], "soil_mode_requested": soil_mode, "canal_supply_mm": None if cs is None else float(cs),
-            "well_supply_mm": None if wsup is None else float(wsup), "lam": float(p.get("lam", 0.5)), "w": float(p.get("w", 0.2)),
+            "well_supply_mm": None if wsup is None else float(wsup), "lam": float(p.get("lam", 0.3)), "w": float(p.get("w", 0.1)),
             "irrigation_mm": float(p["irrigation_mm"]) if p.get("irrigation_mm") is not None else default_irrigation(ws)[0],
             "awc_mm_per_m": p.get("awc_mm_per_m"), "soil": soil, "awc": float(p["awc_mm_per_m"]) if p.get("awc_mm_per_m") is not None else awc_d,
             "current_rotation": list(p.get("current_rotation") or opt.REF["A"]),
@@ -268,9 +269,12 @@ def farm_soil_info():
     return None
 
 
+SOIL_MODE_ALIASES = {"farm": "farm_black_soil", "district": "district_soilgrids"}      # names the UI uses
+
+
 def active_soil(p) -> dict:
     """Soil used for AWC: farm black soil (default) if available, else the district SoilGrids estimate."""
-    mode = p.get("soil_mode", "farm_black_soil")
+    mode = SOIL_MODE_ALIASES.get(p.get("soil_mode") or "farm_black_soil", p.get("soil_mode") or "farm_black_soil")
     if mode == "farm_black_soil":
         fs = farm_soil_info()
         if fs:
@@ -606,4 +610,21 @@ def assumptions_table() -> pd.DataFrame:
              {"name": "awc_uncertainty_range", "value": 0.3, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
              {"name": "irrigation_uncertainty_range", "value": 0.5, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
              {"name": "scenario_seed", "value": sc.SEED, "range": None, "unit": "", "source": "project rule", "badge": "assumption"}]
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df["in_use"] = [_in_use(n) for n in df["name"]]
+    return df
+
+
+def _in_use(name: str) -> bool:
+    """False for table rows the current run does not read: parameters of crops that are not in the crop list, and
+    the fallback potential yields that config/prices_india.yaml overrides."""
+    crops_all = ("rice", "jowar", "bajra", "ragi", "pigeonpea")
+    used = set(opt.CROPS)
+    parts = name.split(".")
+    crop = next((x for x in parts if x in crops_all), None)
+    if crop is not None and crop not in used:
+        return False
+    if parts[0] == "ym_kg_ha":
+        pot = ((_yaml("prices_india.yaml").get("potential_yield_kg_ha")) or {}).get(parts[-1]) or {}
+        return pot.get("value") is None
+    return True

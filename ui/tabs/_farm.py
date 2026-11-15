@@ -1,4 +1,5 @@
-"""Farm-wide totals and the land-split control, shared by Compare Futures and My Priorities."""
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+"""Farm-wide totals and the land-split control, shared by Compare Futures and Our Priorities."""
 import html
 
 import plotly.graph_objects as go
