@@ -119,8 +119,11 @@ def test_hindcast_reads_county_yields_through_fetch_nass(tmp_path, monkeypatch):
     assert len(df) == 34 and df["yield_kg_ha"].iloc[0] == pytest.approx(120 * fetch_nass.kg_ha_per_unit("maize"))
     rng = np.random.default_rng(42)
     idx = pd.date_range("1989-01-01", "2023-12-31", freq="D")
-    weather = pd.DataFrame({"tmax": 28 + rng.normal(0, 3, len(idx)), "tmin": 15 + rng.normal(0, 3, len(idx)),
-                            "precip": rng.gamma(0.5, 6, len(idx))}, index=idx)
+    tmax, tmin = 28 + rng.normal(0, 3, len(idx)), 15 + rng.normal(0, 3, len(idx))
+    weather = pd.DataFrame({"tmax": tmax, "tmin": tmin, "tmean": (tmax + tmin) / 2,   # all v4 weather columns
+                            "rh": np.full(len(idx), 65.0), "wind2": np.full(len(idx), 2.0),
+                            "precip": rng.gamma(0.5, 6, len(idx)), "srad": np.full(len(idx), 18.0)}, index=idx)
+    weather.attrs["lat"] = 40.78
     site = {"id": "NE-lancaster", "fips": "31109", "lat": 40.78, "lon": -96.69, "nass_practice": "NON-IRRIGATED"}
     h = hc.hindcast_county(site, "maize", weather=weather)
     assert h.status == "ok" and h.test_years == list(range(2016, 2024))
