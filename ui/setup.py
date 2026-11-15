@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from ui import autofill
 from streamlit_folium import st_folium
 from engine import api
 from ui.planner_model import (DEMO_SITES, record, area_value, provenance,
@@ -152,8 +153,9 @@ def farm():
     saved = st.session_state.get('_v4_farm_widgets', {})
     for name, value in saved.items():
         st.session_state.setdefault(name, value)
+    autofill.render()
     lat, lon = location_map()
-    if st.button('Load this location', type='primary'):
+    if st.button('Load this location', type='primary') or st.session_state.pop('_v4_autoload', False):
         if missing_api():
             st.warning('Location lookup is waiting for Person 1’s v4 engine/api.py. No global results have been calculated.')
         else:
@@ -184,6 +186,9 @@ def farm():
     # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
     crops = list(record(record(site).get('us_defaults')).get('crops') or [])
     if crops:
+        for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):
+            if c in crops:
+                st.session_state.setdefault(f'v4_crop{i}', c)
         plan = [col.selectbox(f'Year {i+1} current crop', crops, key=f'v4_crop{i}') for i, col in enumerate(st.columns(4))]
     else:
         plan = [col.text_input(f'Year {i+1} current crop', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
