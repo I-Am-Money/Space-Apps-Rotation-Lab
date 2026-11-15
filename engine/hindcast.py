@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Hindcast (engine-decision): single-season model yield vs ICRISAT district yield, per crop.
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times

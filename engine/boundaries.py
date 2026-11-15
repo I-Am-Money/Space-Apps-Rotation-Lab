@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Decision boundaries (engine-decision). All results come from the model; captions are generated
 from the computed numbers. Evaluated over a candidate set of rotations (reference plans, monocultures
 and the top-J plans at the base point) to keep sweeps fast; this is stated in each result.

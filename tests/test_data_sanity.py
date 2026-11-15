@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Data sanity for NASA POWER weather. Runs offline from data/raw/ cache."""
 import json
 from pathlib import Path

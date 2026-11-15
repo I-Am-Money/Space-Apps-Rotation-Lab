@@ -1,62 +1,70 @@
-# Handoff: how to carry RotationLab forward
+# Handoff: where RotationLab stands
 
-Written 2026-11-14 for the team. Read this first, then `engine/CONTRACT.md` (the interface and every design change so far, in order), `SPEC_CHANGES_INDIA.md`, `LIMITATIONS.md` and `docs/`.
+Updated 2026-11-15 after the Build Spec v3 rebuild. Read this first, then `README.md`, `LIMITATIONS.md` and `AI_USE.md`.
+
+The governing document is "RotationLab Build Spec v3 (Nalgonda)". `engine/CONTRACT.md` and `SPEC_CHANGES_INDIA.md` are older working notes kept for history; where they disagree with v3 or with the code, v3 and the code win.
 
 ## What this is
-A decision-support tool for the NASA Space Apps 2026 challenge "Field Shift: Adapting Farms with NASA Data". A 40-acre black-soil rice farm in Nalgonda district, Telangana, compares crop rotations against rice-only (rotation A, "our farm today") using NASA POWER weather, a FAO-56 daily soil water balance, an irrigated-rice water model (canal plus wells), and decision boundaries with expected value of perfect information. Streamlit UI, five tabs.
+A decision-support tool for the NASA Space Apps 2026 challenge "Field Shift: Adapting Farms with NASA Data". A 40-acre black-soil rice farm in Nalgonda district, Telangana, compares four-year crop plans with rice every year (rotation A, "our farm today"). It uses NASA POWER weather, a FAO-56 daily soil water balance, an irrigated-paddy water model fed by canal and well supply, a monsoon-onset rule, a heat penalty at flowering, and a search for the water level where the best plan changes. Streamlit front end, five tabs.
 
 ## Run it
 ```
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # if requirements.txt is missing: numpy pandas streamlit plotly folium streamlit-folium requests pyyaml pytest anthropic scipy xlrd
-.venv/bin/pytest -q                      # all tests; runs offline from data/raw/
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pytest -q                 # 112 tests, offline, about 25 seconds
 .venv/bin/streamlit run app.py
 ```
-Optional: `ANTHROPIC_API_KEY` for the written explanation. Without it the app uses a deterministic template. Never commit keys; `.env` is gitignored.
+Optional: `ANTHROPIC_API_KEY` for the written explanation. Without it the app uses a fixed template. Never commit keys; `.env` is gitignored.
 
 ## Repo map
-- `engine/`: physics and decision code. `api.py` is the only thing the UI calls. `CONTRACT.md` explains shapes and ownership.
-- `config/`: `region.yaml` (district, centroid, crop selection, upstream basin points, water source), `farm.yaml` (acres, soil), `assumptions.yaml` (every model parameter with range, source, badge), `prices_india.yaml` (MSP, costs, potential yields).
-- `data/raw/`: cached downloads so the demo works offline. `docs/NASA_DATA.md` and `docs/INDIA_DATA.md` list every source with URL and access date.
+- `engine/`: the model. `api.py` is the only module the front end calls.
+  - `et0.py`, `waterbalance.py`, `yieldmodel.py`, `crops.py`: crop water use, soil water, paddy water, yield.
+  - `monsoon.py`: the onset rule and sowing dates. `scenarios.py`: weather sequences, stress tests and what-ifs.
+  - `economics.py`, `optimize.py`: profit, the objective, ranking, the plan rule.
+  - `boundaries.py`: tipping-point map, crossovers, the value of a measurement. `hindcast.py`: check against district yields.
+  - `explain.py`: the plain-English explanation (Claude with a template fallback). `fetch_*.py`: cached downloads.
+- `config/`: `assumptions.yaml` (every model parameter with range, source, badge), `prices_india.yaml` (prices, costs, yield ceilings), `region.yaml`, `farm.yaml`.
+- `data/raw/`: cached downloads so the app and tests run offline.
 - `ui/`, `app.py`, `.streamlit/`: the front end. `PRODUCT.md` and `DESIGN.md` hold the design brief.
-- `tests/`: the test suite.
+- `tests/`: `test_spec_v3.py` has one test per row of the spec's test table; the other files cover each module.
 
-## Ground rules we followed
-- No invented data. Every number is cached data, a calculation, a user input or a parameter with a source note. Unverified values say "team to verify" and show a Placeholder or Assumption badge.
-- Provenance badges on every number: Observed, Modeled, Local input, Assumption, Placeholder.
-- Privacy: no village name and no personal names or emails anywhere in the app or repo.
-- Nothing is submitted to the Space Apps portal until the team says so.
+## Ground rules we follow
+- No invented data. Every number is cached data, a calculation, a user input or a parameter with a source note. Unverified values say "team to verify" and carry an Assumption or Placeholder badge.
+- A badge on every number: Observed, Modeled, Local input, Assumption, Placeholder.
+- Privacy: no village name and no personal names or emails anywhere in the app or repo. Nobody under 18 appears by face, voice or name in the demo or on the project page.
+- Never cut: the tipping-point map, the badges, the comparison with rice every year, the hindcast tab.
+- Nothing is submitted to the Space Apps portal until the team agrees.
 
-## What is still placeholder or unverified (fix these first; they drive the ranking)
-1. **Real ICRISAT district yield tables.** `data.icrisat.org` and the Dataverse DOI (10.21421/D2/XFB1BZ) were unreachable from the build environment. Yields currently come from a labelled third-party panel (Mendeley, doi 10.17632/ywp3y5j9vv.1) with rice and bajra only, 1990 to 2015. Download the district CSVs into `data/raw/icrisat_dld/`; the loader prefers them automatically. Then re-check which millets have the most complete Nalgonda record and update `crop_selection` in `config/region.yaml` (currently bajra, provisional). Jowar, ragi and pigeon pea have no yield data, so their hindcast says "no validation data". Check the bajra 2014 and 2015 values (both exactly 500).
-2. **Potential yields (Ym)**: pigeon pea is a placeholder and was driving the top rank. Jowar and ragi too if selected.
-3. **Costs**: operating cost per acre, irrigation cost, soil-test cost, and borewell or tank measurement cost are placeholders. Replace with sourced figures (state cost-of-cultivation data) or the farm's own records in `data/raw/farm_records.csv` (year, crop, area_acres, yield_quintals, irrigation_source, costs_rupees; never fake it).
-4. **Irrigation supply parameters** in `assumptions.yaml` (`base_canal`, `k_canal`, `base_well`, `k_well`, `max_well`, percolation): all "team to verify". Canal supply is a rainfall proxy from five upstream Krishna-basin weather points, not a reservoir model.
-5. **FAO-33 Ky** for rice, millets and pigeon pea, ragi values, pigeon pea crop parameters, rotation effects, sowing dates: marked "team to verify". Someone with agronomy knowledge or farm records should review these.
-6. **Nalgonda centroid** is derived from OpenStreetMap boundary data, not an official centroid. Old-district lineage rests on Wikipedia.
-7. **Upstream basin points** come from Wikidata and Wikipedia; the official basin pages could not be read.
-8. **Rice water source** was left unconfirmed by the farm; the model defaults to `canal_and_well`.
+## What changed in the v3 rebuild
+1. The made-up water charge is gone from profit. Costs are the Telangana cost-of-cultivation survey scaled to 2026-27 (rice, pigeon pea) and a documented estimate for bajra.
+2. Rice yield is milled rice and is sold as paddy at the paddy price.
+3. The objective is the v3 formula. The water slider now rewards plans that use less irrigation water; it does not change the profit shown.
+4. Sowing follows a monsoon-onset rule. A late monsoon loses its early rain and sows late, and never raises yield.
+5. Heat at flowering reduces yield. Soil cover follows a per-crop rule with a soil-carbon direction arrow.
+6. The same non-rice crop four years running is not offered (79 plans). Rice every year stays as the baseline.
+7. Stress tests are the four named in v3. The tipping map is coloured by the number of rice years, with a boundary line and an uncertainty band.
+8. The toy stand-in engine used during early screen design was deleted, so the app can never show made-up numbers.
+9. Tests are named after the spec's test table. `AI_USE.md`, `LIMITATIONS.md` and a header comment in every code file are in place.
 
-## What was in flight when this was written
-The last rounds of work (canal and well supply, upstream rainfall, black-soil inputs, farm totals and the 40-acre land-split slider, `/taste` design pass, second Tipping Points heat map) were being built by parallel agents. Run `pytest -q` and click through all five tabs before trusting any of it; fix or finish whatever is incomplete. The engine and data layers were passing their tests at last check.
+## What is still placeholder or unverified (these drive the ranking)
+1. **Eleven inputs in use are placeholders**: Ky for rice, bajra and pigeon pea; bajra early-season Kc; pigeon pea stage lengths; three fallow parameters; the pigeon-pea-after-pigeon-pea effect; soil-test cost; water-measurement cost. The app lists them under How Good Is This.
+2. **Pigeon pea has no district yield record.** Its yield ceiling comes from a state cost survey. It is in most recommended plans, so this is the first thing to fix.
+3. **ICRISAT district tables.** `data.icrisat.org` could not be reached from the build machine. Download the district CSVs for rice, sorghum, pearl millet and pigeon pea into `data/raw/icrisat_dld/`; the loader prefers them automatically. Steps are in `docs/INDIA_DATA.md`. Check the bajra 2014 and 2015 values (both exactly 500).
+4. **Bajra cost** is an estimate (all-India cost per quintal times district yield ceiling).
+5. **Water supply**: canal 600 mm and wells 400 mm a season are assumptions. The owner should confirm the water source and rough amounts.
+6. **Parameters marked "team to verify"**: heat limits, late-sowing penalty, onset rule numbers, rotation effects, irrigation proxy parameters, hydrologic group D.
+7. **Farm records.** `data/raw/farm_records.csv` (year, crop, area_acres, yield_quintals, irrigation_source, costs_rupees) would replace several assumptions. Never fake it.
 
-## Submission (do not submit until the team agrees)
-Portal rules, read from the Space Apps site on 2026-11-14:
-- Deadline Sunday Nov 15, 11:59 PM in the Team Owner's local time (Universal Event rule).
-- A Universal Event team needs 2 to 6 confirmed members on the portal's Members tab. Confirm every teammate has joined the team and registered for the Universal Event.
-- Required form fields: project name, high-level summary, demo link, final project link, detailed description, use of SI (AI) disclosure, NASA data used, references for every external resource.
-- Demo must be a video of 30 seconds or less OR a deck of 7 slides or fewer, hosted at a public link with no login. English required (non-English video needs English subtitles). No one under 18 in demo or project.
-- Tick both boxes: terms and conditions, and "all work is original" with every external resource (including open-source code) listed in References.
-- Disclose AI use: this code was written with AI assistance. Generated images or video need a visible watermark. No NASA logos or branding in generated content.
+## Left to do before submitting
+1. Deploy to Streamlit Community Cloud (steps in `README.md`) and open the link in a private window.
+2. Make the demo: a video of 30 seconds or less with English subtitles, or a deck of 7 slides or fewer including the title. Over the limit is ineligible.
+3. Fill the form: project name, summary, description, NASA data used, other data and references, AI use (copy from `AI_USE.md`).
+4. Confirm every teammate is on the team's Members tab and registered for the same event.
+5. Click Submit for Judging before 11:59 PM in the Team Owner's local time on Sunday 15 November. Saving is not submitting.
+
+## Portal rules, read from the Space Apps site on 2026-11-14
+- Required fields: project name, high-level summary, demo link, final project link, detailed description, AI disclosure, NASA data used, references for every external resource.
+- Demo and project links must be public with no login. English is required.
+- Tick both boxes: terms and conditions, and "all work is original" with every external resource listed in References.
+- AI-generated images or video need a visible watermark. No NASA logos or branding.
 - Judging: Impact, Creativity, Validity, Relevance (NASA data as a core component), Presentation, each 1 to 5.
-- Challenge asks: compare at least three strategies including the existing rotation; for each, evidence, information gaps and risks that need local review; say the tool supports, not replaces, farmer judgment.
-
-## Next steps
-1. Fill the placeholders above, starting with the ICRISAT tables and costs.
-2. Deploy to Streamlit Community Cloud so the "Link to Final Project" works; test the link in a private window.
-3. Make the demo (30 s video or 7-slide deck) and draft the form text and AI-use disclosure.
-4. Review the "team to verify" parameters with an agronomist or the farm's own records.
-5. When the team agrees, submit through the portal.
-
-## Status at last push
-All 82 tests pass. All five tabs were opened in a browser on the real engine (no mock data, no errors, no names): My Field with canal and well overrides and the black-soil card, Compare Futures, My Priorities (land-split slider and farm totals present), Tipping Points, How Good Is This. Not yet checked: phone-width layout for the newest elements, the `/taste` design pass, and the second Tipping Points heat map by eye.
-Fixed in the last pass: `assumptions_table()` crashed on crops without prices; it now lists potential yields and the farm's 40 acres. The header shows a Draft note whenever model inputs are still unsourced placeholders (currently many: see How Good Is This?).
+- The challenge asks for at least three strategies including the existing rotation; for each, the evidence, the information gaps and the risks that need local review; and a statement that the tool supports, not replaces, farmer judgment.

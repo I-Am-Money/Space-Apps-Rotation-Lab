@@ -1,5 +1,7 @@
 # Interface contract (all agents build against this; do not change without telling the lead)
 
+> **Historical working note.** The project now follows "RotationLab Build Spec v3 (Nalgonda)". Where this file disagrees with v3 or with the code, v3 and the code win. See `HANDOFF.md` for the current state.
+
 Governing docs: RotationLab Build Spec v2 (summarised in the lead's brief) + `SPEC_CHANGES_INDIA.md` (wins on conflicts). Read both first.
 
 ## Global rules

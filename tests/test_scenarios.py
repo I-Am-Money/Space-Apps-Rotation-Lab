@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import numpy as np
 from engine import scenarios as sc
 from tests.decision_fakes import synthetic_annual

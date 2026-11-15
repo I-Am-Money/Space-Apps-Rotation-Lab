@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Crop parameters and assumption lookup. Reads config/assumptions.yaml (nothing hard-coded here)."""
 from __future__ import annotations
 

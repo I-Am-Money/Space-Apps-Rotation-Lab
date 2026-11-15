@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Scenario construction (engine-decision).
 
 A scenario is one plan of 4 consecutive years of REAL weather (Feb 29 dropped):

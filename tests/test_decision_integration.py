@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Integration with the real physics modules (skipped if they are absent)."""
 import numpy as np
 import pytest

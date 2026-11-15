@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """FAO-56 Penman-Monteith reference evapotranspiration (daily).
 
 Reference: Allen, Pereira, Raes, Smith (1998), FAO Irrigation and Drainage

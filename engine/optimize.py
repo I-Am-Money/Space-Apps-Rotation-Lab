@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Rotation optimisation (engine-decision): all 4-year sequences, J score, Pareto frontier, reports.
 
 Build Spec v3 section 7:
