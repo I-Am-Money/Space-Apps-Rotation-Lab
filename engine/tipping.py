@@ -183,18 +183,30 @@ def _money_ready(site, inputs, keys) -> tuple:
 
 # ------------------------------------------------------------------------------------------ recommend()
 
-def _api_recommend():
-    """engine.api.recommend when it is the v4 one (site, inputs, sliders); None otherwise."""
+def _find_recommend():
+    """(recommend function, where it came from). engine.api.recommend when it is the v4 one (site, inputs,
+    sliders). Until the api exposes it, Feature 3's own entry point engine.optimize.recommend_picks is used
+    directly (transitional, the same way Feature 3 reaches simulate()). (None, why) when neither exists."""
     try:
         from engine import api
         fn = getattr(api, "recommend", None)
-        if fn is None:
-            return None
-        kinds = [p.kind for p in inspect.signature(fn).parameters.values()]
-        positional = sum(k in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD) for k in kinds)
-        return fn if positional >= 3 or inspect.Parameter.VAR_POSITIONAL in kinds else None
+        if fn is not None:
+            kinds = [p.kind for p in inspect.signature(fn).parameters.values()]
+            positional = sum(k in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD) for k in kinds)
+            if positional >= 3 or inspect.Parameter.VAR_POSITIONAL in kinds:
+                return fn, "recommend() through engine/api.py"
     except Exception:
-        return None
+        pass
+    try:
+        from engine import optimize
+        picks = getattr(optimize, "recommend_picks", None)
+        if picks is not None:
+            def fn(site, inputs, sliders, crops=None):
+                return picks(site, inputs, sliders, crops=crops, explain_text=False)
+            return fn, "Feature 3's recommend_picks() (engine/api.py does not expose the v4 recommend() yet)"
+    except Exception:
+        pass
+    return None, "no recommend() is available yet"
 
 
 def _accepts(fn, name: str) -> bool:
@@ -339,8 +351,11 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
     notes, method = [], {"climate_shift": mode, "scenarios_bands": full.n}
 
     # ---- who decides the winner: recommend() through the api, or this module's own ranking
-    fn = _api_recommend() if recommend is None else (recommend or None)
-    rec0, why = None, "engine.api.recommend is not available yet" if fn is None else ""
+    if recommend is None:
+        fn, source = _find_recommend()
+    else:
+        fn, source = (recommend or None), ("the recommend() function it was given" if recommend else "recommend() was switched off")
+    rec0, why = None, source if fn is None else ""
     if fn is not None:
         try:
             with SIM.what_if(climate_shift=mode):
@@ -359,7 +374,7 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
         by_kw = _accepts(fn, "crops")
         small_site, by_site = (site, False) if by_kw else _restrict_site(site, pool)
         restricted = by_kw or by_site
-        method.update(winner_source="recommend() through engine/api.py", crops_searched=[_short(c) for c in pool] if restricted else "all candidate crops")
+        method.update(winner_source=source, crops_searched=[_short(c) for c in pool] if restricted else "all candidate crops")
 
         def ask(scen):
             rec = fn(site, inputs, sliders, crops=list(pool)) if by_kw else fn(small_site, inputs, sliders)

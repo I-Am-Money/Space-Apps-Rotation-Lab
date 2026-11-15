@@ -24,8 +24,8 @@ def test_page_renders_map_curves_and_labels():
                                                "If your water supply changes", "If it gets hotter"]
     text = " ".join(m.value for m in at.markdown) + " ".join(c.value for c in at.caption)
     assert "not forecasts" in text and "Your farm now" in text and "Recent" in text
-    assert "`Estimated`" in text and "`Observed`" in text and "`Assumption`" in text      # data labels on the page
-    assert "<span" not in text and "<div" not in text                                   # plain Streamlit, no HTML
+    assert "Estimated" in text and "Observed" in text and "Assumption" in text          # data labels on the page
+    assert "<div" not in text and "style=" not in text                                  # plain Streamlit, no styling
     assert not at.error
     kept = at.session_state["_tipping_result"]
     at.run()                                                                            # second run reuses the result

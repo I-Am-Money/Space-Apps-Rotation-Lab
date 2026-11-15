@@ -22,16 +22,25 @@ _MODES = {"historical": "Historical", "recent": "Recent (last 20 years count dou
 
 
 def _badge(kind: str) -> str:
-    """Text of a data label. Uses the shared badge() when it returns plain text; the v3 badge() returns HTML for
-    the old theme, so until the plain v4 one lands this falls back to the label in code style."""
+    """Text of a data label. Uses the shared v4 badge() once it is on main. The badge() there today is the v3
+    one (HTML for the old theme, and it does not know the v4 kinds "estimated" and "your_input"), so until then
+    this local stand-in shows the label in code style."""
     try:
         from ui.components import badge as shared
         out = shared(kind)
-        if isinstance(out, str) and out and "<" not in out:
+        if isinstance(out, str) and out and "rl-badge" not in out:
             return out
     except Exception:
         pass
     return f"`{_WORDS.get(kind, str(kind))}`"
+
+
+def _md(text: str) -> None:
+    st.markdown(text, unsafe_allow_html=True)        # a shared badge() may return a small HTML label
+
+
+def _cap(text: str) -> None:
+    st.caption(text, unsafe_allow_html=True)
 
 
 def _get(obj, key, default=None):
@@ -98,7 +107,7 @@ def _curve_chart(curve: dict):
 
 def _show_curve(title: str, curve: dict, lead: str, fmt) -> None:
     st.subheader(title)
-    st.caption(f"{lead} Line = average over 500 weather plans; shaded band = 10th to 90th percentile. "
+    _cap(f"{lead} Line = average over 500 weather plans; shaded band = 10th to 90th percentile. "
                f"Dashed line = your farm now. {_badge('estimated')}")
     st.altair_chart(_curve_chart(curve), width="stretch")
     if curve["crossover_details"]:
@@ -116,7 +125,7 @@ def _show_curve(title: str, curve: dict, lead: str, fmt) -> None:
 
 def _show_map(m: dict) -> None:
     st.subheader("Rainfall and water map")
-    st.caption(f"Each square is one what-if: a rainfall level (across) and a water supply (up). Its color is the plan "
+    _cap(f"Each square is one what-if: a rainfall level (across) and a water supply (up). Its color is the plan "
                f"that comes out best there. {_badge('estimated')}")
     rows = [{"Rainfall": f"{r:.1f}x", "Water supply": f"{w:.0f} mm", "Best plan": m["winner"][i][j], "rain": r, "water": w}
             for i, w in enumerate(m["water_mm"]) for j, r in enumerate(m["rain_mult"])]
@@ -167,7 +176,7 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
         st.markdown(f"- {line}")
     climate = result.get("climate") or {}
     if climate:
-        st.caption(f"Climate setting: **{_MODES.get(climate.get('mode'), climate.get('label', ''))}**. {climate.get('text', '')} "
+        _cap(f"Climate setting: **{_MODES.get(climate.get('mode'), climate.get('label', ''))}**. {climate.get('text', '')} "
                    f"{_badge(climate.get('badge', 'assumption'))}")
 
     _show_map(result["map_2d"])
@@ -182,10 +191,10 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
 
     with st.expander("How this was worked out"):
         method = result.get("method") or {}
-        st.markdown(f"- Weather: real years from NASA POWER, re-drawn into {method.get('scenarios_bands', 500)} four-year "
+        _md(f"- Weather: real years from NASA POWER, re-drawn into {method.get('scenarios_bands', 500)} four-year "
                     f"plans (seed 42). {_badge('observed')}")
-        st.markdown(f"- Best plan at each point: {method.get('winner_source', 'not recorded')}. {_badge('estimated')}")
-        st.markdown(f"- Rainfall, heat and water levels tried are fixed what-if steps. {_badge('assumption')}")
+        _md(f"- Best plan at each point: {method.get('winner_source', 'not recorded')}. {_badge('estimated')}")
+        _md(f"- Rainfall, heat and water levels tried are fixed what-if steps. {_badge('assumption')}")
         for note in result.get("notes", []):
             st.markdown(f"- {note}")
         st.markdown("- Planting dates and each crop's best possible yield stay as they are for your farm today; "

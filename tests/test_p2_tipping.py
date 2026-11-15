@@ -95,7 +95,7 @@ def test_winner_comes_from_recommend_inside_the_what_if(weather):
 
     inp = make_inputs("irrigated", 200.0, 100.0, plan=MS)
     tp = T.tipping_points(make_site(weather), inp, {"climate_shift": "historical"}, recommend=recommend)
-    assert tp["method"]["winner_source"].startswith("recommend()")
+    assert "recommend()" in tp["method"]["winner_source"]
     rc, m = tp["rainfall_curve"], tp["map_2d"]
     wet, dry = f"{T.CURRENT}: Maize > Soybeans > Maize > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
     assert rc["winner"] == [dry] * 3 + [wet] * 6
@@ -142,3 +142,29 @@ def test_water_levels_follow_the_farmers_answer():
     assert irr["rows"][2]["water"] == {"mode": "irrigated", "normal_mm": 200.0, "dry_mm": 50.0}
     free = T.water_levels(make_inputs("irrigated"))
     assert free["current_mm"] is None and not any(r["current"] for r in free["rows"])
+
+
+def test_with_the_real_feature_3_optimizer(weather):
+    """End to end with Feature 3's recommend_picks() (the default until engine/api.py exposes the v4 recommend())."""
+    optimize = pytest.importorskip("engine.optimize")
+    if not hasattr(optimize, "recommend_picks"):
+        pytest.skip("Feature 3's v4 optimizer is not in this checkout")
+    from types import SimpleNamespace as NS
+    d = make_site(weather)
+    us = NS(crops=["maize", "soybean"], yields=d["us_defaults"]["yields"], prices=d["us_defaults"]["prices"],
+            costs=d["us_defaults"]["costs"], irrigated_share=0.05)
+    site = NS(weather=weather, lat=41.0, lon=-93.0, elevation_m=300.0, us_defaults=us,
+              soil=NS(awc_mm_per_m=140.0, hydrologic_group="B", organic_matter_pct=3.0, texture="silt loam"))
+    inp = NS(current_plan=["maize", "maize", "maize", "soybean"], farm_acres=100.0, soil_test=None, history=None,
+             crop_overrides={}, water=NS(mode="rain", normal_mm=None, dry_mm=None, source=None))
+    sliders = NS(bad_year=0.3, water=0.0, soil=0.5, profit_tolerance_pct=0.0, climate_shift="historical")
+    tp = T.tipping_points(site, inp, sliders)
+    assert "recommend" in tp["method"]["winner_source"] and "own ranking" not in tp["method"]["winner_source"]
+    assert not any("not by the recommendation engine" in n for n in tp["notes"]), tp["notes"]
+    base = optimize.recommend_picks(site, inp, sliders, explain_text=False)
+    pick = base["headline"] or base["highest_profit"]
+    assert tp["winner_now"].endswith(T.rot_label(T.same_rotation(T.rot_key(pick), (T.rot_key(inp.current_plan),))))
+    m = tp["map_2d"]
+    assert m["winner"][m["current"]["row"]][m["current"]["col"]] == tp["winner_now"]
+    assert all(isinstance(v, str) and v != "Not worked out" for row in m["winner"] for v in row)
+    assert tp["metric"]["name"] == "profit"
