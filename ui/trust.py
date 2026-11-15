@@ -1,0 +1,201 @@
+# AI use: this file was written by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+"""How Good Is This? page (Build Spec v4, A1 step 10, R20-R22). Owner: Person 3.
+
+Sections: validation table and site map, assumptions (every config/assumptions/*.yaml plus the shared
+config/assumptions.yaml), limitations, data sources, AI use. Also the "Not validated here" banner (R21) that
+every results page can show: `banner_for_site(site)` / `render_banner(site)`.
+
+The logic functions are pure (no Streamlit) so they are unit-tested; render() draws the page.
+Data reaches this page only through engine/api.py (validation_summary). Until the v4 api.py on main has it,
+it falls back to engine.correction.validation_summary (same owner, same table).
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+ASSUMPTION_FILES = [ROOT / "config" / "assumptions.yaml", *sorted((ROOT / "config" / "assumptions").glob("*.yaml"))]
+DOCS = {"Limitations": ROOT / "LIMITATIONS.md", "Data sources": ROOT / "DATA_SOURCES.md", "AI use": ROOT / "AI_USE.md"}
+NOT_VALIDATED = ("Not validated here: there are no local yield records for this location to check the model "
+                 "against, so these are model estimates only.")
+VERIFY_WORDS = ("team to verify", "placeholder", "unverified", "tbd")
+
+
+# ------------------------------------------------------------------------------------------- validation data
+
+def load_validation():
+    """ValidationSummary(table, sites) from api.validation_summary(), falling back to engine.correction."""
+    try:
+        from engine import api
+        fn = getattr(api, "validation_summary", None)
+        if callable(fn):
+            return fn()
+    except Exception:
+        pass
+    from engine import correction
+    return correction.validation_summary()
+
+
+def _table_df(summary) -> pd.DataFrame:
+    t = getattr(summary, "table", None)
+    if isinstance(t, pd.DataFrame):
+        return t.copy()
+    return pd.DataFrame(list(t or []))
+
+
+def _fmt(v, nd=2) -> str:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return "n/a"
+    return "n/a" if f != f else f"{f:.{nd}f}"
+
+
+def validation_rows(summary) -> list[dict]:
+    """Display rows: county, crop, held-out r and MAE (t/ha) with and without the correction, status."""
+    df = _table_df(summary)
+    rows = []
+    for r in df.to_dict("records"):
+        status = r.get("status") or "unknown"
+        ok = status == "ok"
+        mae = lambda k: _fmt(float(r[k]) / 1000.0) if ok and pd.notna(r.get(k)) else "n/a"
+        rows.append({
+            "County": f"{r.get('county') or r.get('site')}, {r.get('state') or ''}".strip(", "),
+            "ERS region": r.get("ers_region") or r.get("region") or "",
+            "Crop": r.get("crop"), "Water": r.get("water") or "",
+            "r (held out)": _fmt(r.get("r")) if ok else "n/a", "MAE t/ha": mae("mae"),
+            "r corrected": _fmt(r.get("r_corrected")) if ok else "n/a", "MAE corrected t/ha": mae("mae_corrected"),
+            "Years train/test": f"{int(r['n_train'])}/{int(r['n_test'])}" if ok else "",
+            "Status": "validated" if ok else status, "Model": r.get("badge") or ""})
+    return rows
+
+
+def validated_fips(summary) -> set[str]:
+    df = _table_df(summary)
+    if df.empty or "status" not in df:
+        return set()
+    return {str(f).zfill(5) for f in df.loc[df["status"] == "ok", "fips"].dropna()}
+
+
+# ------------------------------------------------------------------------------------------- R21 banner
+
+def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
+    """{"show": bool, "text": str}. The banner shows unless the pin's US county has hindcast results
+    (status ok) for the crop (or any crop if crop is None). Non-US pins always show it."""
+    fips = getattr(site, "us_county_fips", None) if site is not None else None
+    if isinstance(site, dict):
+        fips = site.get("us_county_fips") or site.get("fips")
+    if not fips:
+        return {"show": True, "text": NOT_VALIDATED}
+    summary = load_validation() if summary is None else summary
+    df = _table_df(summary)
+    if df.empty or "fips" not in df or "status" not in df:
+        return {"show": True, "text": NOT_VALIDATED}
+    here = df[(df["fips"].astype(str).str.zfill(5) == str(fips).zfill(5)) & (df["status"] == "ok")]
+    if crop is not None:
+        here = here[here["crop"] == crop]
+    if here.empty:
+        return {"show": True, "text": NOT_VALIDATED}
+    r = here.iloc[0]
+    return {"show": False, "text": f"Checked against NASS yields in this county ({r['crop']}): held-out r = "
+                                   f"{_fmt(r.get('r'))}. See How Good Is This?"}
+
+
+# ------------------------------------------------------------------------------------------- assumptions
+
+def _walk(node, path, file_label, out):
+    if isinstance(node, dict) and "value" in node:
+        src = node.get("source") or node.get("note") or ""
+        val = node["value"]
+        text = str(src).lower()
+        out.append({"File": file_label, "Parameter": ".".join(path), "Value": val if not isinstance(val, (dict, list))
+                    else yaml.safe_dump(val, default_flow_style=True, width=10_000).strip(),
+                    "Unit": node.get("unit", ""), "Range": node.get("range", ""), "Source": str(src).strip(),
+                    "Badge": "placeholder" if (not src or any(w in text for w in VERIFY_WORDS)) else
+                             (node.get("badge") or "assumption")})
+        return
+    if isinstance(node, dict):
+        for k, v in node.items():
+            _walk(v, path + [str(k)], file_label, out)
+
+
+def assumption_rows(files=None) -> list[dict]:
+    """Every parameter that carries a `value` in the assumption files, with source, range and badge.
+    Unsourced or 'team to verify' values get the Placeholder badge."""
+    out: list[dict] = []
+    for f in files or ASSUMPTION_FILES:
+        if not Path(f).exists():
+            continue
+        try:
+            doc = yaml.safe_load(Path(f).read_text()) or {}
+        except yaml.YAMLError:
+            continue
+        _walk(doc, [], str(Path(f).relative_to(ROOT)) if str(f).startswith(str(ROOT)) else Path(f).name, out)
+    return out
+
+
+def doc_text(name: str) -> str:
+    p = DOCS[name]
+    return p.read_text() if p.exists() else f"{p.name} is missing."
+
+
+# ------------------------------------------------------------------------------------------- Streamlit
+
+def render_banner(site=None, crop=None) -> None:
+    import streamlit as st
+    b = banner_for_site(site, crop=crop)
+    (st.warning if b["show"] else st.caption)(b["text"])
+
+
+def site_map(summary):
+    import plotly.express as px
+    df = _table_df(summary)
+    if df.empty:
+        return None
+    g = df.groupby(["site", "county", "state", "lat", "lon"], dropna=False).agg(
+        status=("status", lambda s: "validated" if (s == "ok").any() else s.iloc[0]),
+        crops=("crop", lambda s: ", ".join(map(str, s)))).reset_index()
+    fig = px.scatter_geo(g, lat="lat", lon="lon", color="status", hover_name="county",
+                         hover_data={"state": True, "crops": True, "lat": False, "lon": False}, scope="usa")
+    fig.update_traces(marker={"size": 11})
+    fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0}, height=380, legend_title_text="")
+    return fig
+
+
+def render() -> None:
+    import streamlit as st
+
+    st.header("How good is this?")
+    st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, "
+             "then compared it with what farmers actually harvested. The latest 8 years were never used to tune "
+             "anything, so those numbers show how the model does on years it has not seen.")
+    summary = load_validation()
+    rows = validation_rows(summary)
+    st.subheader("Validation (hindcast)")
+    if not any(r["Status"] == "validated" for r in rows):
+        st.warning("Validation has not been run yet: NASS county yields are not cached (they need a NASS API key). "
+                   "The counties below are the ones that will be checked.")
+    st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
+               "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
+               "training years only.")
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    fig = site_map(summary)
+    if fig is not None:
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Assumptions")
+    a = pd.DataFrame(assumption_rows())
+    if not a.empty:
+        n_ph = int((a["Badge"] == "placeholder").sum())
+        st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
+        st.dataframe(a, hide_index=True, use_container_width=True)
+    for name in DOCS:
+        with st.expander(name, expanded=(name == "Limitations")):
+            st.markdown(doc_text(name))
+
+
+if __name__ == "__main__":
+    render()
