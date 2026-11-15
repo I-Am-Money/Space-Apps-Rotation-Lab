@@ -144,7 +144,7 @@ crops:
     heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 3290, range: [3125, 3454], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Wheat, hard red spring' (FDC ID 168889): 329 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/168889/nutrients", badge: observed}
   barley:
     name: {value: "Barley", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
@@ -198,7 +198,7 @@ crops:
     heat_tmax_c: {value: 38, range: [36, 40], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 3290, range: [3125, 3454], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Sorghum grain' (FDC ID 169716): 329 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/169716/nutrients", badge: observed}
   pearl_millet:
     name: {value: "Pearl millet", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
@@ -272,7 +272,7 @@ crops:
     heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not counted yet. USDA FoodData Central, SR Legacy, 'Peanuts, all types, raw' (FDC ID 172430) gives 567 kcal per 100 g (read from the FDC API on 2026-11-15, https://fdc.nal.usda.gov/fdc-app.html#/food-details/172430/nutrients), but that is for shelled kernels and the yield is in-shell peanuts: the kernel share (edible_fraction) is team to verify, so no calories are counted for this crop.", badge: placeholder}
     edible_fraction: {value: 1.0, range: [0.5, 1.0], unit: "-", source: "Yield is in-shell peanuts; the calorie value is for shelled kernels. edible_fraction is team to verify. 1.0 overstates food calories until verified.", badge: placeholder}
   dry_bean:
     name: {value: "Dry beans", range: null, unit: "text", source: "Display name.", badge: observed}
@@ -309,7 +309,7 @@ crops:
     heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 3780, range: [3591, 3969], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Chickpeas (garbanzo beans, bengal gram), mature seeds, raw' (FDC ID 173756): 378 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/173756/nutrients", badge: observed}
   lentil:
     name: {value: "Lentil", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}

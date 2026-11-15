@@ -49,9 +49,12 @@ Simulation
 - A crop with no yield number (no farmer entry and no county number) is reported as a share of potential only; its
   yield in kg is "not a number" and it is listed in `SimResult.missing_yield`. Nothing is filled in.
 - Double crops are simulated, but Feature 3's enumeration uses one crop per plan year.
-- Calories per kg are filled only for crops read from USDA FoodData Central on 2026-11-15 (see below). The others are
-  empty and not counted. Sunflower, canola and sugar beet are counted as zero or empty because the edible share of
-  the harvested product was not verified.
+- Calories per kg are filled only for crops read from USDA FoodData Central on 2026-11-15 (see below): maize,
+  soybean, winter wheat, spring wheat, barley, sorghum, rice, chickpea, lentil and potato. Not read yet, so empty and
+  not counted: oats, pearl millet, dry bean, pea and pigeonpea. Peanut and sunflower have a value on record but are
+  not counted, and canola and sugar beet are counted as zero, because the edible share of the harvested product was
+  not verified. Cotton is a fibre crop and counts as zero. A plan that grows one of these crops shows fewer food
+  calories than it really produces, so the "most food" pick is biased against them.
 
 Climate shift (R8). All three modes are what-ifs, not forecasts.
 - Recent: the 500 bootstrap plans are drawn again with the last 20 calendar years of the record twice as likely.
