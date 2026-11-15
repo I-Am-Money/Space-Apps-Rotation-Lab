@@ -46,6 +46,9 @@ STATE_FIPS = {
     "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI", "56": "WY"}
 
 
+_PRECACHE = False      # True only inside precache_county(): answers go to the committed data/precache/
+
+
 class NassUnavailable(RuntimeError):
     """No NASS key or network, and nothing cached for this query."""
 
@@ -117,7 +120,8 @@ def query(kind_key: str, params: dict, refresh: str = "auto") -> tuple[list[dict
     """Cached Quick Stats query. Returns (records, meta with data_as_of / stale / from_cache)."""
     try:
         return cache.fetch_cached("nass", kind_key, lambda: _get(params), SOURCE,
-                                  url="https://quickstats.nass.usda.gov/api", refresh=refresh)
+                                  url="https://quickstats.nass.usda.gov/api", refresh=refresh,
+                                  precache=_PRECACHE)
     except cache.DataUnavailable as e:
         raise NassUnavailable(str(e)) from e
 
@@ -315,3 +319,30 @@ def us_defaults(fips: str) -> dict:
             out["badges"][f"cost:{crop}"] = "estimated"
             out["notes"][f"cost:{crop}"] = c["note"]
     return out
+
+
+def precache_county(fips: str, crops=None) -> dict:
+    """Fetch every NASS query a county needs and write it to the committed pre-cache (needs NASS_API_KEY)."""
+    global _PRECACHE
+    _PRECACHE = True
+    try:
+        d = us_defaults(fips)
+        for crop in crops or []:
+            county_yields(fips, crop)
+        return d
+    finally:
+        _PRECACHE = False
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--precache-validation" in sys.argv:
+        from engine import hindcast as _hc
+
+        for site in _hc.validation_sites():
+            try:
+                d = precache_county(site["fips"], site["crops"])
+                print(site["id"], "ok" if d["available"] else d["notes"].get("nass"))
+            except NassUnavailable as err:
+                print(site["id"], "NASS unavailable:", err)
