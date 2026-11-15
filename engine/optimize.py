@@ -215,6 +215,38 @@ def objective(mean, worst10, irrigation_mm, lam, w, water_price_proxy):
     return (1 - lam) * mean + lam * worst10 - w * irrigation_mm * water_price_proxy
 
 
+def breakeven_shortfall(plan, scenset, awc, irr, lam, w, price_mult=1.0, scale=None) -> dict | None:
+    """How much less money the non-rice crops of `plan` can bring in (a lower price or a lower yield) before rice every
+    year (rotation A) scores at least as high on J. A sensitivity check on the least certain inputs, not a forecast.
+    Returns None for a plan with no non-rice year. `shortfall` is a fraction of the non-rice revenue (0 to 1), or None
+    when the plan still scores higher with no non-rice revenue at all."""
+    plan = list(plan)
+    cols = [i for i, c in enumerate(plan) if c != "rice"]
+    if not cols:
+        return None
+    scale = water_price_proxy_rs_per_mm_acre() if scale is None else scale
+    a = rotation_arrays(plan, scenset, awc, irr, price_mult)
+    b = rotation_arrays(REF[BASELINE_ID], scenset, awc, irr, price_mult)
+    alt_rev = np.asarray(a["eco"]["revenue"])[:, cols].sum(1)
+    jb = float(objective(b["profit"].mean(), worst_fraction_mean(b["profit"]), b["irrig"].mean(), lam, w, scale))
+
+    def j(short):
+        prof = a["profit"] - short * alt_rev
+        return float(objective(prof.mean(), worst_fraction_mean(prof), a["irrig"].mean(), lam, w, scale))
+
+    out = {"crops": sorted({plan[i] for i in cols}), "non_rice_revenue_mean": float(alt_rev.mean()),
+           "lead_over_baseline": j(0.0) - jb, "baseline_id": plan_id(REF[BASELINE_ID])}
+    if j(0.0) <= jb:
+        return {**out, "shortfall": 0.0}
+    if j(1.0) > jb:
+        return {**out, "shortfall": None}
+    lo, hi = 0.0, 1.0
+    for _ in range(50):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if j(mid) > jb else (lo, mid)
+    return {**out, "shortfall": 0.5 * (lo + hi)}
+
+
 def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None, extra=()) -> pd.DataFrame:
     """One row per rotation. `extra` = rotations the team rule does not offer (plan_allowed is False) but that the
     user asked to see, e.g. their current rotation: they get offered=False, are never recommended and have rank 0."""

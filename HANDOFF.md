@@ -10,7 +10,7 @@ A decision-support tool for the NASA Space Apps 2026 challenge "Field Shift: Ada
 ## Run it
 ```
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/pytest -q                 # 112 tests, offline, about 25 seconds
+.venv/bin/pytest -q                 # 114 tests, offline, about 25 seconds
 .venv/bin/streamlit run app.py
 ```
 Optional: `ANTHROPIC_API_KEY` for the written explanation. Without it the app uses a fixed template. Never commit keys; `.env` is gitignored.

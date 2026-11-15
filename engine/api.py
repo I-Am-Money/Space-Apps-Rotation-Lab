@@ -494,7 +494,8 @@ def recommend(params=None) -> dict:
         "irrigation_canal_m3", "irrigation_well_m3", "total_water_m3", "d_total_profit_mean", "d_total_profit_worst10",
         "d_total_irrigation_m3", "d_total_water_m3"]
     pts = df[cols]
-    return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts,
+    be = opt.breakeven_shortfall(r["top"]["plan"], ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"], df.attrs["scale"])
+    return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts, "breakeven": be,
             "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today",
             "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "label": farm["label"],
                      "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"], "soil": p["soil"]},

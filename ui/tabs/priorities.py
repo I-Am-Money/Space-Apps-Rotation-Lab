@@ -76,6 +76,16 @@ def render():
         if gap < CLOSE_CALL_RS:
             md(f'<p class="rl-note"><strong>Close call.</strong> The second plan, {html.escape(plan_label(ru["plan"]))}, scores only Rs {gap:,.0f} per acre lower over four years. '
                f'We treat any gap under Rs {CLOSE_CALL_RS:,} as a tie (a rule of thumb, not a statistical test), so choose between the two on what suits the farm.</p>')
+    be = rec.get("breakeven")
+    if be and not same:
+        crops = " and ".join(data.CROP_LABEL.get(c, c).lower() for c in be["crops"])
+        if be.get("shortfall") is None:
+            room = f"Even with no income at all from {crops}, this plan still scores higher than rice every year for these priorities, because of the weight put on saving water."
+        else:
+            room = (f"If {crops} brings in {be['shortfall'] * 100:.0f}% less money than assumed (a lower price or a lower yield), "
+                    f"rice every year scores higher than this plan for these priorities.")
+        md(f'<p class="rl-note"><strong>Room for error.</strong> {room} The model values {crops} at the full support price'
+           f'{", and pigeon pea has no district yield record" if "pigeonpea" in be["crops"] else ""}, so check both locally before acting. {badge("modeled")}</p>')
     wp = rec.get("water_price_proxy") or {}
     if wp.get("value_rs_per_mm_ha") is not None:
         md(f'<p class="rl-note">How the score works: average profit and worst-10% profit are mixed by the first slider. The second slider then subtracts '

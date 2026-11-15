@@ -39,7 +39,7 @@ The app runs offline from the files in `data/raw/`, except the satellite map lay
 
 Optional: set `ANTHROPIC_API_KEY` to have Claude write the short explanation on the Our Priorities tab from the computed numbers. Without a key the app writes it from a fixed template. Never commit a key.
 
-Tests: `.venv/bin/pytest -q` (112 tests, about 25 seconds, no internet needed). `tests/test_spec_v3.py` has one test for every row of the build spec's test table.
+Tests: `.venv/bin/pytest -q` (114 tests, about 25 seconds, no internet needed). `tests/test_spec_v3.py` has one test for every row of the build spec's test table.
 
 ## Deploy (Streamlit Community Cloud)
 

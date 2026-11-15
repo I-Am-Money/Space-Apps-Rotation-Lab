@@ -87,6 +87,40 @@ def test_water_slider_never_picks_a_thirstier_plan():
     assert all(b <= a + 1e-9 for a, b in zip(irr, irr[1:]))
 
 
+def test_breakeven_shortfall_is_where_the_plan_and_rice_only_tie():
+    p = api.norm_params({"lam": 0.3, "w": 0.1})
+    ss, df = api._table(p)
+    scale = df.attrs["scale"]
+    assert opt.breakeven_shortfall(["rice"] * 4, ss, p["awc"], p["irrigation_mm"], 0.3, 0.1) is None     # no non-rice year
+    plan = ["rice", "pigeonpea", "rice", "rice"]
+    be = opt.breakeven_shortfall(plan, ss, p["awc"], p["irrigation_mm"], 0.3, 0.1, 1.0, scale)
+    assert be["crops"] == ["pigeonpea"] and be["baseline_id"] == "rice-rice-rice-rice"
+    a, b = (opt.rotation_arrays(x, ss, p["awc"], p["irrigation_mm"]) for x in (plan, ["rice"] * 4))
+    jb = opt.objective(b["profit"].mean(), opt.worst_fraction_mean(b["profit"]), b["irrig"].mean(), 0.3, 0.1, scale)
+    lead = opt.objective(a["profit"].mean(), opt.worst_fraction_mean(a["profit"]), a["irrig"].mean(), 0.3, 0.1, scale) - jb
+    assert be["lead_over_baseline"] == pytest.approx(lead)
+    if be["shortfall"] is None:                       # still ahead with no pigeon pea income at all
+        prof = a["profit"] - a["eco"]["revenue"][:, [1]].sum(1)
+    else:
+        assert 0.0 <= be["shortfall"] <= 1.0
+        if lead <= 0:
+            assert be["shortfall"] == 0.0
+            return
+        prof = a["profit"] - be["shortfall"] * a["eco"]["revenue"][:, [1]].sum(1)
+        j = opt.objective(prof.mean(), opt.worst_fraction_mean(prof), a["irrig"].mean(), 0.3, 0.1, scale)
+        assert j == pytest.approx(jb, abs=1.0)        # the two score the same at the break-even point
+        return
+    assert opt.objective(prof.mean(), opt.worst_fraction_mean(prof), a["irrig"].mean(), 0.3, 0.1, scale) > jb
+
+
+def test_recommend_reports_breakeven_for_the_top_plan():
+    r = api.recommend({"lam": 0.3, "w": 0.1})
+    if all(c == "rice" for c in r["top"]["plan"]):
+        assert r["breakeven"] is None
+    else:
+        assert set(r["breakeven"]) >= {"crops", "shortfall", "lead_over_baseline", "non_rice_revenue_mean"}
+
+
 def test_objective_matches_v3_formula_by_hand():
     # J = (1 - lam) * mean + lam * worst10 - w * irrigation * water_price_proxy
     assert opt.objective(1000.0, 400.0, 500.0, 0.25, 0.5, 2.0) == 0.75 * 1000 + 0.25 * 400 - 0.5 * 500 * 2.0
