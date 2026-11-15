@@ -54,7 +54,15 @@ Every code file in the repo now starts with an AI-use line (checked 2026-11-15).
 Claude Code wrote `engine/fetch_nass.py`, `engine/fetch_ers.py`, `engine/us_rules.py`, `ui/trust.py`, the NASS
 and weather wiring in `engine/hindcast.py` and `engine/correction.py`, their tests, and these docs, under the
 team's direction. ERS costs and regions come from the ERS files listed in `DATA_SOURCES.md`. Tests that need
-NASS data use synthetic records, labelled as synthetic in the test files. They are never used in the app.
+NASS data use synthetic records, labelled as synthetic in the test files. They are never used in the app. The
+validation results come from real NASS county yields and ICRISAT district yields (see `DATA_SOURCES.md`).
+
+### Submission text
+
+Claude Code drafted the slide text, the 30-second video script and the project page text in `submission/` from
+the repo's own results and documents (`config/validation/results.csv`, `LIMITATIONS.md`, `DATA_SOURCES.md`, this
+file). No number in them was written by hand or generated. The team edits, builds the slides, records the video
+and submits. The video and slides use app screenshots only, with no people, voices or AI-generated media.
 
 ### How these docs are put together
 
