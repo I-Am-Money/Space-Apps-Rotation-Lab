@@ -49,7 +49,7 @@ To rebuild the validation table once NASS yields are cached: `.venv/bin/python -
    plan and a short plain-English explanation.
 7. **Tipping points and what to measure next.** The rainfall, heat or water supply at which the best plan
    changes, and which unknown (water supply, soil water capacity, organic matter) would be most worth measuring.
-8. **How good is this?** A hindcast in 12 US counties across 8 regions (`config/validation/sites.yaml`):
+8. **How good is this?** A hindcast in 12 US counties across 9 regions (`config/validation/sites.yaml`):
    modeled against NASS county yields, detrended, with the latest 8 years held out. A small linear correction
    for rain, heat and year is fitted on training years only, and results are shown with and without it
    (`engine/hindcast.py`, `engine/correction.py`). Where there is no local yield data, the app says

@@ -1,6 +1,6 @@
 # Validation config (Person 3)
 
-- `sites.yaml`: 12 US counties across 8 regions for the hindcast (R20), with Census Gazetteer centroids and
+- `sites.yaml`: 12 US counties across 9 regions for the hindcast (R20), with Census Gazetteer centroids and
   the NASS Quick Stats query fields per crop.
 - `results.csv` (written by `python -m engine.hindcast`): the validation table the app shows through
   `api.validation_summary()`. If it is missing, the app shows "validation not run yet".
