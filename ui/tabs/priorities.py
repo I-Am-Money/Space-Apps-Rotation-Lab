@@ -28,6 +28,11 @@ def explain_inputs(rec, tp, p):
              diff_irrigation_mm=round(t["irrigation_mm"] - a.irrigation_mm),
              same_as_today=bool(t["id"] == "rice-rice-rice-rice"),
              bad_year_weight=p["lam"], water_saving_weight=p["w"])
+    nofx, be = rec.get("no_rotation_effects"), rec.get("breakeven")
+    if nofx:
+        d["diff_mean_profit_if_no_rotation_effects"] = round(nofx["d_mean_profit"])
+    if be and be.get("shortfall") is not None:
+        d["new_crop_income_shortfall_pct_that_flips_the_advice"] = round(be["shortfall"] * 100)
     if tp:
         co = tp["rainfall_crossover"].get("crossovers") or []
         d["rain_crossover"] = co[0]["rain_mult"] if co else None
@@ -58,7 +63,8 @@ def render():
     base = mdf[mdf.id == "rice-rice-rice-rice"].iloc[0]
     t = rec["top"]
     b = "placeholder" if data.is_mock() else "modeled"
-    ex = explain.explain(explain_inputs(rec, None, p))
+    tp_key, tp_seen = st.session_state.get("_tp") or (None, None)      # only when Tipping Points was already opened for these inputs
+    ex = explain.explain(explain_inputs(rec, tp_seen if tp_key == repr(sorted(p.items(), key=str)) else None, p))
     src = "Written by Claude from the numbers on this page." if ex["source"] == "model" else "Written from a fixed template using the numbers on this page."
     same = t["id"] == "rice-rice-rice-rice"
     md(f'<div class="rl-hero"><p style="margin:0;font-size:.9rem;opacity:.85">{"Recommended for these priorities: stay with rice every year" if same else "Recommended for these priorities"} {badge(b)}</p>'
@@ -76,16 +82,31 @@ def render():
         if gap < CLOSE_CALL_RS:
             md(f'<p class="rl-note"><strong>Close call.</strong> The second plan, {html.escape(plan_label(ru["plan"]))}, scores only Rs {gap:,.0f} per acre lower over four years. '
                f'We treat any gap under Rs {CLOSE_CALL_RS:,} as a tie (a rule of thumb, not a statistical test), so choose between the two on what suits the farm.</p>')
-    be = rec.get("breakeven")
-    if be and not same:
-        crops = " and ".join(data.CROP_LABEL.get(c, c).lower() for c in be["crops"])
-        if be.get("shortfall") is None:
-            room = f"Even with no income at all from {crops}, this plan still scores higher than rice every year for these priorities, because of the weight put on saving water."
-        else:
-            room = (f"If {crops} brings in {be['shortfall'] * 100:.0f}% less money than assumed (a lower price or a lower yield), "
-                    f"rice every year scores higher than this plan for these priorities.")
-        md(f'<p class="rl-note"><strong>Room for error.</strong> {room} The model values {crops} at the full support price'
-           f'{", and pigeon pea has no district yield record" if "pigeonpea" in be["crops"] else ""}, so check both locally before acting. {badge("modeled")}</p>')
+    be, nofx = rec.get("breakeven"), rec.get("no_rotation_effects")
+    if not same and (be or nofx):
+        items = []
+        if nofx:
+            fx = nofx.get("effects") or {}
+            def pct(v):
+                return f"{abs(float(v) - 1) * 100:.0f}% {'more' if float(v) >= 1 else 'less'}"
+            d0, d1 = nofx["d_mean_profit"], nofx["d_mean_profit_with_effects"]
+            def vs(d):
+                return "the same as" if abs(d) < 0.5 else f"{fmt_rs(abs(d))} per acre {'more' if d > 0 else 'less'} than"
+            items.append(f"<strong>It leans on rotation benefits that nobody has measured here.</strong> The model assumes rice yields {pct(fx.get('rice_after_pigeonpea', 1))} "
+                         f"after pigeon pea and {pct(fx.get('rice_after_rice', 1))} after rice. Those are starting values from the build spec with no source yet {badge('assumption')}. "
+                         f"With every rotation effect set to zero, this plan would earn {vs(d0)} rice every year, instead of {vs(d1)} it. "
+                         f"The water saving does not depend on them.")
+        if be:
+            crops = " and ".join(data.CROP_LABEL.get(c, c).lower() for c in be["crops"])
+            if be.get("shortfall") is None:
+                room = f"Even with no income at all from {crops}, this plan still scores higher than rice every year for these priorities, because of the weight put on saving water."
+            else:
+                room = (f"If {crops} brings in {be['shortfall'] * 100:.0f}% less money than assumed (a lower price or a lower yield), "
+                        f"rice every year scores higher than this plan for these priorities.")
+            items.append(f"<strong>Room for error on the new crops.</strong> {room} The model values {crops} at the full support price"
+                         f"{', and pigeon pea has no district yield record' if 'pigeonpea' in be['crops'] else ''}.")
+        md('<div class="rl-note" style="max-width:95ch"><p style="margin:.2rem 0 .3rem"><strong>How solid is this?</strong> Check these locally before acting.</p><ul style="margin:.2rem 0 0 1.1rem">'
+           + "".join(f"<li style='margin-bottom:.35rem'>{i}</li>" for i in items) + "</ul></div>")
     wp = rec.get("water_price_proxy") or {}
     if wp.get("value_rs_per_mm_ha") is not None:
         md(f'<p class="rl-note">How the score works: average profit and worst-10% profit are mixed by the first slider. The second slider then subtracts '

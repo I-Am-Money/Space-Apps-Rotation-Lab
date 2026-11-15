@@ -2,6 +2,8 @@
 """FAO-33 yield response (Doorenbos & Kassam 1979): 1 - Ya/Ym = Ky (1 - ETa/ETm), plus rotation effects."""
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
 from typing import Sequence
 
 import numpy as np
@@ -17,29 +19,51 @@ def season_yield(ym_kg_ha: float, ky: float, eta, etm, rotation_factor=1.0):
     return ym_kg_ha * rel * rotation_factor
 
 
+@lru_cache(maxsize=1)
+def _farm_current_crop():
+    try:
+        import yaml
+        doc = yaml.safe_load((Path(__file__).resolve().parents[1] / "config" / "farm.yaml").read_text()) or {}
+        return (doc.get("farm") or {}).get("current_crop")
+    except Exception:
+        return None
+
+
+def previous_crop(params: dict | None = None):
+    """The crop grown the year before the plan starts: farm.current_crop in config/farm.yaml (a farm fact, Local
+    input), unless params["previous_crop"] says otherwise. The farm grows rice every year today, so a plan that
+    starts with rice starts with rice after rice. None means year 1 has no predecessor."""
+    if params and "previous_crop" in params:
+        return params["previous_crop"]
+    return _farm_current_crop()
+
+
+def _pair_factor(prev, cur, params) -> float:
+    if prev == "pigeonpea":
+        if cur == "rice":
+            return A(params, "rotation.rice_after_pigeonpea")
+        if cur in MILLETS:
+            return A(params, "rotation.millet_after_pigeonpea")
+        if cur == "pigeonpea":
+            return A(params, "rotation.pigeonpea_after_pigeonpea")
+    elif prev == "rice" and cur == "rice":
+        return A(params, "rotation.rice_after_rice")
+    elif prev in MILLETS and cur in MILLETS:
+        return A(params, "rotation.millet_after_millet")
+    return 1.0
+
+
 def rotation_factor(plan: Sequence[str], params: dict | None = None) -> np.ndarray:
-    """Per-year yield multiplier from the previous year's crop (year 1 has no predecessor: 1.0)."""
-    f = np.ones(len(plan))
-    for i in range(1, len(plan)):
-        prev, cur = plan[i - 1], plan[i]
-        if prev == "pigeonpea":
-            if cur == "rice":
-                f[i] = A(params, "rotation.rice_after_pigeonpea")
-            elif cur in MILLETS:
-                f[i] = A(params, "rotation.millet_after_pigeonpea")
-            elif cur == "pigeonpea":
-                f[i] = A(params, "rotation.pigeonpea_after_pigeonpea")
-        elif prev == "rice" and cur == "rice":
-            f[i] = A(params, "rotation.rice_after_rice")
-        elif prev in MILLETS and cur in MILLETS:
-            f[i] = A(params, "rotation.millet_after_millet")
-    return f
+    """Per-year yield multiplier from the previous year's crop. Year 1 follows previous_crop() (rice on this farm)."""
+    seq = [previous_crop(params)] + list(plan)
+    return np.array([_pair_factor(seq[i], seq[i + 1], params) for i in range(len(plan))], float)
 
 
 def nitrogen_credit_kg_ha(plan: Sequence[str], params: dict | None = None) -> np.ndarray:
-    """Nitrogen credit (kg N/ha) to rice or millet following pigeon pea."""
+    """Nitrogen credit (kg N/ha) to rice or millet following pigeon pea (year 1 follows previous_crop())."""
+    seq = [previous_crop(params)] + list(plan)
     n = np.zeros(len(plan))
-    for i in range(1, len(plan)):
-        if plan[i - 1] == "pigeonpea" and (plan[i] == "rice" or plan[i] in MILLETS):
+    for i in range(len(plan)):
+        if seq[i] == "pigeonpea" and (seq[i + 1] == "rice" or seq[i + 1] in MILLETS):
             n[i] = A(params, "rotation.n_credit_after_pigeonpea")
     return n

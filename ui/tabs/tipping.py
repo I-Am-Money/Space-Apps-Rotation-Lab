@@ -32,6 +32,7 @@ def render():
     p = data.params()
     with st.spinner(data.MSG["tipping_points"]):
         tp = data.tipping(p)
+    st.session_state["_tp"] = (repr(sorted(p.items(), key=str)), tp)     # lets Our Priorities quote the thresholds without recomputing
     g, xo = tp["grid"], tp["rainfall_crossover"]
     b = "placeholder" if data.is_mock() else "modeled"
     tab_head("Tipping Points", "At what water level should land move out of rice? This tab shows where the answer changes, and how sure the model is about that line.")

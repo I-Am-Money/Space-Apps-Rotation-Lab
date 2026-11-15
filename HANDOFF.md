@@ -10,7 +10,7 @@ A decision-support tool for the NASA Space Apps 2026 challenge "Field Shift: Ada
 ## Run it
 ```
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/pytest -q                 # 114 tests, offline, about 25 seconds
+.venv/bin/pytest -q                 # 117 tests, offline, about 25 seconds
 .venv/bin/streamlit run app.py
 ```
 Optional: `ANTHROPIC_API_KEY` for the written explanation. Without it the app uses a fixed template. Never commit keys; `.env` is gitignored.
@@ -43,9 +43,11 @@ Optional: `ANTHROPIC_API_KEY` for the written explanation. Without it the app us
 6. The same non-rice crop four years running is not offered (79 plans). Rice every year stays as the baseline.
 7. Stress tests are the four named in v3. The tipping map is coloured by the number of rice years, with a boundary line and an uncertainty band.
 8. The toy stand-in engine used during early screen design was deleted, so the app can never show made-up numbers.
-9. Tests are named after the spec's test table. `AI_USE.md`, `LIMITATIONS.md` and a header comment in every code file are in place.
+9. A second audit then fixed: water overrides that were ignored after the first run (a cache bug), memory use on Tipping Points (1.4 GB down to 0.5 GB), two supply settings that never reached the model, year 1 now following last year's rice, and rotation effects set to the spec's starting values. The app now shows how much a recommendation leans on those rotation effects.
+10. Tests are named after the spec's test table. `AI_USE.md`, `LIMITATIONS.md` and a header comment in every code file are in place.
 
 ## What is still placeholder or unverified (these drive the ranking)
+0. **Rotation effects decide the money result.** Rice after pigeon pea plus 8 percent, rice after rice minus 3 percent, millet after millet minus 5 percent and the nitrogen credit are the build spec's starting values with no source. With them the alternating plan ties rice every year; without them it earns about Rs 14,000 per acre less. Find a sourced value or a local trial result before quoting any profit claim.
 1. **Eleven inputs in use are placeholders**: Ky for rice, bajra and pigeon pea; bajra early-season Kc; pigeon pea stage lengths; three fallow parameters; the pigeon-pea-after-pigeon-pea effect; soil-test cost; water-measurement cost. The app lists them under How Good Is This.
 2. **Pigeon pea has no district yield record.** Its yield ceiling comes from a state cost survey. It is in most recommended plans, so this is the first thing to fix.
 3. **ICRISAT district tables.** `data.icrisat.org` could not be reached from the build machine. Download the district CSVs for rice, sorghum, pearl millet and pigeon pea into `data/raw/icrisat_dld/`; the loader prefers them automatically. Steps are in `docs/INDIA_DATA.md`. Check the bajra 2014 and 2015 values (both exactly 500).

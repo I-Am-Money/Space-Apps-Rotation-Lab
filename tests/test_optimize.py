@@ -121,6 +121,27 @@ def test_recommend_reports_breakeven_for_the_top_plan():
         assert set(r["breakeven"]) >= {"crops", "shortfall", "lead_over_baseline", "non_rice_revenue_mean"}
 
 
+def test_without_rotation_effects_removes_them_exactly():
+    from engine.yieldmodel import rotation_factor
+    p = api.norm_params({})
+    ss, _ = api._table(p)
+    assert opt.without_rotation_effects(["rice"] * 4, ss, p["awc"], p["irrigation_mm"]) is None
+    plan = ["pigeonpea", "rice", "pigeonpea", "rice"]
+    out = opt.without_rotation_effects(plan, ss, p["awc"], p["irrigation_mm"])
+
+    def by_hand(pl):
+        e = opt.rotation_arrays(pl, ss, p["awc"], p["irrigation_mm"])["eco"]
+        f = rotation_factor(pl)
+        return sum((e["revenue"][:, y] / f[y] - e["op_cost"][:, y]) for y in range(4))
+    a, b = by_hand(plan), by_hand(["rice"] * 4)
+    assert out["d_mean_profit"] == pytest.approx(a.mean() - b.mean())
+    assert out["d_worst10_profit"] == pytest.approx(opt.worst_fraction_mean(a) - opt.worst_fraction_mean(b))
+    full = opt.rotation_arrays(plan, ss, p["awc"], p["irrigation_mm"])["profit"].mean() - opt.rotation_arrays(["rice"] * 4, ss, p["awc"], p["irrigation_mm"])["profit"].mean()
+    assert out["d_mean_profit_with_effects"] == pytest.approx(full)
+    # rice after pigeon pea is assumed to do better than rice after rice, so removing the effects can only hurt this plan
+    assert out["d_mean_profit"] < out["d_mean_profit_with_effects"]
+
+
 def test_objective_matches_v3_formula_by_hand():
     # J = (1 - lam) * mean + lam * worst10 - w * irrigation * water_price_proxy
     assert opt.objective(1000.0, 400.0, 500.0, 0.25, 0.5, 2.0) == 0.75 * 1000 + 0.25 * 400 - 0.5 * 500 * 2.0

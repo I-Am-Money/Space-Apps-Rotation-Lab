@@ -18,16 +18,30 @@ RotationLab runs every four-year plan of rice, bajra (pearl millet) and pigeon p
 
 Every number carries a badge: Observed, Modeled, Local input, Assumption or Placeholder (yellow, for an input with no verified source yet).
 
+![Tipping Points: the rainfall by irrigation map](assets/screens/4_tipping_points.png)
+
+![Our Priorities: the recommendation and how solid it is](assets/screens/3_our_priorities.png)
+
+Screenshots of all five tabs are in `assets/screens/`.
+
 ## What the model says today
 
 At the default settings (priorities slider 30, water-saving slider 10), over 500 resampled four-year weather sequences, in rupees per acre over four years:
 
 | Plan | Average profit | Worst 10% | Irrigation water |
 |---|---|---|---|
-| Rice every year (the farm today) | 35,114 | 24,612 | 2,474 mm |
-| Rice, pigeon pea, rice, rice (recommended) | 35,398 | 25,460 | 1,850 mm |
+| Rice every year (the farm today) | 36,581 | 25,950 | 2,474 mm |
+| Pigeon pea, rice, pigeon pea, rice (recommended) | 36,478 | 25,430 | 1,235 mm |
 
-So one pigeon pea year in four is modeled to earn about the same and use about a quarter less irrigation water. Read that with care: eleven inputs are still placeholders, pigeon pea has no yield record for the district, and the top plans are close to tied. `LIMITATIONS.md` has the full list.
+So alternating pigeon pea and rice is modeled to earn about the same as rice every year (Rs 103 per acre less over four years) on half the irrigation water. With the water-saving slider at zero the model keeps rice every year. At normal rainfall, plans with two or more rice years start to win once the farm has about 383 mm of irrigation water a season (340 to 418 mm when the weather record is resampled).
+
+Read that with care, and the app says the same on screen:
+
+- The tie rests on rotation benefits nobody has measured here (rice yields 8% more after pigeon pea and 3% less after rice, starting values from the build spec). With those set to zero the same plan earns Rs 14,080 per acre less than rice every year. The water saving does not depend on them.
+- If pigeon pea brings in 5% less money than assumed, rice every year scores higher.
+- Eleven inputs are still placeholders and pigeon pea has no yield record for the district.
+
+`LIMITATIONS.md` has the full list.
 
 ## Run it
 
@@ -37,14 +51,14 @@ So one pigeon pea year in four is modeled to earn about the same and use about a
 
 The app runs offline from the files in `data/raw/`, except the satellite map layers, which load live from NASA.
 
-Optional: set `ANTHROPIC_API_KEY` to have Claude write the short explanation on the Our Priorities tab from the computed numbers. Without a key the app writes it from a fixed template. Never commit a key.
+Optional: set `ANTHROPIC_API_KEY` to have Claude write the short explanation on the Our Priorities tab from the computed numbers. Without a key the app writes it from a fixed template. With a key, each new slider setting calls the API once and the answer is cached. Never commit a key.
 
-Tests: `.venv/bin/pytest -q` (114 tests, about 25 seconds, no internet needed). `tests/test_spec_v3.py` has one test for every row of the build spec's test table.
+Tests: `.venv/bin/pytest -q` (117 tests, about 25 seconds, no internet needed). `tests/test_spec_v3.py` has one test for every row of the build spec's test table.
 
 ## Deploy (Streamlit Community Cloud)
 
 1. Sign in at share.streamlit.io with the GitHub account that owns this repository.
-2. New app, this repository, branch `main`, main file `app.py`.
+2. New app, this repository, branch `main`, main file `app.py`. Under Advanced settings choose Python 3.13 (the version the tests were run on).
 3. Optional: add `ANTHROPIC_API_KEY` under Secrets.
 4. Open the public link in a private window before submitting, so it is awake.
 

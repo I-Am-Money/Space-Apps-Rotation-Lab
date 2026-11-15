@@ -15,6 +15,10 @@ RotationLab compares four-year crop plans with a simple daily water-balance mode
 
 ## The longer list
 
+### What the money result rests on
+0. **Rotation effects are assumed, and they decide the profit comparison.** The model assumes rice yields 8 percent more after pigeon pea, 3 percent less after rice, and millet 5 percent less after millet, plus a nitrogen credit of 30 kg per ha after pigeon pea. These are the starting values in Build Spec v3 section 5.5 and none has a source yet. Rice margins are thin, so a few percent of rice yield moves profit a lot: with the effects, pigeon pea alternating with rice earns about the same as rice every year; with every effect set to zero it earns about Rs 14,000 per acre less over four years. The app shows this beside every recommendation. The irrigation water a plan uses does not depend on these effects.
+   Year 1 of a plan follows the farm's last crop, which is rice, so a plan that starts with rice starts with rice after rice.
+
 ### Inputs that still have no verified source
 1. **Eleven model inputs in use are placeholders.** They are the yield-response factor Ky for rice, bajra and pigeon pea, the bajra early-season crop coefficient, the pigeon pea growth-stage lengths, three bare-soil (fallow) parameters, the pigeon-pea-after-pigeon-pea effect, and the cost of a soil test and of a water-supply measurement. The app counts them on the first screen and lists them, with a yellow Placeholder badge, under How Good Is This. Until they are replaced, treat every recommendation as a demonstration.
 2. **Pigeon pea has no yield record for the district.** Its yield ceiling (741 kg per ha) comes from a state cost-of-cultivation survey, not a district series, and its crop coefficients are stand-ins from the closest legume in FAO-56, as the build spec allows. Nothing about pigeon pea is checked against observed yields. Pigeon pea appears in most recommended plans, so this is the weakest link in the tool.
@@ -50,7 +54,7 @@ RotationLab compares four-year crop plans with a simple daily water-balance mode
 24. **The value of a measurement is an upper bound.** It assumes the soil test or water measurement is exact and that the unknown value is equally likely anywhere in its range. A real measurement is worth less. With no sourced cost for the measurement, the app says so and does not say whether it is worth buying.
 
 ### How well the model is checked
-25. **The check is weak, and it is shown as it is.** Against district rice yields the correlation is 0.56 over 26 years and 0.51 on the last 8 years, which are held out. For bajra it is 0.33 and 0.64. District rice mixes irrigated and rainfed fields over a district larger than today's Nalgonda, and the model overshoots district rice by about 360 kg per ha on average. No parameter was tuned to these yields.
+25. **The check is weak, and it is shown as it is.** Against district rice yields the correlation is 0.56 over 26 years and 0.51 on the last 8 years, which are held out. For bajra it is 0.33 and 0.64. District rice mixes irrigated and rainfed fields over a district larger than today's Nalgonda, and the model overshoots district rice by about 265 kg per ha on average. No parameter was tuned to these yields.
 26. **The yield panel is third-party.** The ICRISAT site could not be reached, so yields come from a published panel built on ICRISAT district data (Mendeley Data, doi 10.17632/ywp3y5j9vv.1), 1990 to 2015, rice and pearl millet only.
 27. **Farm records.** If `data/raw/farm_records.csv` exists it is plotted as local input. When it is absent, nothing is made up.
 28. **The map.** NASA GIBS layers load live from NASA when the app has internet. They are pictures for context and are not used in the calculation.

@@ -120,7 +120,7 @@ def render():
                              key="w_water_source", on_change=lambda: V.update(water_source=st.session_state.get("w_water_source") or "canal_and_well"))
         st.slider("Water available per season (mm), single-source modes only", 0, 3000, step=50, value=int(V["irrigation_mm"]), **data.bind("irrigation_mm"))
         md(f'{badge("assumption")} Used only when a single-source mode is selected. Canal and well is the default.')
-        st.number_input("Recharge exponent k (single-source modes)", 0.0, 1.0, step=0.1, value=float(V["recharge_k"]), **data.bind("recharge_k"))
+        st.number_input("How strongly a weak monsoon cuts the supply (0 = not at all, 1 = in step with rainfall)", 0.0, 1.0, step=0.1, value=float(V["recharge_k"]), **data.bind("recharge_k"))
 
     left, right = st.columns([1.45, 1], gap="large")
     with left:

@@ -24,8 +24,14 @@ def test_simulated_yield_equals_ym_when_unstressed_and_never_negative():
 
 
 def test_rotation_factor_and_n_credit():
-    f = rotation_factor(["rice", "rice", "pigeonpea", "jowar"])
+    f = rotation_factor(["rice", "rice", "pigeonpea", "jowar"], {"previous_crop": None})     # no crop before year 1
     assert f[0] == 1 and f[1] < 1 and f[2] == 1 and f[3] > 1
+    # The farm grew rice the year before (config/farm.yaml), so a plan that starts with rice starts with rice after rice.
+    g = rotation_factor(["rice", "rice", "pigeonpea", "jowar"])
+    assert g[0] == g[1] < 1 and list(g[2:]) == list(f[2:])
+    assert rotation_factor(["pigeonpea", "rice", "rice", "rice"])[0] == 1                   # pigeon pea after rice: no effect
+    assert rotation_factor(["bajra", "rice", "rice", "rice"], {"previous_crop": "bajra"})[0] < 1
+    assert nitrogen_credit_kg_ha(["rice", "rice", "rice", "rice"], {"previous_crop": "pigeonpea"})[0] > 0
     assert rotation_factor(["pigeonpea", "rice", "x", "x"])[1] > 1
     assert rotation_factor(["jowar", "bajra", "jowar", "jowar"])[1] < 1
     assert nitrogen_credit_kg_ha(["pigeonpea", "jowar", "rice", "rice"])[1] > 0
