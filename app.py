@@ -29,14 +29,14 @@ else:
     pending = st.session_state.pop('_v5_go', None)
     if pending:
         st.session_state['v5_page'] = pending
-    if 'v4_rec' not in st.session_state and st.session_state.get('v5_page') not in ('Farm setup', 'How good is this?', 'Field zones'):
+    if 'v4_rec' not in st.session_state and st.session_state.get('v5_page') not in ('Farm setup', 'How good is this?'):
         st.session_state['v5_page'] = 'Farm setup'
     st.session_state.setdefault('v5_page', 'Recommendations' if 'v4_rec' in st.session_state else 'Farm setup')
     with st.sidebar:
-        page = st.radio('Pages', ['Farm setup', 'Recommendations', 'Tipping points', 'What to measure next', 'How good is this?', 'Field zones'], key='v5_page')
+        page = st.radio('Pages', ['Farm setup', 'Recommendations', 'Tipping points', 'What to measure next', 'How good is this?'], key='v5_page')
         if st.button('Start again'):
             for key in list(st.session_state):
-                if key.startswith(('v4_', '_v4_', 'v5_', '_v5_')) or key in ('pin_lat', 'pin_lon'):
+                if key.startswith(('v4_', '_v4_', 'v5_', '_v5_', 'rec_', 'meas_')) or key in ('pin_lat', 'pin_lon', '_tipping_result'):
                     del st.session_state[key]
             st.rerun()
     try:
@@ -47,14 +47,14 @@ else:
         elif page == 'How good is this?':
             from ui import trust
             trust.render()
-        elif page == 'Field zones':
-            from ui import zones
-            zones.render(st.session_state.get('v4_site'), st.session_state.get('v4_inputs'))
         elif 'v4_inputs' not in st.session_state:
             st.info('Complete your farm setup before viewing modeled results.')
         else:
             site, inputs = st.session_state['v4_site'], st.session_state['v4_inputs']
             st.info('Modeled estimates for planning. Not a guarantee of yield or profit.')
+            if st.session_state.get('v4_example_farm'):
+                st.caption('Example farm: ' + st.session_state['v4_example_farm'] + '. The weather, soil, yields, prices and costs are real '
+                           'records for this place. The farm answers are an example: change them with "Edit farm details".')
             if st.button('Edit farm details'):
                 st.session_state['v4_screen'] = 'farm'
                 st.session_state['_v5_go'] = 'Farm setup'
@@ -68,6 +68,8 @@ else:
                 banner = banner_for_site(site, summary=st.session_state['v4_validation'])
                 if banner['show']:
                     st.warning(banner['text'])
+                elif banner.get('text'):
+                    st.caption(banner['text'])
             except Exception:
                 logging.exception('Validation records could not be loaded')
                 st.warning('Validation records could not be loaded. Not validated here; local performance is unconfirmed.')

@@ -75,7 +75,7 @@ def test_moving_a_slider_reruns_without_error_and_keeps_the_guardrail():
 def test_area_unit_acre_changes_the_money_unit_shown():
     ha = _text(AppTest.from_function(_rec_app, default_timeout=60).run())
     ac = _text(AppTest.from_function(_rec_acre_app, default_timeout=60).run())
-    assert "/ha/yr" in ha and "/acre/yr" in ac and "/acre/yr" not in ha
+    assert "per ha per year" in ha and "per acre per year" in ac and "per acre" not in ha
 
 
 def test_stand_in_simulation_shows_the_red_example_badge_and_warning():

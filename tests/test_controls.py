@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Regression checks for controls, caching and shared whole-farm weather risk."""
 import numpy as np
 import pandas as pd

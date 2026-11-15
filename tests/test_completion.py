@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Onset, heat, cache isolation and explicit local-cost regression coverage."""
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier

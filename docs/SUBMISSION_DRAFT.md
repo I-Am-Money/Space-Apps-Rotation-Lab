@@ -46,7 +46,7 @@ or `config/validation/results.csv`. Do not fill one in by hand.
 - Visual: [screenshot: tipping point curves and 2D map]
 
 ### Slide 6: How good is this? (validation)
-- Hindcast in 12 US counties across 9 regions (Corn Belt, Eastern Corn Belt, Great Plains, Northern Plains,
+- Hindcast in 14 US counties across 9 regions (Corn Belt, Eastern Corn Belt, Great Plains, Northern Plains,
   Southern Plains, Pacific Northwest, Northeast, Southeast, Delta) against USDA NASS county yields.
 - Latest 8 years held out. Detrended Pearson r and MAE, with and without the linear bias correction.
   - Median held-out r: TBD (model) / TBD (corrected)
@@ -90,7 +90,7 @@ tipping-point view shows at what rainfall, heat or water supply the best plan ch
 ranks which unknown is most worth testing. Each pick has a short plain-English explanation. Claude writes it
 from the computed numbers only, and every number and crop name in it is checked against the results.
 
-To show how far to trust it, RotationLab hindcasts county yields in 12 US counties across 9 regions against
+To show how far to trust it, RotationLab hindcasts county yields in 14 US counties across 9 regions against
 USDA NASS records, holding out the latest 8 years. Results are shown with and without a small statistical
 correction. Every value carries a badge (Observed, Estimated, Your input, Assumption), and places with no
 local yield data say "Not validated here".

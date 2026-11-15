@@ -269,7 +269,16 @@ def render() -> None:
     a = pd.DataFrame(assumption_rows())
     if not a.empty:
         n_ph = int((a["Badge"] == "placeholder").sum())
-        st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
+        n_obs = int((a["Badge"] == "observed").sum())
+        n_asm = len(a) - n_ph - n_obs
+        st.write(f"The model runs on {len(a)} listed values. {n_obs} are taken from a published source (for example FAO-56, "
+                 f"FAO-33 or USDA). {n_asm} are stated planning assumptions. {n_ph} are team choices or values still to be "
+                 f"checked against a source, such as the Soil Health Score weights: they are marked Placeholder so that nobody "
+                 f"mistakes them for measurements.")
+        counts = (a.assign(Kind=a["Badge"].map({"observed": "Published source", "placeholder": "Placeholder (team to verify)"}).fillna("Assumption"))
+                  .groupby(["File", "Kind"]).size().unstack(fill_value=0).reset_index())
+        st.dataframe(counts, hide_index=True)
+        st.caption("Every value, with its range and source:")
         for col in ("Value", "Range", "Unit"):
             a[col] = a[col].map(lambda v: "" if v is None else str(v))
         a["Badge"] = a["Badge"].map(badge)

@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Create a reviewed source bundle; credentials and personal farm uploads are excluded."""
 import hashlib
 import json

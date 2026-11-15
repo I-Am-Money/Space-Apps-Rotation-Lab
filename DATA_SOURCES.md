@@ -8,16 +8,17 @@ Spec v4, A3). Owners add a row when they add a dataset. Status: **in use** means
 
 | Data | Source and URL | Downloaded | Status | Used for |
 |---|---|---|---|---|
-| Daily weather 1981 to latest year (T2M_MAX, T2M_MIN, T2M, RH2M, WS2M, PRECTOTCORR, ALLSKY_SFC_SW_DWN) | NASA POWER daily point API, community AG: https://power.larc.nasa.gov/api/temporal/daily/point (docs https://power.larc.nasa.gov/docs/) | 2026-11-14 (India points); 2026-11-15 (Story County, IA validation site) | in use | Water balance, scenarios, climate card, hindcast. -999 = missing. Solar radiation starts 1984, so the record used is 1984 to 2025. |
+| Daily weather 1981 to latest year (T2M_MAX, T2M_MIN, T2M, RH2M, WS2M, PRECTOTCORR, ALLSKY_SFC_SW_DWN) | NASA POWER daily point API, community AG: https://power.larc.nasa.gov/api/temporal/daily/point (docs https://power.larc.nasa.gov/docs/) | 2026-11-14 (India points); 2026-11-15 (the three example farms and the US validation sites, cached in `data/precache/weather/`; other pins are fetched when loaded) | in use | Water balance, scenarios, climate card, hindcast. -999 = missing. Solar radiation starts 1984, so the record used is 1984 to 2025. |
 | Satellite map layers: SMAP L4 root-zone soil moisture, MODIS Terra NDVI 16-day | NASA GIBS WMTS, layer IDs from GetCapabilities: https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&REQUEST=GetCapabilities | 2026-11-14 (capabilities cached in `data/raw/gibs_capabilities_epsg3857.xml`, layer IDs in `data/gibs_layers.json`) | in use | Map context only, not model input |
-| Elevation 30 m | NASA SRTM / NASADEM | not downloaded | planned (zones stretch) | Field zones |
+| Elevation 30 m | NASA SRTM / NASADEM | not downloaded | not used in this version (field zones were not built) | None |
 
 ## Other data
 
 | Data | Source and URL | Downloaded | Status | Used for |
 |---|---|---|---|---|
 | US county yields, prices received, crops grown (area harvested), irrigated share (Census of Agriculture) | USDA NASS Quick Stats: https://quickstats.nass.usda.gov (downloaded without a key through the website's spreadsheet export; the API at https://quickstats.nass.usda.gov/api needs `NASS_API_KEY` and was not used) | 2026-11-15, the 14 validation counties only | yields, prices, crops grown and irrigated share for the 14 counties cached in `data/precache/nass/`; other counties: cached copy, else the farmer enters values | US defaults, hindcast "actual" yields |
-| US soil | USDA NRCS Soil Data Access (SSURGO; STATSGO fallback): https://sdmdataaccess.nrcs.usda.gov/ | not downloaded | planned (Person 2) | Soil water capacity, texture |
+| US soil | USDA NRCS Soil Data Access (SSURGO; STATSGO fallback): https://sdmdataaccess.nrcs.usda.gov/ | 2026-11-15 (example and validation sites cached in `data/precache/soil/`; other pins are fetched when loaded) | in use (`engine/fetch_ssurgo.py`) | Soil water capacity, texture |
+| Food energy per kilogram of each crop | USDA FoodData Central, SR Legacy: https://fdc.nal.usda.gov (each value in `config/assumptions/simulation.yaml` names the food and its FDC ID) | read 2026-11-15 | in use, for the crops listed in `docs/notes/person2.md`; crops with no verified value are not counted | Food energy on the recommendation cards |
 | Global soil | ISRIC SoilGrids: https://soilgrids.org/ | 2026-11-14 (two India points, `data/raw/soil_*.json`) | in use (India) | Soil outside the US |
 | US production costs (9 crops: corn, soybeans, wheat, sorghum, barley, oats, cotton, rice, peanuts), dollars per planted acre, latest year 2025 | USDA ERS Commodity Costs and Returns, one CSV per crop: https://www.ers.usda.gov/data-products/commodity-costs-and-returns | 2026-11-15 (`data/precache/costs/`) | in use (`engine/fetch_ers.py`) | Operating cost per hectare by Farm Resource Region |
 | County to ERS Farm Resource Region (3,112 counties, regions 1 to 9) | USDA ERS, "Aggregating counties to ERS resource regions": https://www.ers.usda.gov/sites/default/files/images/reglink.xls | 2026-11-15 (`data/precache/geo/`) | in use | Picks the ERS cost region for a county; validation site regions |

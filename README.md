@@ -7,9 +7,9 @@ will strengthen their soil and hold up as it keeps changing, without losing mone
 
 Results are modeled estimates for planning. They are not a guarantee of yield or profit.
 
-> **Status (2026-11-15).** The team is building version 4 (any pin on Earth, with US auto-fill) to Build Spec
-> v4. Until the v4 merge, `main` runs the earlier India build (one farm district in Telangana, kharif season).
-> This README describes v4. The India build is described in `docs/INDIA_DATA.md` and `docs/NASA_DATA.md`.
+`main` runs version 4: any pin on Earth, with US auto-fill. Three example farms on the start screen (Iowa, Nebraska
+and Texas) open a full result in one click. The earlier single-farm India build is still reachable from the start
+screen and is described in `docs/INDIA_DATA.md` and `docs/NASA_DATA.md`.
 
 ## Setup
 
@@ -90,7 +90,9 @@ data sources in `DATA_SOURCES.md`.
 
 ## AI use
 
-Claude Code (Anthropic) wrote most of the code, tests and docs under the team's direction. In the app,
+AI coding assistants wrote most of the code, tests and docs under the team's direction: Claude Code (Anthropic) for
+the engine, validation, recommendations and tipping points, and OpenAI Codex for the app shell, site and data
+fetchers. In the app,
 Claude (`claude-sonnet-5-5`) writes the plain-English explanations. It sees only computed numbers, and a guard
 rejects any reply with a number or crop that is not in the results, falling back to a fixed template. AI made
 up no data. Details are in `AI_USE.md`, and every code file has an AI-use header comment.
