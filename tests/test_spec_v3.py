@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from engine import api, economics, monsoon
+from engine import api_v3 as api, economics, monsoon
 from engine import optimize as opt
 from engine import scenarios as sc
 from engine.crops import load_crops

@@ -44,7 +44,7 @@ def cache_path(lat: float, lon: float) -> Path:
 def _request(lat, lon, start, end):
     r = requests.get(API, params={
         "parameters": ",".join(PARAMS), "community": "AG", "longitude": lon,
-        "latitude": lat, "start": start, "end": end, "format": "JSON"}, timeout=180)
+        "latitude": lat, "start": start, "end": end, "format": "JSON"}, timeout=(5, 30))
     r.raise_for_status()
     return r.json()
 
@@ -184,16 +184,21 @@ SOURCE_NAME = "NASA POWER daily point API (community AG)"
 def _request_range(lat, lon, start: str, end: str) -> dict:
     try:
         return _request(lat, lon, start, end)
-    except Exception:
+    except requests.HTTPError as exc:
+        # Chunk only a rejected range/size request. Repeating timeouts or authentication/
+        # rate-limit errors nine times makes an outage slower without improving coverage.
+        if exc.response is None or exc.response.status_code not in (400, 413, 422):
+            raise
         data = None
         y0, y1 = int(start[:4]), int(end[:4])
-        for a in range(y0, y1 + 1, 5):
-            part = _request(lat, lon, f"{a}0101" if a > y0 else start, f"{min(a + 4, y1)}1231" if a + 4 < y1 else end)
+        for first in range(y0, y1 + 1, 5):
+            part = _request(lat, lon, f"{first}0101" if first > y0 else start,
+                            f"{min(first + 4, y1)}1231" if first + 4 < y1 else end)
             if data is None:
                 data = part
             else:
-                for k, v in part["properties"]["parameter"].items():
-                    data["properties"]["parameter"][k].update(v)
+                for key, values in part['properties']['parameter'].items():
+                    data['properties']['parameter'][key].update(values)
         return data
 
 
@@ -204,7 +209,7 @@ def _fetch_payload(lat: float, lon: float) -> dict:
     days = sorted(par[PARAMS[0]])
     cols = {RENAME[k]: [None if (par[k].get(d) is None or par[k][d] <= -900) else par[k][d] for d in days]
             for k in PARAMS}
-    return {"first_day": days[0], "last_day": days[-1], "n_days": len(days), "columns": cols,
+    return {"first_day": days[0], "last_day": days[-1], "n_days": len(days), "dates": days, "columns": cols,
             "elevation_m": raw["geometry"]["coordinates"][2],
             "grid_point": raw["geometry"]["coordinates"][:2],
             "api_version": raw.get("header", {}).get("api", {}).get("version")}
@@ -232,9 +237,12 @@ def frame_from_payload(payload: dict, lat: float, lon: float, meta: dict | None 
     """Build the clean daily frame (see module notes). Raises ValueError if NASA returned no usable days."""
     from engine import et0 as _et0
 
-    idx = pd.date_range(pd.Timestamp(payload["first_day"]), periods=payload["n_days"], freq="D")
+    idx = pd.to_datetime(payload["dates"], format="%Y%m%d") if payload.get("dates") else pd.date_range(pd.Timestamp(payload["first_day"]), periods=payload["n_days"], freq="D")
     df = pd.DataFrame({k: pd.array(v, dtype="float64") for k, v in payload["columns"].items()}, index=idx).astype(float)
     df.index.name = "date"
+    if df.index.has_duplicates or not df.index.is_monotonic_increasing:
+        raise ValueError("NASA POWER dates must be unique and increasing")
+    df = df.reindex(pd.date_range(df.index.min(), df.index.max(), freq="D"))
     core = df[["tmax", "tmin", "precip"]].notna().all(axis=1)
     if not core.any():
         raise ValueError("NASA POWER returned no usable days for this point")

@@ -89,6 +89,9 @@ import gzip as _gzip
 import json as _json
 import os as _os
 import re as _re
+import tempfile as _tempfile
+import io as _io
+import math as _math
 from pathlib import Path as _Path
 
 ROOT = _Path(__file__).resolve().parent.parent
@@ -109,7 +112,10 @@ def expiry_days(kind: str) -> int:
 
 def location_key(lat: float, lon: float, ndigits: int = 3) -> str:
     """Cache key for a point. 3 decimals is about 100 m, far finer than the 0.5 degree weather grid."""
-    return f"{round(float(lat), ndigits):.{ndigits}f}_{round(float(lon), ndigits):.{ndigits}f}"
+    lat, lon = float(lat), float(lon)
+    if not _math.isfinite(lat) or not _math.isfinite(lon) or not -90 <= lat <= 90 or not -180 <= lon <= 180:
+        raise ValueError("Invalid cache coordinates")
+    return f"{round(lat, ndigits):.{ndigits}f}_{round(lon, ndigits):.{ndigits}f}"
 
 
 def _safe(key: str) -> str:
@@ -157,15 +163,26 @@ def write(kind: str, key: str, payload, source: str, url: str = "", precache: bo
     meta = {"kind": kind, "key": key, "source": source, "url": url,
             "data_as_of": data_as_of or _today().isoformat(), "expiry_days": expiry_days(kind)}
     path = _path(PRECACHE_DIR if precache else RUNTIME_DIR, kind, key)
+    temporary = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        with _gzip.open(tmp, "wt", encoding="utf-8") as f:
-            _json.dump({"meta": meta, "payload": payload}, f, separators=(",", ":"))
-        _os.replace(tmp, path)
+        previous = _load(path)
+        if previous and previous == (payload, meta):
+            return dict(meta, stored=True)
+        fd, name = _tempfile.mkstemp(prefix=path.name + '.', suffix='.tmp', dir=path.parent)
+        _os.close(fd)
+        temporary = _Path(name)
+        with temporary.open('wb') as binary:
+            with _gzip.GzipFile(filename='', fileobj=binary, mode='wb', mtime=0) as compressed:
+                with _io.TextIOWrapper(compressed, encoding='utf-8') as text:
+                    _json.dump({'meta': meta, 'payload': payload}, text, separators=(',', ':'), allow_nan=False)
+        _os.replace(temporary, path)
+        return dict(meta, stored=True)
     except OSError:
-        pass          # read-only disk: the value is still returned to the caller, just not stored
-    return meta
+        return dict(meta, stored=False)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def offline() -> bool:
@@ -183,8 +200,12 @@ def fetch_cached(kind: str, key: str, fetcher, source: str, url: str = "", refre
              "force" always fetch; fall back to the cached copy if the fetch fails.
     fetcher() must return a JSON-serializable payload, or raise.
     """
+    if refresh not in ("auto", "never", "force"):
+        raise ValueError("refresh must be auto, never or force")
     cached = read(kind, key)
     if cached and refresh != "force" and (refresh == "never" or is_fresh(cached[1])):
+        if precache:
+            write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
         return cached[0], dict(cached[1], stale=not is_fresh(cached[1]), from_cache=True)
     if not offline():
         try:
@@ -196,5 +217,7 @@ def fetch_cached(kind: str, key: str, fetcher, source: str, url: str = "", refre
     else:
         failure = "offline mode (ROTATIONLAB_OFFLINE)"
     if cached:
+        if precache:
+            write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
         return cached[0], dict(cached[1], stale=True, from_cache=True, refresh_error=failure)
     raise DataUnavailable(f"{source}: no cached copy for {kind}/{key} and the source is unreachable ({failure})")

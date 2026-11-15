@@ -65,3 +65,19 @@ def test_precache_seed_is_used_and_never_mode_skips_refresh(tmp_cache):
 
 def test_location_key_rounds():
     assert cache.location_key(42.03754, -93.46609) == "42.038_-93.466"
+
+
+def test_precache_promotes_existing_runtime_entry(tmp_cache):
+    cache.write('weather','promote',{'v':1},'test source')
+    cache.fetch_cached('weather','promote',lambda: pytest.fail('No network for fresh data'), 'test source',precache=True)
+    assert (cache.PRECACHE_DIR/'weather'/'promote.json.gz').exists()
+
+
+def test_identical_seed_writes_are_byte_stable_and_nonfinite_json_is_rejected(tmp_cache):
+    cache.write('soil','stable',{'v':1},'source',precache=True)
+    path=cache.PRECACHE_DIR/'soil'/'stable.json.gz'
+    original=path.read_bytes()
+    cache.write('soil','stable',{'v':1},'source',precache=True)
+    assert path.read_bytes()==original
+    with pytest.raises(ValueError):
+        cache.write('soil','invalid',{'v':float('nan')},'source')

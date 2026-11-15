@@ -1,5 +1,5 @@
-# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
-"""Economics (engine-decision). Rupees per acre. The ONLY place kg/ha is converted to per-acre.
+# AI use: legacy code used Claude Code; v4 economics and input validation revised with OpenAI Codex. See AI_USE.md.
+"""Economics: v4 metric interface plus the preserved v3 rupees-per-acre interface. The ONLY place kg/ha is converted to per-acre.
 
 Build Spec v3 section 5.7:
   Profit_year = Ya * MSP - operating_cost - N_cost_adjustment      (N adjustment = saving after pigeon pea)
@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+from engine.cache import ArrayCache
 
 ROOT = Path(__file__).resolve().parent.parent
 HA_PER_ACRE = 0.404686
@@ -29,17 +30,11 @@ ALIASES = {"rice": ("rice", "paddy", "paddy_common"), "jowar": ("jowar", "sorghu
 PRICE_KEYS = ("msp_rs_per_quintal", "price_rs_per_quintal", "msp", "prices_rs_per_quintal", "prices")
 OPCOST_KEYS = ("operating_cost_rs_per_acre", "operating_cost", "cost_of_cultivation_rs_per_acre")
 
-# Fallbacks used ONLY so code runs when config/prices_india.yaml lacks the value. These are UNVERIFIED dev
-# placeholders with no source (not MSP, not cost-of-cultivation data). Every use carries badge "placeholder".
-PLACEHOLDER = {
-    "price_rs_per_quintal": {"rice": 2369.0, "jowar": 3699.0, "bajra": 2775.0, "pigeonpea": 8000.0},
-    "operating_cost_rs_per_acre": {"rice": 28000.0, "jowar": 11000.0, "bajra": 9000.0, "pigeonpea": 13000.0},
-    "n_cost_rs_per_kg": 13.0,
-    "soil_test_cost_rs": None,
-    "water_measure_cost_rs": None,
-    "farm_area_acres": 5.0,
-}
-PLACEHOLDER_NOTE = "unverified dev placeholder, no source; team to verify / replace via config/prices_india.yaml"
+# Optional measurement quotes remain unknown until entered. Missing economic
+# inputs never receive invented prices, budgets or nitrogen costs.
+PLACEHOLDER = {"n_cost_rs_per_kg": None, "soil_test_cost_rs": None,
+               "water_measure_cost_rs": None}
+PLACEHOLDER_NOTE = "Input needed: no usable configured value; enter a farmer input."
 
 
 def _num(x):
@@ -76,7 +71,7 @@ def _crop_dict(node) -> dict:
     return out
 
 
-_PRICE_CACHE: dict = {}
+_PRICE_CACHE = ArrayCache(2 * 1024 * 1024)
 
 
 def load_prices(path=None) -> dict:
@@ -90,7 +85,7 @@ def load_prices(path=None) -> dict:
 
 
 def _load_prices(path) -> dict:
-    """Read config/prices_india.yaml tolerantly. Missing values fall back to flagged placeholders."""
+    """Read legacy config. Missing price/cost stays None; profit requires explicit input."""
     import yaml
     path = Path(path or PRICES_PATH)
     raw = {}
@@ -102,19 +97,15 @@ def _load_prices(path) -> dict:
     op = _crop_dict(op_node)
     out = {"price_rs_per_quintal": {}, "operating_cost_rs_per_acre": {}}
     for c in CROPS:
-        if c not in PLACEHOLDER["price_rs_per_quintal"] and c not in price:
-            continue          # e.g. ragi: only usable if the YAML provides it (no invented fallback)
         if c in price:
             out["price_rs_per_quintal"][c], badges[f"price_{c}"] = price[c], "observed"
         else:
-            out["price_rs_per_quintal"][c], badges[f"price_{c}"] = PLACEHOLDER["price_rs_per_quintal"][c], "placeholder"
+            out["price_rs_per_quintal"][c], badges[f"price_{c}"] = None, "input_needed"
         if c in op:
             meta = next((op_node[n] for n in ALIASES[c] if n in op_node), {})
             out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = op[c], meta.get("badge", "assumption") if isinstance(meta, dict) else "assumption"
-        elif c not in PLACEHOLDER["operating_cost_rs_per_acre"] and c not in price:
-            continue
         else:
-            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = PLACEHOLDER["operating_cost_rs_per_acre"].get(c, PLACEHOLDER["operating_cost_rs_per_acre"]["bajra"]), "placeholder"
+            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = None, "input_needed"
     for k, alts in {"n_cost_rs_per_kg": ("n_cost_rs_per_kg", "nitrogen_cost_rs_per_kg"),
                     "soil_test_cost_rs": ("soil_test_cost_rs",),
                     "water_measure_cost_rs": ("water_measure_cost_rs", "borewell_or_tank_capacity_measurement_cost_rs")}.items():
@@ -161,14 +152,26 @@ def plan_economics(plan, sim: dict, price_mult: float = 1.0, prices: dict | None
                    n_credit=None) -> dict:
     """sim = PlanResult. Returns per-year arrays [S,4] in rupees/acre and the plan profit [S]."""
     prices = prices or load_prices()
+    for crop in plan:
+        for field in ('price_rs_per_quintal', 'operating_cost_rs_per_acre'):
+            value = prices.get(field, {}).get(crop)
+            _nonnegative(value, f'{field} for {crop}')
     yld = np.asarray(sim["yield_kg_ha"], float)                       # [S,4] kg/ha (rice: milled rice)
+    _nonnegative(yld, 'yield (kg/ha)')
+    _nonnegative(price_mult, 'price multiplier')
     sold = np.array([prices.get("sold_kg_per_yield_kg", {}).get(c, 1.0) for c in plan])   # rice is sold as paddy
     price_kg = np.array([prices["price_rs_per_quintal"][c] / 100.0 for c in plan]) * price_mult   # Rs/kg
     op = np.array([prices["operating_cost_rs_per_acre"][c] for c in plan])
     kg_acre = yld * sold[None, :] * HA_PER_ACRE                       # the single kg/ha -> per-acre conversion
     revenue = kg_acre * price_kg[None, :]
     credit = n_credit_kg_ha(plan) if n_credit is None else np.asarray(n_credit, float)
-    n_saving = np.broadcast_to(credit * HA_PER_ACRE * prices["n_cost_rs_per_kg"], yld.shape)
+    nitrogen_cost = prices.get("n_cost_rs_per_kg")
+    if nitrogen_cost is None:
+        if np.any(credit != 0):
+            raise InputNeededError('Input needed: enter nitrogen cost before applying a nitrogen credit.')
+        nitrogen_cost = 0.0  # zero credit contributes exactly zero; no cost is assumed
+    _nonnegative(nitrogen_cost, 'nitrogen cost')
+    n_saving = np.broadcast_to(credit * HA_PER_ACRE * nitrogen_cost, yld.shape)
     profit_year = revenue - op[None, :] + n_saving
     return {"profit_year": profit_year, "profit": profit_year.sum(1), "revenue": revenue,
             "op_cost": np.broadcast_to(op, yld.shape), "n_saving": n_saving, "sold_kg_acre": kg_acre,
@@ -188,10 +191,110 @@ def economics_badges(prices: dict) -> dict:
     b = prices["badges"]
     costs = [v for k, v in b.items() if k.startswith("opcost_")]
     return {"profit": "modeled",
-            "prices": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("price_")) else "observed",
-            "operating_cost": "placeholder" if "placeholder" in costs else "local" if costs and all(v == "local" for v in costs) else "assumption",
+            "prices": "input_needed" if any(v == "input_needed" for k, v in b.items() if k.startswith("price_")) else "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("price_")) else "observed",
+            "operating_cost": "input_needed" if "input_needed" in costs else "placeholder" if "placeholder" in costs else "local" if costs and all(v == "local" for v in costs) else "assumption",
             "n_cost": b["n_cost_rs_per_kg"]}
 
+
+# v4 interface: metric throughout, no guessed prices or budgets.
+# Exact international acre (1 acre = 43,560 international square feet).
+HECTARES_PER_ACRE = 0.40468564224
+POUNDS_TO_KG = 0.45359237
+BUSHEL_WEIGHT_LB = {'maize': 56, 'corn': 56, 'sorghum': 56, 'jowar': 56,
+                    'soybean': 60, 'soybeans': 60, 'wheat': 60,
+                    'wheat_winter': 60, 'wheat_spring': 60}
+CONVERSION_SOURCE = 'https://www.ers.usda.gov/media/7780/ah-697.pdf (Tables 3 and 6)'
+
+
+class InputNeededError(ValueError):
+    """A farmer-supplied economic input is required before displaying money."""
+
+
+def _nonnegative(value, name):
+    if value is None:
+        raise InputNeededError(f'Input needed: enter {name}.')
+    try:
+        arr = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise InputNeededError(f'Input needed: {name} must be numeric.') from exc
+    if np.any(~np.isfinite(arr)) or np.any(arr < 0):
+        raise InputNeededError(f'Input needed: {name} must be finite and nonnegative.')
+    return arr
+
+
+def profit_per_hectare(yield_kg_ha, price_per_kg=None, cost_per_ha=None):
+    """Currency/ha = harvested kg/ha × same-currency/kg − same-currency/ha.
+
+    Broadcasts over scenario/season arrays. Yield must be the commodity as sold;
+    this function does not assume rice processing factors or exchange rates.
+    """
+    y = _nonnegative(yield_kg_ha, 'yield (kg/ha)')
+    p = _nonnegative(price_per_kg, 'price (currency/kg)')
+    c = _nonnegative(cost_per_ha, 'cost (currency/ha)')
+    try:
+        with np.errstate(over='raise', invalid='raise'):
+            return y * p - c
+    except FloatingPointError as exc:
+        raise InputNeededError('Input needed: economic inputs exceed the supported numeric range.') from exc
+    except ValueError as exc:
+        raise ValueError('Yield, price and cost must have compatible scenario/season shapes.') from exc
+
+
+def currency_ha_to_acre(value):
+    """Any currency/ha → that same currency/acre, including negative profits."""
+    arr = np.asarray(value, dtype=float)
+    if np.any(~np.isfinite(arr)):
+        raise ValueError('Currency values must be finite.')
+    return arr * HECTARES_PER_ACRE
+
+
+def kg_ha_to_quintals_per_acre(value):
+    """Exact v4 conversion; the older singular-name helper retains v3 rounding."""
+    return _nonnegative(value, 'yield (kg/ha)') * HECTARES_PER_ACRE / 100
+
+
+def kg_ha_to_bushels_acre(value, crop):
+    crop = str(crop).lower().strip()
+    if crop not in BUSHEL_WEIGHT_LB:
+        raise InputNeededError(f'Input needed: no verified bushel weight for {crop}; display kg or quintals instead.')
+    return _nonnegative(value, 'yield (kg/ha)') * HECTARES_PER_ACRE / (BUSHEL_WEIGHT_LB[crop] * POUNDS_TO_KG)
+
+
+def bushels_acre_to_kg_ha(value, crop):
+    crop = str(crop).lower().strip()
+    if crop not in BUSHEL_WEIGHT_LB:
+        raise InputNeededError(f'Input needed: no verified bushel weight for {crop}.')
+    return _nonnegative(value, 'yield (bushels/acre)') * BUSHEL_WEIGHT_LB[crop] * POUNDS_TO_KG / HECTARES_PER_ACRE
+
+
+def resolve_crop_economics(crop, country, defaults=None, overrides=None):
+    """Resolve already-normalized US defaults or explicit farmer inputs.
+
+    Fetching NASS and ERS is owned by Person 3; this function never fetches them.
+    defaults: {yields: {crop: kg/ha}, prices: {crop: currency/kg},
+               costs: {crop: currency/ha}}. Values may be metadata dictionaries.
+    overrides: {crop: {yield, price, cost}}. A zero input is explicit, not missing.
+    Outside the US all three fields must be farmer-supplied.
+    """
+    us = str(country).strip().upper() in ('US', 'USA', 'UNITED STATES', 'UNITED STATES OF AMERICA')
+    defaults = defaults or {}
+    override = (overrides or {}).get(crop) or {}
+    result, badges, sources = {}, {}, {}
+    for field, bucket in (('yield', 'yields'), ('price', 'prices'), ('cost', 'costs')):
+        user = field in override and override[field] is not None
+        raw = override[field] if user else (defaults.get(bucket) or {}).get(crop) if us else None
+        meta = raw if isinstance(raw, dict) else {}
+        value = meta.get('value') if isinstance(raw, dict) else raw
+        arr = _nonnegative(value, f'{field} for {crop}')
+        if arr.ndim != 0:
+            raise InputNeededError(f'Input needed: enter one typical {field} for {crop}.')
+        if not user and any(flag in str(meta.get('badge', '')).lower() for flag in ('placeholder', 'example', 'stub', 'input_needed')):
+            raise InputNeededError(f'Input needed: replace the unverified {field} for {crop}.')
+        result[field] = float(arr)
+        badges[field] = 'Your input' if user else meta.get('badge', 'Estimated')
+        sources[field] = 'Farmer input' if user else meta.get('source', 'US default supplied by site API')
+    return {**result, 'badges': badges, 'sources': sources,
+            'units': {'yield': 'kg/ha', 'price': 'currency/kg', 'cost': 'currency/ha'}}
 
 # =====================================================================================================
 # Build Spec v4 / v5 (Feature 3): generic profit per hectare for any pin. Everything above this line is the

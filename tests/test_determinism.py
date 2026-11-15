@@ -1,6 +1,6 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import numpy as np
-from engine import api
+from engine import api_v3 as api
 from engine import optimize as opt
 from tests.decision_fakes import fake_simulate_plan, synthetic_annual
 
