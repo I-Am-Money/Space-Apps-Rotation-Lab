@@ -169,3 +169,18 @@ def test_explanations_exist_for_each_pick_and_use_no_unknown_numbers():
     r = run()
     assert set(r["explanations"]) == {"headline", "highest_profit", "best_soil"}
     assert all(isinstance(t, str) and len(t) > 20 for t in r["explanations"].values())
+
+
+def test_sliders_respond_fast_and_a_new_pin_scores_within_budget():
+    """R23: slider moves about 1 s; a new pin about 15 s. Six crops = 1296 rotations with the stand-in simulator."""
+    import time
+    crops = ["maize", "soybean", "sorghum", "wheat_winter", "rice", "peanut"]
+    class S2(Site):
+        us_defaults = {"prices": {c: 200.0 for c in crops}, "costs": {c: 300.0 for c in crops}}
+    inp = Inputs(plan=("maize",) * 4)
+    t = time.time(); bundle = opt.score_candidates(S2(), inp, crops=crops, scenarios=list(range(41))); score_s = time.time() - t
+    assert len(bundle["scored"]) == 6 ** 4 and score_s < 15.0
+    t = time.time()
+    for lam in (0.0, 0.5, 1.0):
+        opt.assemble_recommendation(bundle, {"bad_year": lam, "soil": 0.5, "water": 0.0}, explain_text=False)
+    assert (time.time() - t) / 3 < 1.0

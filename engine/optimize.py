@@ -677,12 +677,31 @@ def _default_simulate():
     return _stand_in_simulate, True
 
 
-def recommend_picks(site, inputs, sliders, crops=None, simulate=None, scenarios=None, most_food: bool = False,
-                    explain_text: bool = True) -> dict:
-    """The full Feature 3 recommendation: enumerate, simulate, score, pick. Returns a dict shaped like
-    api.Recommendations (headline, highest_profit, best_soil, all_results, current_plan_result, guardrail_met,
-    explanations) plus `excluded_crops`, or {"input_needed": [...]} when a price or cost for a current-plan crop is
-    missing. Never fills a missing price or cost with a default."""
+def score_rotations(rotations, site, inputs, sim_fn, scenarios, econ, history=None, frac: float = 0.10,
+                    cover_cost_per_ha: float = 0.0) -> list:
+    """Simulate and score each rotation (mean and worst-10% profit, calories, water, Soil Health Score)."""
+    return [_score_one(rot, _read_sim(sim_fn(site, inputs, rot, scenarios)), econ, history, frac, cover_cost_per_ha)
+            for rot in rotations]
+
+
+def prepare_economics(site, inputs, pool, current_crops) -> tuple:
+    """Price and cost for every crop in `pool`. Returns (econ, input_needed, excluded): a missing price or cost for a
+    current-plan crop is `input_needed`; for any other crop it is `excluded` (left out, reported). Never defaulted."""
+    overrides = getattr(inputs, "crop_overrides", None) or {}
+    us = getattr(site, "us_defaults", None)
+    econ, needed, excluded = {}, [], []
+    for c in pool:
+        try:
+            econ[c] = economics.crop_economics(c, us, overrides)
+        except economics.InputNeeded as e:
+            (needed if c in current_crops else excluded).append({"crop": c, "field": e.field})
+    return econ, needed, excluded
+
+
+def score_candidates(site, inputs, crops=None, simulate=None, scenarios=None) -> dict:
+    """The slow part (R23): enumerate and simulate every rotation. Independent of the sliders, so the UI caches it and
+    calls `assemble_recommendation` on every slider move. Returns a bundle, or {"input_needed": [...]} when a price or
+    cost for a current-plan crop is missing (never defaulted)."""
     from engine import candidates as cand
     frac = float(_f3_params()["worst_tail"]["value"])
     sim_fn, is_stand_in = (simulate, False) if simulate is not None else _default_simulate()
@@ -692,13 +711,7 @@ def recommend_picks(site, inputs, sliders, crops=None, simulate=None, scenarios=
     pool = list(crops) if crops is not None else cand.candidates(site, inputs)
     pool = sorted(set(pool) | current_crops)
     overrides = getattr(inputs, "crop_overrides", None) or {}
-    us = getattr(site, "us_defaults", None)
-    econ, needed, excluded = {}, [], []
-    for c in pool:
-        try:
-            econ[c] = economics.crop_economics(c, us, overrides)
-        except economics.InputNeeded as e:
-            (needed if c in current_crops else excluded).append({"crop": c, "field": e.field})
+    econ, needed, excluded = prepare_economics(site, inputs, pool, current_crops)
     if needed:
         return {"input_needed": needed, "excluded_crops": excluded, "example": is_stand_in}
     pool = [c for c in pool if c in econ]
@@ -706,26 +719,35 @@ def recommend_picks(site, inputs, sliders, crops=None, simulate=None, scenarios=
     allow_cover = cover_cost is not None
     rotations = enumerate_rotations(pool, allow_cover=allow_cover, current_plan=plan)
     history = getattr(inputs, "history", None)
-    scored = []
-    for rot in rotations:
-        scored.append(_score_one(rot, _read_sim(sim_fn(site, inputs, rot, scenarios)), econ, history, frac,
-                                 float(cover_cost or 0.0)))
-    cur_rot = {"crops": plan, "cover_crops": [False] * YEARS_IN_PLAN}
-    idx_cur = next(i for i, r in enumerate(rotations) if r["crops"] == cur_rot["crops"] and r["cover_crops"] == cur_rot["cover_crops"])
+    scored = score_rotations(rotations, site, inputs, sim_fn, scenarios, econ, history, frac, float(cover_cost or 0.0))
+    cur_crops = plan
+    idx_cur = next(i for i, r in enumerate(rotations) if r["crops"] == cur_crops and not any(r["cover_crops"]))
     current = scored[idx_cur]
     for r in scored:
         r["deltas_vs_current"] = {k: float(r[k] - current[k]) for k in DELTA_KEYS}
         r["example"] = is_stand_in
         if is_stand_in:
             r["badges"] = {k: "example" for k in r["badges"]}
+    bundle = {"scored": scored, "current": current, "excluded_crops": excluded, "cover_crops_offered": allow_cover,
+              "example": is_stand_in}
+    if not allow_cover:
+        bundle["cover_crop_note"] = "Cover-crop options need your seed and planting cost per hectare (not offered until entered)."
+    return bundle
+
+
+def assemble_recommendation(bundle: dict, sliders, most_food: bool = False, explain_text: bool = True) -> dict:
+    """The fast part: apply the sliders to a scored bundle (vectorised, well under a second)."""
+    if "input_needed" in bundle:
+        return bundle
+    scored, current = bundle["scored"], bundle["current"]
     picks = choose_picks(scored, current, sliders, most_food)
     out = {"headline": None if picks["headline"] is None else scored[picks["headline"]],
            "highest_profit": scored[picks["highest_profit"]], "best_soil": scored[picks["best_soil"]],
            "all_results": scored, "current_plan_result": current, "guardrail_met": picks["guardrail_met"],
-           "explanations": {}, "excluded_crops": excluded, "profit_floor": picks["profit_floor"],
-           "cover_crops_offered": allow_cover, "example": is_stand_in}
-    if not allow_cover:
-        out["cover_crop_note"] = "Cover-crop options need your seed and planting cost per hectare (not offered until entered)."
+           "explanations": {}, "excluded_crops": bundle["excluded_crops"], "profit_floor": picks["profit_floor"],
+           "cover_crops_offered": bundle["cover_crops_offered"], "example": bundle["example"]}
+    if "cover_crop_note" in bundle:
+        out["cover_crop_note"] = bundle["cover_crop_note"]
     if explain_text:
         from engine import explain as _ex
         for name in ("headline", "highest_profit", "best_soil"):
@@ -734,3 +756,11 @@ def recommend_picks(site, inputs, sliders, crops=None, simulate=None, scenarios=
                                          "No rotation keeps your average profit within your tolerance, so there is no headline pick. "
                                          "Raise the tolerance or look at the other two picks.")
     return out
+
+
+def recommend_picks(site, inputs, sliders, crops=None, simulate=None, scenarios=None, most_food: bool = False,
+                    explain_text: bool = True) -> dict:
+    """The full Feature 3 recommendation: enumerate, simulate, score, pick. Returns a dict shaped like
+    api.Recommendations (headline, highest_profit, best_soil, all_results, current_plan_result, guardrail_met,
+    explanations) plus `excluded_crops`, or {"input_needed": [...]}. Never fills a missing price or cost with a default."""
+    return assemble_recommendation(score_candidates(site, inputs, crops, simulate, scenarios), sliders, most_food, explain_text)

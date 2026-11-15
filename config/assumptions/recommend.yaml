@@ -184,6 +184,7 @@ optimize:
 # ---------------------------------------------------------------- evpi (R19): what to measure next
 # EVPI = mean_k[ max_r J(r, a_k) ] - max_r mean_k[ J(r, a_k) ] with k equally weighted values of the uncertain input.
 evpi:
+  top_rotations:            {value: 30, range: [10, 100], unit: rotations, source: "Speed: value of information is judged on the best rotations at the base inputs plus your current plan (R23). Team to verify.", badge: assumption}
   samples:                  {value: 9, range: [5, 15], unit: "values per input", source: "Build Spec v2 section 8.3 (9 equally weighted values).", badge: assumption}
   awc_relative_range:       {value: 0.25, range: [0.1, 0.4], unit: "fraction of the soil's water capacity", source: "Build Spec v2 section 8.2: plus or minus 25% when only one value is known.", badge: assumption}
   water_relative_range:     {value: 0.30, range: [0.1, 0.5], unit: "fraction of the stated supply", source: "Team choice for the farmer's own supply estimate. Team to verify.", badge: assumption}
