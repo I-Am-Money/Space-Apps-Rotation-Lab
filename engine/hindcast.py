@@ -1,4 +1,5 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+# TODO (partial): v4 US hindcast runs on a stand-in yield model until engine.yieldmodel.season_relative_yield exists, and needs NASS yields (engine.fetch_nass + NASS_API_KEY) before it produces real results. See HANDOFF_P3.md.
 """Hindcast (engine-decision): single-season model yield vs ICRISAT district yield, per crop.
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times

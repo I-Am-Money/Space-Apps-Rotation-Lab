@@ -1,3 +1,4 @@
+<!-- TODO (partial): draft only; screenshots and every TBD number still to fill from the final app. See HANDOFF_P3.md. -->
 # Submission draft: deck and project page (for the team to edit)
 
 Draft by Person 3. **Nothing here has been submitted.** Only a team member submits, from the Space Apps portal.

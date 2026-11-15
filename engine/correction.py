@@ -1,4 +1,5 @@
 # AI use: this file was written by Claude Code (Anthropic) under the team's direction, then reviewed by the team. See AI_USE.md.
+# TODO (partial): code works and is tested, but config/validation/results.csv has not been generated (no NASS yields yet); api.validation_summary() is not wired to it yet. See HANDOFF_P3.md.
 """Hybrid bias correction (Build Spec v4, R12) and validation_summary() for api.py. Owner: Person 3.
 
 In counties with enough NASS history, a numpy linear regression of (actual - modeled yield) on season rain,

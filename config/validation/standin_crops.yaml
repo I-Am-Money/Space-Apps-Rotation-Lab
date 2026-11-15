@@ -1,3 +1,4 @@
+# TODO (stand-in): replace with Person 2's crop parameters once their hindcast yield function lands. See HANDOFF_P3.md.
 # STAND-IN single-season crop settings for engine/hindcast.py (Person 3), used ONLY until Person 2's yield
 # function for hindcasts exists (engine.yieldmodel.season_relative_yield). Results made with these are badged
 # "Estimated (stand-in model)". Person 2's crops.py values replace all of this.
