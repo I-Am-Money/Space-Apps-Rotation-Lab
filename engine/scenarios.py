@@ -307,6 +307,8 @@ class Scenarios:
     heat_shift_c: float = 0.0
     note: str = "real years from NASA POWER"
     seed: int | None = None
+    climate_mode: str = "historical"                # set by engine.climate_shift: historical | recent | trend
+    climate_info: dict = _field(default_factory=dict)   # what the climate mode changed, in numbers (for the UI)
 
     @property
     def n(self) -> int:
@@ -407,14 +409,30 @@ def historical(weather_or_annual, lat=None, elevation_m=None) -> Scenarios:
     return _make(a, idx, [f"{yrs[r[0]]}-{yrs[r[-1]]}" for r in idx], "historical")
 
 
-def bootstrap(weather_or_annual, n: int | None = None, seed: int | None = None, lat=None, elevation_m=None) -> Scenarios:
-    """n plans (default 500) of 4 real years drawn with replacement from the record, fixed seed (default 42)."""
+def bootstrap(weather_or_annual, n: int | None = None, seed: int | None = None, lat=None, elevation_m=None,
+              year_weights=None) -> Scenarios:
+    """n plans (default 500) of 4 real years drawn with replacement from the record, fixed seed (default 42).
+
+    year_weights (one number per record year, used by engine.climate_shift's "recent" mode): a year with weight 2
+    is twice as likely to be drawn. Whole-number weights are applied by listing such a year that many times in
+    the pool the draw is made from, so all-ones weights give exactly the plans of the plain bootstrap."""
     from engine.crops import rule
     a = _as_annual(weather_or_annual, lat, elevation_m)
     n = int(rule("n_bootstrap") if n is None else n)
     seed = int(rule("seed") if seed is None else seed)
-    idx = np.random.default_rng(seed).integers(0, len(a["years"]), size=(n, PLAN_YEARS))
     yrs = a["years"]
+    rng = np.random.default_rng(seed)
+    if year_weights is None:
+        idx = rng.integers(0, len(yrs), size=(n, PLAN_YEARS))
+    else:
+        w = np.asarray(year_weights, float)
+        if w.shape != (len(yrs),) or not np.isfinite(w).all() or w.min() < 0 or w.sum() <= 0:
+            raise ValueError("year_weights needs one non-negative number per year of the record")
+        if np.allclose(w, np.round(w)):
+            pool = np.repeat(np.arange(len(yrs)), np.round(w).astype(int))
+            idx = pool[rng.integers(0, len(pool), size=(n, PLAN_YEARS))]
+        else:
+            idx = rng.choice(len(yrs), size=(n, PLAN_YEARS), p=w / w.sum())
     return _make(a, idx, ["/".join(str(yrs[i]) for i in r) for r in idx], "bootstrap", seed=seed)
 
 
