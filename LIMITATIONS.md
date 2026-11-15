@@ -92,10 +92,11 @@ log to the "Logged by the team" section, or tell Person 3.
     export's "Data Item" text; this was checked against every yield item in the 14 counties. The key-based API
     path itself has still never been run live (team to verify once a key exists).
 
-## Blocked items and the fallback used
+## Trust page and India check
 
-23. **v4 engine API not on main yet (2026-11-15).** The trust page reads `api.validation_summary()` once it
-    exists and uses the same table from `engine/correction.py` until then.
+23. **Trust page data path.** The "How good is this?" page reads the validation table through
+    `api.validation_summary()`, which returns the saved `config/validation/results.csv`. The app never re-runs
+    the hindcast or downloads yields while a farmer is using it, so the table is as of the last run (2026-11-15).
 24. **India validation pack: one district.** The only India check is Nalgonda district, Telangana (ICRISAT/TCI
     District Level Database, which ends in 2017). It covers jowar, bajra and pigeon pea, rainfed, with the team's
     yield function. Training years are 1981 to 2009, and the held-out years are 2010 to 2017. Results are mixed
