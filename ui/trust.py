@@ -24,6 +24,30 @@ NOT_VALIDATED = ("Not validated here: there are no local yield records for this 
 NEAR_DEG = 0.5      # team choice: about one NASA POWER cell; a district is roughly this size. Team to verify.
 VERIFY_WORDS = ("team to verify", "placeholder", "unverified", "tbd")
 
+# Team UI rule (2026-11-15): plain Streamlit defaults only, no custom colors, CSS or styling. Data labels go
+# through badge() from ui/components.py only. Until its basic (plain-text) version is on main, this file uses a
+# minimal local fallback with the same call shape. The shared one is used automatically once it returns plain
+# text (no HTML).
+_FALLBACK_LABELS = {"observed": "Observed", "estimated": "Estimated", "your_input": "Your input",
+                    "assumption": "Assumption", "placeholder": "Placeholder (team to verify)",
+                    "example": "EXAMPLE DATA", "missing": "Missing"}
+
+
+def _local_badge(kind: str) -> str:
+    return _FALLBACK_LABELS.get(str(kind or "placeholder").lower(), _FALLBACK_LABELS["placeholder"])
+
+
+def badge(kind: str) -> str:
+    """Plain-text label for a badge kind: ui.components.badge when it is the plain version, else the fallback."""
+    try:
+        from ui.components import badge as shared
+        out = shared(kind)
+        if isinstance(out, str) and "<" not in out:
+            return out
+    except Exception:
+        pass
+    return _local_badge(kind)
+
 
 # ------------------------------------------------------------------------------------------- validation data
 
@@ -55,6 +79,11 @@ def _fmt(v, nd=2) -> str:
     return "n/a" if f != f else f"{f:.{nd}f}"
 
 
+def _s(v) -> str:
+    """Text cell: '' for None/NaN (CSV round-trips turn empty cells into NaN, which is truthy)."""
+    return "" if v is None or (isinstance(v, float) and v != v) else str(v)
+
+
 def validation_rows(summary) -> list[dict]:
     """Display rows: county, crop, held-out r and MAE (t/ha) with and without the correction, status."""
     df = _table_df(summary)
@@ -64,13 +93,15 @@ def validation_rows(summary) -> list[dict]:
         ok = status == "ok"
         mae = lambda k: _fmt(float(r[k]) / 1000.0) if ok and pd.notna(r.get(k)) else "n/a"
         rows.append({
-            "County": f"{r.get('county') or r.get('site')}, {r.get('state') or ''}".strip(", "),
-            "ERS region": r.get("ers_region") or r.get("region") or "",
-            "Crop": r.get("crop"), "Water": r.get("water") or "",
+            "County": f"{_s(r.get('county')) or _s(r.get('site'))}, {_s(r.get('state'))}".strip(", "),
+            "Country": "US" if _s(r.get("fips")) else "India" if "India" in _s(r.get("region")) else "",
+            "ERS region": _s(r.get("ers_region")) or _s(r.get("region")),
+            "Crop": _s(r.get("crop")), "Water": _s(r.get("water")),
             "r (held out)": _fmt(r.get("r")) if ok else "n/a", "MAE t/ha": mae("mae"),
             "r corrected": _fmt(r.get("r_corrected")) if ok else "n/a", "MAE corrected t/ha": mae("mae_corrected"),
             "Years train/test": f"{int(r['n_train'])}/{int(r['n_test'])}" if ok else "",
-            "Status": "validated" if ok else status, "Model": r.get("badge") or ""})
+            "Status": "validated" if ok else status, "Label": badge("estimated" if ok else "missing"),
+            "Model": "stand-in" if "stand-in" in _s(r.get("badge")) else _s(r.get("badge"))})
     return rows
 
 
@@ -159,19 +190,12 @@ def render_banner(site=None, crop=None) -> None:
     (st.warning if b["show"] else st.caption)(b["text"])
 
 
-def site_map(summary):
-    import plotly.express as px
+def site_points(summary) -> pd.DataFrame:
+    """One row per validation site with lat/lon (for st.map)."""
     df = _table_df(summary)
-    if df.empty:
-        return None
-    g = df.groupby(["site", "county", "state", "lat", "lon"], dropna=False).agg(
-        status=("status", lambda s: "validated" if (s == "ok").any() else s.iloc[0]),
-        crops=("crop", lambda s: ", ".join(map(str, s)))).reset_index()
-    fig = px.scatter_geo(g, lat="lat", lon="lon", color="status", hover_name="county",
-                         hover_data={"state": True, "crops": True, "lat": False, "lon": False}, scope="usa")
-    fig.update_traces(marker={"size": 11})
-    fig.update_layout(margin={"l": 0, "r": 0, "t": 0, "b": 0}, height=380, legend_title_text="")
-    return fig
+    if df.empty or not {"lat", "lon"} <= set(df.columns):
+        return pd.DataFrame(columns=["site", "lat", "lon"])
+    return df.dropna(subset=["lat", "lon"]).drop_duplicates("site")[["site", "lat", "lon"]].reset_index(drop=True)
 
 
 def render() -> None:
@@ -184,17 +208,18 @@ def render() -> None:
     summary = load_validation()
     rows = validation_rows(summary)
     st.subheader("Validation (hindcast)")
-    us_ok = [r for r in rows if r["Status"] == "validated" and r["ERS region"] not in ("", "Deccan Plateau (India)")]
+    us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
     if not us_ok:
         st.warning("US counties are not validated yet: NASS county yields are not cached (they need a NASS API "
                    "key). The US counties below are the ones that will be checked.")
     st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
                "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
                "training years only.")
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-    fig = site_map(summary)
-    if fig is not None:
-        st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    pts = site_points(summary)
+    if len(pts):
+        st.caption("Validation sites")
+        st.map(pts)
 
     st.subheader("Assumptions")
     a = pd.DataFrame(assumption_rows())
@@ -203,7 +228,8 @@ def render() -> None:
         st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
         for col in ("Value", "Range", "Unit"):
             a[col] = a[col].map(lambda v: "" if v is None else str(v))
-        st.dataframe(a, hide_index=True, use_container_width=True)
+        a["Badge"] = a["Badge"].map(badge)
+        st.dataframe(a, hide_index=True)
     for name in DOCS:
         with st.expander(name, expanded=(name == "Limitations")):
             st.markdown(doc_text(name))

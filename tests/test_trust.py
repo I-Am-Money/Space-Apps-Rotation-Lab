@@ -69,3 +69,34 @@ def test_banner_outside_us_hidden_only_near_validated_district():
     s = SimpleNamespace(table=t, sites=[])
     assert not trust.banner_for_site({"lat": 17.0, "lon": 79.0, "us_county_fips": None}, s)["show"]
     assert trust.banner_for_site({"lat": 20.0, "lon": 79.0, "us_county_fips": None}, s)["show"]
+
+
+def test_badge_is_plain_text_without_styling():
+    for kind in ("observed", "estimated", "your_input", "assumption", "placeholder", "example", "missing", None):
+        label = trust.badge(kind)
+        assert label and "<" not in label and "style" not in label.lower()
+    assert trust.badge("placeholder").startswith("Placeholder")
+
+
+def test_trust_page_has_no_custom_styling():
+    src = (trust.ROOT / "ui" / "trust.py").read_text()
+    for banned in ("unsafe_allow_html", "<style", "st.html", "color_discrete", "update_layout", "update_traces"):
+        assert banned not in src
+
+
+def test_site_points_one_per_site():
+    pts = trust.site_points(trust.load_validation())
+    assert len(pts) == pts["site"].nunique() >= 14
+
+
+def test_us_and_india_rows_told_apart_after_csv_round_trip(tmp_path):
+    """Empty CSV cells come back as NaN; India rows must not count as validated US counties."""
+    t = pd.DataFrame([{"site": "IN-x", "crop": "jowar", "fips": "", "region": "Deccan Plateau (India)",
+                       "ers_region": "", "status": "ok", "r": 0.3, "mae": 100, "n_train": 26, "n_test": 8},
+                      {"site": "IA-story", "crop": "maize", "fips": "19169", "region": "Corn Belt",
+                       "ers_region": "Heartland", "status": "no NASS data"}])
+    f = tmp_path / "r.csv"
+    t.to_csv(f, index=False)
+    rows = trust.validation_rows(SimpleNamespace(table=pd.read_csv(f, dtype={"fips": str}), sites=[]))
+    assert [r["Country"] for r in rows] == ["India", "US"]
+    assert rows[0]["ERS region"] == "Deccan Plateau (India)" and rows[0]["Status"] == "validated"
