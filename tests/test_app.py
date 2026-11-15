@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-from engine import api
+from engine import api_v3 as api
 
 
 def test_five_screens_and_supply_override(monkeypatch):

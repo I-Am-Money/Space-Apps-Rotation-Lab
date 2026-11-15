@@ -1,0 +1,51 @@
+# Charvik / Feature 1. Operational choices; ranges and source notes preserved.
+p4_data:
+  soilgrids_profile_depth_cm:
+    value: 100
+    range:
+    - 5
+    - 200
+    unit: cm
+    badge: assumption
+    source: 'Team choice: summarize the upper 1 m using ISRIC standard depth intervals;
+      not a crop rooting-depth assumption. https://docs.isric.org/globaldata/soilgrids/SoilGrids_faqs_01.html'
+  soilgrids_cache_days:
+    value: 365
+    range:
+    - 1
+    - 365
+    unit: days
+    badge: assumption
+    source: 'RotationLab v4 A3/A4: soil and elevation cache expiry is one year.'
+  gibs_capabilities_cache_days:
+    value: 7
+    range:
+    - 1
+    - 7
+    unit: days
+    badge: assumption
+    source: 'Team operational choice: refresh the imagery catalog weekly; only advertised
+      observation dates are selectable. Stale offline catalogs are flagged.'
+climate_card:
+  early_start: {value: 1981, range: [1981, 1981], source: 'Build spec R17 baseline start.'}
+  early_end: {value: 2000, range: [2000, 2000], source: 'Build spec R17 baseline end.'}
+  recent_years: {value: 20, range: [20, 20], source: 'Build spec R17 recent comparison.'}
+  north_season_start_month: {value: 5, range: [1, 12], source: 'Team warm-season comparison convention; not a site-specific crop calendar. Team to verify.'}
+  south_season_start_month: {value: 11, range: [1, 12], source: 'Team warm-season comparison convention; not a site-specific crop calendar. Team to verify.'}
+  season_months: {value: 5, range: [1, 12], source: 'Team consistent climate-card comparison window. Team to verify.'}
+  heat_threshold_c: {value: 35, range: [30, 40], source: 'Team climate indicator; not a universal crop-damage threshold. Team to verify.'}
+  onset_window_days: {value: 5, range: [3, 10], source: 'Team rain-start proxy window, not a validated meteorological onset definition. Team to verify.'}
+  onset_rain_mm: {value: 20, range: [10, 40], source: 'Team rain-start proxy total, not a validated meteorological onset definition. Team to verify.'}
+demo_presets:
+  iowa:
+    label: {value: 'Corn Belt · Iowa', range: null, source: 'Team selection of Story County validation location.'}
+    lat: {value: 42.037538, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Story County IA.'}
+    lon: {value: -93.466093, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Story County IA.'}
+  kansas:
+    label: {value: 'Great Plains · Kansas', range: null, source: 'Team selection of Sumner County validation location.'}
+    lat: {value: 37.236662, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Sumner County KS.'}
+    lon: {value: -97.493352, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Sumner County KS.'}
+  georgia:
+    label: {value: 'Southeast · Georgia', range: null, source: 'Team selection of Mitchell County validation location.'}
+    lat: {value: 31.228997, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Mitchell County GA.'}
+    lon: {value: -84.192038, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Mitchell County GA.'}

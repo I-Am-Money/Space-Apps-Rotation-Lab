@@ -1,6 +1,5 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
-# TODO (Person 2 handoff, 2026-11-15 12:56 PM): works live (SSURGO in IA, KS, GA, AR, CA, WA, TX; STATSGO2 fallback in PA;
-# None for water and non-US points) but has NO unit tests yet and is not wired into get_site().
+# Feature 1: wired into get_site; weighted-profile, invalid-data and fallback tests in test_ssurgo_v5.py.
 """US soil at a point from the USDA NRCS soil survey (Build Spec v4, Person 2 task 2).
 
 Source: USDA NRCS Soil Data Access (SDA) REST service, https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest
@@ -20,6 +19,7 @@ Cached for 1 year through engine.cache (R24).
 from __future__ import annotations
 
 import requests
+import math
 
 from engine import cache
 
@@ -64,7 +64,7 @@ def run_query(sql: str, timeout: int = 60) -> list[dict]:
 
 def _num(x):
     try:
-        return None if x in (None, "") else float(x)
+        return None if x in (None, "") or not math.isfinite(float(x)) or float(x) <= -900 else float(x)
     except (TypeError, ValueError):
         return None
 
@@ -85,9 +85,11 @@ def _weighted(rows: list[dict], col: str, top_cm: float):
 def summarize(rows: list[dict]) -> dict | None:
     """Soil summary from SDA horizon rows of one component, or None when no horizon has an AWC value."""
     awc, depth_cm = _weighted(rows, "awc_r", TOP_MM / 10.0)
-    if awc is None or awc <= 0:
+    if awc is None or not 0 < awc <= 1:
         return None
     om, _ = _weighted(rows, "om_r", OM_TOP_CM)
+    if om is not None and not 0 <= om <= 100:
+        om = None
     sand, _ = _weighted(rows, "sandtotal_r", OM_TOP_CM)
     silt, _ = _weighted(rows, "silttotal_r", OM_TOP_CM)
     clay, _ = _weighted(rows, "claytotal_r", OM_TOP_CM)

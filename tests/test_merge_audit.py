@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from engine import api, optimize as opt, scenarios as sc
+from engine import api_v3 as api, optimize as opt, scenarios as sc
 from tests.decision_fakes import fake_simulate_plan, synthetic_annual
 
 

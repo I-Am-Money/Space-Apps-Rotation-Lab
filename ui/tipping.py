@@ -61,7 +61,7 @@ def _signature(site, inputs, sliders) -> str:
 
 def compute(site, inputs, sliders) -> dict:
     """The tipping analysis for this farm, worked out once and kept in the session until an input changes."""
-    from engine import tipping
+    from engine import api as tipping
     sig = _signature(site, inputs, sliders)
     kept = st.session_state.get("_tipping_result")
     if kept and kept[0] == sig:

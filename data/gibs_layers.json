@@ -1,161 +1,149 @@
 {
- "center": {
-  "lat": 16.877,
-  "lon": 79.193,
-  "default_zoom": 8,
-  "source": "config/region.yaml"
- },
- "test_tile_zyx": [
-  5,
-  14,
-  23
- ],
- "capabilities_url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&request=GetCapabilities",
- "retrieved": "2026-11-14",
- "capabilities_default_time_note": "layer dates below come from the capabilities XML",
- "layers": {
-  "soil_moisture": [
-   {
-    "id": "SMAP_L4_Analyzed_Root_Zone_Soil_Moisture",
-    "title": "Root Zone Soil Moisture (L4, 12z Instantaneous, Model Value-Added, SMAP)",
-    "format": "image/png",
-    "tile_matrix_set": [
-     "GoogleMapsCompatible_Level6"
+  "capabilities_url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&request=GetCapabilities",
+  "retrieved": "2026-11-15",
+  "data_as_of": "2026-11-15",
+  "stale": false,
+  "fallback_reason": null,
+  "cache_note": "Person 2 engine.cache disk/seed backend (7-day GIBS expiry).",
+  "persistent_cache": true,
+  "precache_written": true,
+  "center": {
+    "lat": 17.5,
+    "lon": 78.5,
+    "default_zoom": 8
+  },
+  "layers": {
+    "soil_moisture": [
+      {
+        "title": "Root Zone Soil Moisture (L4, 12z Instantaneous, Model Value-Added, SMAP)",
+        "format": "image/png",
+        "tile_matrix_set": [
+          "GoogleMapsCompatible_Level6"
+        ],
+        "max_native_zoom": 6,
+        "time_ranges": [
+          "2015-03-31/2025-07-06/P1D",
+          "2025-07-08/2025-07-09/P1D",
+          "2025-07-11/2025-07-20/P1D",
+          "2025-07-22/2025-08-03/P1D",
+          "2025-08-05/2025-08-22/P1D",
+          "2025-08-24/2025-08-25/P1D",
+          "2025-08-27/2025-09-04/P1D",
+          "2025-09-06/2025-09-30/P1D",
+          "2025-10-02/2025-10-09/P1D",
+          "2025-12-12/2026-03-16/P1D",
+          "2026-03-18/2026-05-10/P1D",
+          "2026-05-12/2026-05-16/P1D",
+          "2026-05-19/2026-08-09/P1D",
+          "2026-08-16/2026-08-30/P1D",
+          "2026-09-01/2026-11-06/P1D",
+          "2026-11-08/2026-11-10/P1D"
+        ],
+        "tile_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png",
+        "default_time": "2026-11-10",
+        "id": "SMAP_L4_Analyzed_Root_Zone_Soil_Moisture",
+        "name": "Root Zone Soil Moisture (L4, 12z Instantaneous, Model Value-Added, SMAP)",
+        "date": "2026-11-10",
+        "available_dates": [
+          "2026-11-10",
+          "2026-11-09",
+          "2026-11-08",
+          "2026-11-06",
+          "2026-11-05",
+          "2026-11-04",
+          "2026-11-03",
+          "2026-11-02"
+        ],
+        "first_date": "2015-03-31",
+        "last_date": "2026-11-10",
+        "verified_tile": {
+          "date": "2026-11-10",
+          "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/22.png",
+          "status": 200,
+          "bytes": 11099,
+          "content_type": "image/png",
+          "valid_image_response": true
+        },
+        "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png",
+        "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png",
+        "badge": "Observed",
+        "data_as_of": "2026-11-15",
+        "stale": false
+      }
     ],
-    "time_ranges": [
-     "2015-03-31/2025-07-06/P1D",
-     "2025-07-08/2025-07-09/P1D",
-     "2025-07-11/2025-07-20/P1D",
-     "2025-07-22/2025-08-03/P1D",
-     "2025-08-05/2025-08-22/P1D",
-     "2025-08-24/2025-08-25/P1D",
-     "2025-08-27/2025-09-04/P1D",
-     "2025-09-06/2025-09-30/P1D",
-     "2025-10-02/2025-10-09/P1D",
-     "2025-12-12/2026-03-16/P1D",
-     "2026-03-18/2026-05-10/P1D",
-     "2026-05-12/2026-05-16/P1D",
-     "2026-05-19/2026-08-09/P1D",
-     "2026-08-16/2026-08-30/P1D",
-     "2026-09-01/2026-11-06/P1D",
-     "2026-11-08/2026-11-10/P1D"
-    ],
-    "first_date": "2015-03-31",
-    "last_date": "2026-11-10",
-    "verified_tile": {
-     "date": "2026-11-10",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/23.png",
-     "status": 200,
-     "bytes": 10825,
-     "content_type": "image/png"
-    },
-    "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Root_Zone_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"
-   },
-   {
-    "id": "SMAP_L4_Analyzed_Surface_Soil_Moisture",
-    "title": "Surface Soil Moisture (L4, 12z Instantaneous, Model Value-Added, SMAP)",
-    "format": "image/png",
-    "tile_matrix_set": [
-     "GoogleMapsCompatible_Level6"
-    ],
-    "time_ranges": [
-     "2015-03-31/2025-07-27/P1D",
-     "2025-07-29/2025-10-09/P1D",
-     "2025-12-12/2026-03-16/P1D",
-     "2026-03-18/2026-05-10/P1D",
-     "2026-05-12/2026-05-16/P1D",
-     "2026-05-19/2026-08-09/P1D",
-     "2026-08-16/2026-08-30/P1D",
-     "2026-09-01/2026-11-06/P1D",
-     "2026-11-08/2026-11-10/P1D"
-    ],
-    "first_date": "2015-03-31",
-    "last_date": "2026-11-10",
-    "verified_tile": {
-     "date": "2026-11-10",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/5/14/23.png",
-     "status": 200,
-     "bytes": 11028,
-     "content_type": "image/png"
-    },
-    "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-10/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png"
-   }
-  ],
-  "ndvi": [
-   {
-    "id": "MODIS_Terra_L3_NDVI_16Day",
-    "title": "Vegetation Index (16-Day, MODIS, Terra)",
-    "format": "image/png",
-    "tile_matrix_set": [
-     "GoogleMapsCompatible_Level9"
-    ],
-    "time_ranges": [
-     "2000-03-05/2000-12-18/P16D",
-     "2001-01-01/2001-12-19/P16D",
-     "2002-01-01/2002-12-19/P16D",
-     "2003-01-01/2003-12-19/P16D",
-     "2004-01-01/2004-12-18/P16D",
-     "2005-01-01/2005-12-19/P16D",
-     "2006-01-01/2006-12-19/P16D",
-     "2007-01-01/2007-12-19/P16D",
-     "2008-01-01/2008-12-18/P16D",
-     "2009-01-01/2009-12-19/P16D",
-     "2010-01-01/2010-12-19/P16D",
-     "2011-01-01/2011-12-19/P16D",
-     "2012-01-01/2012-12-18/P16D",
-     "2013-01-01/2013-12-19/P16D",
-     "2014-01-01/2014-12-19/P16D",
-     "2015-01-01/2015-12-19/P16D",
-     "2016-01-01/2016-12-18/P16D",
-     "2017-01-01/2017-12-19/P16D",
-     "2018-01-01/2018-12-19/P16D",
-     "2019-01-01/2019-12-19/P16D",
-     "2020-01-01/2020-12-18/P16D",
-     "2021-01-01/2021-12-19/P16D",
-     "2022-01-01/2022-12-19/P16D",
-     "2023-01-01/2023-12-19/P16D",
-     "2024-01-01/2024-12-18/P16D",
-     "2025-01-01/2025-12-19/P16D",
-     "2026-01-01/2026-10-16/P16D"
-    ],
-    "first_date": "2000-03-05",
-    "last_date": "2026-10-16",
-    "verified_tile": {
-     "date": "2026-10-16",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/5/14/23.png",
-     "status": 200,
-     "bytes": 19082,
-     "content_type": "image/png"
-    },
-    "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png"
-   },
-   {
-    "id": "MODIS_Terra_L3_NDVI_Monthly",
-    "title": "Vegetation Index (L3, Monthly, MODIS, Terra)",
-    "format": "image/png",
-    "tile_matrix_set": [
-     "GoogleMapsCompatible_Level7"
-    ],
-    "time_ranges": [
-     "2000-03-01/2025-03-01/P1M",
-     "2025-05-01/2026-10-01/P1M"
-    ],
-    "first_date": "2000-03-01",
-    "last_date": "2026-10-01",
-    "verified_tile": {
-     "date": "2026-10-01",
-     "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_Monthly/default/2026-10-01/GoogleMapsCompatible_Level7/5/14/23.png",
-     "status": 200,
-     "bytes": 18219,
-     "content_type": "image/png"
-    },
-    "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_Monthly/default/2026-10-01/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png"
-   }
-  ]
- },
- "primary": {
-  "soil_moisture": "SMAP_L4_Analyzed_Root_Zone_Soil_Moisture",
-  "ndvi": "MODIS_Terra_L3_NDVI_16Day"
- },
- "fallback": "If a layer or date is unavailable: show a static Worldview screenshot labelled with layer id and date; the model never depends on GIBS."
+    "ndvi": [
+      {
+        "title": "Vegetation Index (16-Day, MODIS, Terra)",
+        "format": "image/png",
+        "tile_matrix_set": [
+          "GoogleMapsCompatible_Level9"
+        ],
+        "max_native_zoom": 9,
+        "time_ranges": [
+          "2000-03-05/2000-12-18/P16D",
+          "2001-01-01/2001-12-19/P16D",
+          "2002-01-01/2002-12-19/P16D",
+          "2003-01-01/2003-12-19/P16D",
+          "2004-01-01/2004-12-18/P16D",
+          "2005-01-01/2005-12-19/P16D",
+          "2006-01-01/2006-12-19/P16D",
+          "2007-01-01/2007-12-19/P16D",
+          "2008-01-01/2008-12-18/P16D",
+          "2009-01-01/2009-12-19/P16D",
+          "2010-01-01/2010-12-19/P16D",
+          "2011-01-01/2011-12-19/P16D",
+          "2012-01-01/2012-12-18/P16D",
+          "2013-01-01/2013-12-19/P16D",
+          "2014-01-01/2014-12-19/P16D",
+          "2015-01-01/2015-12-19/P16D",
+          "2016-01-01/2016-12-18/P16D",
+          "2017-01-01/2017-12-19/P16D",
+          "2018-01-01/2018-12-19/P16D",
+          "2019-01-01/2019-12-19/P16D",
+          "2020-01-01/2020-12-18/P16D",
+          "2021-01-01/2021-12-19/P16D",
+          "2022-01-01/2022-12-19/P16D",
+          "2023-01-01/2023-12-19/P16D",
+          "2024-01-01/2024-12-18/P16D",
+          "2025-01-01/2025-12-19/P16D",
+          "2026-01-01/2026-10-16/P16D"
+        ],
+        "tile_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/{Time}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png",
+        "default_time": "2026-10-16",
+        "id": "MODIS_Terra_L3_NDVI_16Day",
+        "name": "Vegetation Index (16-Day, MODIS, Terra)",
+        "date": "2026-10-16",
+        "available_dates": [
+          "2026-10-16",
+          "2026-09-30",
+          "2026-09-14",
+          "2026-08-29",
+          "2026-08-13",
+          "2026-07-28",
+          "2026-07-12",
+          "2026-06-26"
+        ],
+        "first_date": "2000-03-05",
+        "last_date": "2026-10-16",
+        "verified_tile": {
+          "date": "2026-10-16",
+          "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/5/14/22.png",
+          "status": 200,
+          "bytes": 26056,
+          "content_type": "image/png",
+          "valid_image_response": true
+        },
+        "tile_url_template": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+        "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_L3_NDVI_16Day/default/2026-10-16/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png",
+        "badge": "Observed",
+        "data_as_of": "2026-11-15",
+        "stale": false
+      }
+    ]
+  },
+  "primary": {
+    "soil_moisture": "SMAP_L4_Analyzed_Root_Zone_Soil_Moisture",
+    "ndvi": "MODIS_Terra_L3_NDVI_16Day"
+  },
+  "fallback": "If no advertised layer/date is available, omit that overlay. Never fabricate a satellite image."
 }
