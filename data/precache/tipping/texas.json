@@ -1,0 +1,420 @@
+{
+ "made": "2026-11-15",
+ "fingerprint": "4893b07562a9ac4bab66893bb959054374130b119e73941f9c9e28d154316495",
+ "farm_key": "6341af1e0b61aac93c1c2235ae815865f22b77d9369f30bdcfcb892a9885ef47",
+ "result": {
+  "rainfall_curve": {
+   "x": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.2,
+    1.3
+   ],
+   "x_label": "Rainfall (1.0 = the real record)",
+   "current_x": 1.0,
+   "series": {
+    "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+     -256.47988991285064,
+     -217.5205132324534,
+     -177.75036581010613,
+     -139.96059385156553,
+     -103.43626628588336,
+     -70.26694056666418,
+     -41.26730374773371,
+     -16.389441818617,
+     4.805909260059233
+    ],
+    "Cotton > Cotton > Winter wheat > Cotton": [
+     -190.0753578576719,
+     -113.88676204245644,
+     -37.796628686040194,
+     35.920627578073436,
+     104.95642889032952,
+     167.42116927027925,
+     223.88150883558424,
+     274.14004263144255,
+     319.40749004910447
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      -297.204805954844,
+      -267.9331513341979,
+      -238.1958055933765,
+      -205.46443871774858,
+      -172.68385168414594,
+      -141.21134536598282,
+      -115.0343997396772,
+      -90.89170124878886,
+      -73.24114596068702
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      -288.70585730223195,
+      -230.6247833450863,
+      -172.2282364513563,
+      -116.16886320102488,
+      -60.13185685439554,
+      -5.531056024688356,
+      49.026483095268894,
+      96.4908087271494,
+      137.59297196936384
+     ]
+    },
+    "p90": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      -208.09448792053433,
+      -159.12619485977078,
+      -109.20045955539968,
+      -65.31442184972737,
+      -20.20561477522741,
+      14.250283514806497,
+      42.66750587052991,
+      68.39022779597694,
+      89.7930192485667
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      -90.18182736124994,
+      4.904943203903386,
+      98.87831094105674,
+      184.0562547016575,
+      261.02263307791486,
+      333.65564750962784,
+      399.52202032977885,
+      452.0856969840855,
+      500.6069765803063
+     ]
+    }
+   },
+   "winner": [
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton"
+   ],
+   "crossovers": [],
+   "crossover_details": [],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   }
+  },
+  "heat_curve": {
+   "x": [
+    0.0,
+    1.0,
+    2.0,
+    3.0
+   ],
+   "x_label": "Heat shift (degC added to every day's maximum)",
+   "current_x": 0.0,
+   "series": {
+    "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+     -70.26694056666418,
+     -70.26694056666418,
+     -70.31675957916866,
+     -70.37046802967124
+    ],
+    "Cotton > Cotton > Winter wheat > Cotton": [
+     167.42116927027925,
+     134.95189530349802,
+     98.68307615911279,
+     51.88631756826722
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      -141.21134536598282,
+      -141.21134536598282,
+      -141.21134536598282,
+      -141.4653603686592
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      -5.531056024688356,
+      -38.38915179146904,
+      -74.96808530156291,
+      -117.47637100542636
+     ]
+    },
+    "p90": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      14.250283514806497,
+      14.250283514806497,
+      14.250283514806497,
+      14.250283514806497
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      333.65564750962784,
+      306.915116478822,
+      271.2035336726055,
+      212.8636501761491
+     ]
+    }
+   },
+   "winner": [
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton"
+   ],
+   "crossovers": [],
+   "crossover_details": [],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   }
+  },
+  "water_curve": {
+   "x": [
+    0.0,
+    100.0,
+    200.0,
+    300.0,
+    400.0,
+    500.0
+   ],
+   "x_label": "Water supply (mm a year)",
+   "current_x": 0.0,
+   "series": {
+    "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+     -70.26694056666418,
+     39.90985125610306,
+     144.28848831136605,
+     234.26960372032812,
+     298.3028345658097,
+     329.2607387887634
+    ],
+    "Cotton > Cotton > Winter wheat > Cotton": [
+     167.42116927027925,
+     344.01680150045627,
+     520.0077361016642,
+     691.7003930934794,
+     844.8296834023546,
+     960.7915029953982
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      -141.21134536598282,
+      -35.450941618929185,
+      69.22537218982671,
+      169.87071957832694,
+      251.64373057414144,
+      308.7602590572133
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      -5.531056024688356,
+      157.96908397271162,
+      315.56145300718896,
+      473.8695074985134,
+      626.6328982599234,
+      760.5323653501974
+     ]
+    },
+    "p90": {
+     "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat": [
+      14.250283514806497,
+      130.59694771893132,
+      230.98867471042055,
+      300.07751867862765,
+      334.65874796296214,
+      338.49492926068217
+     ],
+     "Cotton > Cotton > Winter wheat > Cotton": [
+      333.65564750962784,
+      526.6977956370055,
+      717.8751436235823,
+      898.770400873132,
+      1050.7884083215924,
+      1143.8330487023022
+     ]
+    }
+   },
+   "winner": [
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Cotton > Cotton > Winter wheat > Cotton"
+   ],
+   "crossovers": [],
+   "crossover_details": [],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   },
+   "note": "What if this farm had this much irrigation water a year (the same in dry years)? The cost of getting the water is not counted."
+  },
+  "map_2d": {
+   "rain_mult": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.2,
+    1.3
+   ],
+   "water_mm": [
+    0.0,
+    100.0,
+    200.0,
+    300.0,
+    400.0,
+    500.0
+   ],
+   "winner": [
+    [
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ],
+    [
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ],
+    [
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ],
+    [
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ],
+    [
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Winter wheat > Cotton > Winter wheat > Cotton",
+     "Winter wheat > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ],
+    [
+     "Winter wheat > Cotton > Winter wheat > Cotton",
+     "Winter wheat > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton",
+     "Cotton > Cotton > Winter wheat > Cotton"
+    ]
+   ],
+   "labels": [
+    "Cotton > Cotton > Winter wheat > Cotton",
+    "Winter wheat > Cotton > Winter wheat > Cotton"
+   ],
+   "current": {
+    "rain_mult": 1.0,
+    "water_mm": 0.0,
+    "row": 0,
+    "col": 5,
+    "text": "rain only",
+    "winner": "Cotton > Cotton > Winter wheat > Cotton"
+   },
+   "note": "What if this farm had this much irrigation water a year (the same in dry years)? The cost of getting the water is not counted.",
+   "badge": "estimated"
+  },
+  "bands": {
+   "rainfall": [],
+   "heat": [],
+   "water": []
+  },
+  "note": "what-if adjustments to real years, not forecasts",
+  "example": false,
+  "headlines": [
+   "With the real weather record and your water, the best plan is Cotton > Cotton > Winter wheat > Cotton.",
+   "Changing rainfall, heat or water supply one at a time does not change the best plan here. When rainfall and water change together, 4 of the 54 combinations on the map pick a different plan."
+  ],
+  "notes": [
+   "The same crops in the same order, started in a different year, count as one plan.",
+   "What-if winners are searched among rotations of: Winter wheat, Cotton."
+  ],
+  "method": {
+   "climate_shift": "historical",
+   "scenarios_bands": 500,
+   "winner_source": "recommend() through engine/api.py",
+   "crops_searched": [
+    "Winter wheat",
+    "Cotton"
+   ],
+   "scenarios_winner": 500,
+   "coarse_map": false,
+   "seconds": 6.0
+  },
+  "climate": {
+   "mode": "historical",
+   "label": "Historical",
+   "what_if": "what-if, not a forecast",
+   "record": [
+    1981,
+    2025
+   ],
+   "badge": "observed",
+   "text": "Every real weather year from 1981 to 2025 counts once."
+  },
+  "current_plan": "Your current plan: Winter wheat > Winter wheat > Winter wheat > Winter wheat",
+  "winner_now": "Cotton > Cotton > Winter wheat > Cotton",
+  "metric": {
+   "name": "profit",
+   "badge": "estimated",
+   "label": "Average profit per hectare per year"
+  },
+  "badges": {
+   "weather": "observed",
+   "winner": "estimated",
+   "curves": "estimated",
+   "bands": "estimated",
+   "what_if_levels": "assumption"
+  }
+ }
+}

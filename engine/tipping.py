@@ -326,13 +326,16 @@ def _crossings(xs, winners, vals, keys, weights, n_resample: int, seed: int) -> 
     return out
 
 
-def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, budget_s: float | None = None) -> dict:
+def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, budget_s: float | None = None,
+                   full_search: bool = False) -> dict:
     """Where the best plan changes with rainfall, heat and water supply. See the module docstring.
 
     recommend   the recommend(site, inputs, sliders) function to ask for the winner; default engine.api.recommend.
                 Pass False to skip it and use the module's own ranking.
     progress    optional progress(done, total, text) callback for the screen.
     budget_s    time to aim for (default rule tipping_time_budget_s).
+    full_search True = every what-if point uses all the weather plans, however long that takes (used when a
+                result is worked out ahead of time, see engine/tipping_precache.py).
     """
     t_start = time.perf_counter()
     budget = float(C.rule("tipping_time_budget_s") if budget_s is None else budget_s)
@@ -418,9 +421,20 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
     base_pt = (1.0, 0.0, CUR)
     curve_pts = [(r, 0.0, CUR) for r in rains] + [(1.0, 0.0, k) for k in wkeys] + [(1.0, h, CUR) for h in heats]
     map_rains, map_w = list(rains), list(wkeys)
-    base_winner = same_rotation(base_winner, (current,))
+    # One rotation, one name: the farm's current plan keeps its own order, and a pick keeps the order the
+    # Recommendations page shows it in (a plan that repeats every four years can be written starting in any year).
+    shown = []
+    if rec0 is not None:
+        for pick_name in ("headline", "highest_profit", "best_soil"):
+            pick = _get(rec0, pick_name)
+            if pick is not None:
+                try:
+                    shown.append(rot_key(pick))
+                except Exception:
+                    pass
+    base_winner = same_rotation(base_winner, (current, base_winner))
     winners = {base_pt: base_winner}
-    prefer = (current, base_winner)
+    prefer = tuple(dict.fromkeys([current, base_winner] + shown))
 
     def plan(points):
         return [p for p in dict.fromkeys(points) if p not in winners]
@@ -455,7 +469,7 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
         run(todo[:1], full.n)
         dt_full = time.perf_counter() - t0
         left = budget - (time.perf_counter() - t_start)
-        if s_w >= full.n or dt_full * (len(todo) - 1) <= min(float(C.rule("tipping_full_search_s")), max(left, 1.0)):
+        if full_search or s_w >= full.n or dt_full * (len(todo) - 1) <= min(float(C.rule("tipping_full_search_s")), max(left, 1.0)):
             s_w = full.n
             run(todo[1:], s_w)
         else:
@@ -577,7 +591,14 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
     head += say(hc, "Heat shift", lambda v: f"+{v:.1f} degC")
     head += say(wc, "Water supply", lambda v: f"{v:.0f} mm a year")
     if len(head) == 1:
-        head.append("The best plan stays the same across every rainfall, heat and water level tried here.")
+        cells = [v for row in grid for v in row if v != name_of(None)]
+        other = sum(v != name_of(base_winner) for v in cells)
+        if other:
+            head.append(f"Changing rainfall, heat or water supply one at a time does not change the best plan here. "
+                        f"When rainfall and water change together, {other} of the {len(cells)} combinations on the map "
+                        f"pick a different plan.")
+        else:
+            head.append("The best plan stays the same across every rainfall, heat and water level tried here.")
     method["seconds"] = round(time.perf_counter() - t_start, 1)
     return {"rainfall_curve": rc, "heat_curve": hc, "water_curve": wc, "map_2d": map_2d,
             "bands": {"rainfall": rc["crossover_details"], "heat": hc["crossover_details"], "water": wc["crossover_details"]},

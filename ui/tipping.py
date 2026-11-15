@@ -3,7 +3,7 @@
 
     render(site=None, inputs=None, sliders=None, result=None)
 
-Plain Streamlit only: default theme, default chart colors, no CSS. Data labels go through badge() from
+Plain Streamlit only: default theme, no CSS. One color per plan across the map and the charts (_plan_colors). Data labels go through badge() from
 ui/components.py (see _badge).
 
 The page shows numbers from engine/tipping.py and computes nothing itself except display formatting.
@@ -65,6 +65,14 @@ def compute(site, inputs, sliders) -> dict:
     kept = st.session_state.get("_tipping_result")
     if kept and kept[0] == sig:
         return kept[1]
+    try:                                             # an example farm: the result was worked out ahead of time
+        from engine import tipping_precache
+        saved = tipping_precache.load(site, inputs, sliders)
+    except Exception:
+        saved = None
+    if saved is not None:
+        st.session_state["_tipping_result"] = (sig, saved)
+        return saved
     bar = st.progress(0.0, text="Checking what-if climates")
 
     def progress(done, total, text):
@@ -86,6 +94,35 @@ def _area() -> tuple[str, float]:
     return "acre", 1.0 / ACRES_PER_HECTARE
 
 
+BEST_NOW, CURRENT_PLAN = "#1b6e4b", "#9aa0a6"          # green = best plan today, grey = what the farm does today
+OTHER_PLANS = ["#2b7bba", "#e08a1e", "#8e5ea2", "#c0504d", "#17a2a2", "#7a8f2a", "#b5651d", "#4b5fa8"]
+
+
+def _plan_colors(result: dict) -> dict:
+    """One color per plan for the whole page, so a plan looks the same on the map and on every chart."""
+    names = [result.get("winner_now"), result.get("current_plan")]
+    names += list((result.get("map_2d") or {}).get("labels") or [])
+    for key in ("rainfall_curve", "water_curve", "heat_curve"):
+        names += list((result.get(key) or {}).get("series") or {})
+    colors, spare = {}, iter(OTHER_PLANS * 4)
+    for name in dict.fromkeys(n for n in names if n):
+        if name == result.get("winner_now"):
+            colors[name] = BEST_NOW
+        elif name == result.get("current_plan"):
+            colors[name] = CURRENT_PLAN
+        else:
+            colors[name] = next(spare)
+    return colors
+
+
+def _scale(names, colors: dict | None):
+    """An Altair color scale for these plans, or the default colors when no page palette was passed."""
+    names = list(dict.fromkeys(names))
+    if not colors or any(n not in colors for n in names):
+        return alt.Undefined
+    return alt.Scale(domain=names, range=[colors[n] for n in names])
+
+
 def _curve_frame(curve: dict, scale: float = 1.0) -> pd.DataFrame:
     k = scale if curve["metric"]["name"] == "profit" else 1.0     # only money is per area; yield shares stay as they are
     rows = []
@@ -96,8 +133,9 @@ def _curve_frame(curve: dict, scale: float = 1.0) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _curve_chart(curve: dict, unit: str = "hectare", scale: float = 1.0):
+def _curve_chart(curve: dict, unit: str = "hectare", scale: float = 1.0, colors: dict | None = None):
     df = _curve_frame(curve, scale)
+    plan_scale = _scale(curve["series"], colors)
     x = alt.X("x:Q", title=curve["x_label"], scale=alt.Scale(zero=False))
     tips = ["Plan", alt.Tooltip("x:Q", title=curve["x_label"]), alt.Tooltip("Average:Q", format=",.0f"),
             alt.Tooltip("Low (10th percentile):Q", format=",.0f"), alt.Tooltip("High (90th percentile):Q", format=",.0f"),
@@ -105,9 +143,9 @@ def _curve_chart(curve: dict, unit: str = "hectare", scale: float = 1.0):
     y_title = f"Profit per {unit} per year" if curve["metric"]["name"] == "profit" else "Share of best possible yield (%)"
     legend = alt.Legend(orient="bottom", direction="vertical", labelLimit=600, title="Plan")
     band = alt.Chart(df).mark_area(opacity=0.2).encode(x=x, y=alt.Y("Low (10th percentile):Q", title=y_title),
-                                                      y2="High (90th percentile):Q", color=alt.Color("Plan:N", legend=None))
+                                                      y2="High (90th percentile):Q", color=alt.Color("Plan:N", legend=None, scale=plan_scale))
     line = alt.Chart(df).mark_line(point=True).encode(x=x, y=alt.Y("Average:Q", title=y_title),
-                                                      color=alt.Color("Plan:N", legend=legend), tooltip=tips)
+                                                      color=alt.Color("Plan:N", legend=legend, scale=plan_scale), tooltip=tips)
     layers = [band, line]
     if curve.get("current_x") is not None:
         layers.append(alt.Chart(pd.DataFrame({"x": [curve["current_x"]], "label": ["your farm now"]}))
@@ -116,11 +154,12 @@ def _curve_chart(curve: dict, unit: str = "hectare", scale: float = 1.0):
     return alt.layer(*layers).resolve_legend(color="independent").properties(height=380 + 24 * len(curve["series"]))
 
 
-def _show_curve(title: str, curve: dict, lead: str, fmt, unit: str = "hectare", scale: float = 1.0) -> None:
+def _show_curve(title: str, curve: dict, lead: str, fmt, unit: str = "hectare", scale: float = 1.0,
+                colors: dict | None = None) -> None:
     st.subheader(title)
     _cap(f"{lead} Line = average over 500 weather plans; shaded band = 10th to 90th percentile. "
                f"Dashed line = your farm now. {_badge('estimated')}")
-    st.altair_chart(_curve_chart(curve, unit, scale), width="stretch")
+    st.altair_chart(_curve_chart(curve, unit, scale, colors), width="stretch")
     if curve["crossover_details"]:
         for d in curve["crossover_details"]:
             how = (f"10th to 90th percentile {fmt(d['p10'])} to {fmt(d['p90'])}" if d["by"] == "average"
@@ -134,7 +173,7 @@ def _show_curve(title: str, curve: dict, lead: str, fmt, unit: str = "hectare", 
         st.dataframe(_curve_frame(curve, scale).rename(columns={"x": curve["x_label"]}), hide_index=True)
 
 
-def _show_map(m: dict) -> None:
+def _show_map(m: dict, colors: dict | None = None) -> None:
     st.subheader("Rainfall and water map")
     _cap(f"Each square is one what-if: a rainfall level (across) and a water supply (up). Its color is the plan "
                f"that comes out best there. {_badge('estimated')}")
@@ -144,13 +183,14 @@ def _show_map(m: dict) -> None:
     x = alt.X("Rainfall:O", sort=[f"{r:.1f}x" for r in m["rain_mult"]], title="Rainfall (1.0x = the real record)", axis=alt.Axis(labelAngle=0))
     y = alt.Y("Water supply:O", sort=[f"{w:.0f} mm" for w in sorted(m["water_mm"], reverse=True)], title="Water supply a year")
     squares = alt.Chart(df).mark_rect().encode(x=x, y=y, tooltip=["Rainfall", "Water supply", "Best plan"],
-                                               color=alt.Color("Best plan:N", legend=alt.Legend(orient="bottom", direction="vertical", labelLimit=600)))
+                                               color=alt.Color("Best plan:N", scale=_scale(m["labels"], colors),
+                                                               legend=alt.Legend(orient="bottom", direction="vertical", labelLimit=600)))
     layers = [squares]
     cur = m["current"]
     if cur.get("row") is not None:
         here = pd.DataFrame({"Rainfall": [f"{m['rain_mult'][cur['col']]:.1f}x"], "Water supply": [f"{m['water_mm'][cur['row']]:.0f} mm"],
                              "label": ["◆ your farm"], "Best plan": [cur["winner"]]})
-        layers.append(alt.Chart(here).mark_text(fontWeight="bold").encode(x=x, y=y, text="label", tooltip=["label", "Best plan"]))
+        layers.append(alt.Chart(here).mark_text(fontWeight="bold", color="white").encode(x=x, y=y, text="label", tooltip=["label", "Best plan"]))
     st.altair_chart(alt.layer(*layers).properties(height=380 + 24 * len(m["labels"])), width="stretch")
     if cur.get("row") is not None:
         st.markdown(f"**◆ Your farm now:** the real rainfall record, {cur['text']}. Best plan there: **{cur['winner']}**.")
@@ -158,6 +198,10 @@ def _show_map(m: dict) -> None:
         st.markdown(f"**Your farm now** is not on this map: {cur['text']}. Best plan for your farm: **{cur['winner']}**.")
     if m.get("note"):
         st.caption(m["note"])
+    if len(m["labels"]) > 1:
+        st.caption("The best plan is picked with your settings for bad years, soil and profit. Where two plans score "
+                   "almost the same, one square can differ from its neighbours, so read the map for its regions, "
+                   "not for a single square.")
     with st.expander("The map as a table"):
         table = pd.DataFrame(m["winner"], index=[f"{w:.0f} mm" for w in m["water_mm"]], columns=[f"{r:.1f}x rain" for r in m["rain_mult"]])
         st.dataframe(table.iloc[::-1])
@@ -190,16 +234,17 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
         _cap(f"Climate setting: **{_MODES.get(climate.get('mode'), climate.get('label', ''))}**. {climate.get('text', '')} "
                    f"{_badge(climate.get('badge', 'assumption'))}")
 
-    _show_map(result["map_2d"])
+    colors = _plan_colors(result)
+    _show_map(result["map_2d"], colors)
     money = result["metric"]["name"] == "profit"
     unit, scale = _area()
     what = f"average profit per {unit} per year, in the currency of your prices" if money else "share of the best possible yield"
     _show_curve("If rainfall changes", result["rainfall_curve"],
-                f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale)
+                f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale, colors)
     _show_curve("If your water supply changes", result["water_curve"],
-                f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale)
+                f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale, colors)
     _show_curve("If it gets hotter", result["heat_curve"],
-                f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale)
+                f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale, colors)
 
     with st.expander("How this was worked out"):
         method = result.get("method") or {}
@@ -211,5 +256,9 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
             st.markdown(f"- {note}")
         st.markdown("- Planting dates and each crop's best possible yield stay as they are for your farm today; "
                     "only the weather and the water supply change.")
-        if method.get("seconds") is not None:
+        if method.get("precomputed"):
+            st.caption(f"Worked out ahead of time for this example farm ({method['precomputed']}), with the same code, data "
+                       "and settings and all the weather plans at every what-if point, so the page opens at once. "
+                       "Change any answer or slider and it is worked out again live.")
+        elif method.get("seconds") is not None:
             st.caption(f"Worked out in {method['seconds']:.0f} seconds.")

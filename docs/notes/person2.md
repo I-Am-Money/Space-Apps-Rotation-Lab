@@ -145,3 +145,25 @@ runs inside Feature 2 at run time: the simulation, climate modes and tipping poi
   Measured on the build machine with six crops (1,296 rotations): 6.5 seconds without it, 1.9 seconds with it, the
   same rotations picked, sometimes listed from a different starting year. It is off unless asked for, so Feature 3's
   results are unchanged today. It applies only to the 500 bootstrap plans.
+
+## Tipping Points page: names, colors and summary line (after the 5 PM audit)
+
+- A plan is written in the same year order as on the Recommendations page (the farm's current plan keeps its own
+  order). Before this, the same rotation could read "Cotton > Cotton > Cotton > Winter wheat" on this page and
+  "Cotton, Cotton, Winter wheat, Cotton" on Recommendations. The curves now simulate that same year order.
+- One color per plan across the map and the three charts: green is the best plan today, grey is the current plan.
+- When no single change (rainfall, heat or water) moves the best plan but some rainfall-and-water combinations
+  on the map do, the summary line now says so and counts them, instead of saying the plan never changes.
+- Display name of maize is "Corn" (US-first app). The crop id stays `maize`.
+
+## Example farms: tipping results worked out ahead of time
+
+- `engine/tipping_precache.py` saves the tipping result of each rain-fed example farm (all 500 weather plans at every
+  what-if point) to `data/precache/tipping/<name>.json`. The Tipping Points page uses it only when the hash of
+  every `engine/*.py` and `config/assumptions/*.yaml` file and the farm's key (place, full-year weather totals,
+  soil, county defaults, answers, sliders) both match. Otherwise it computes live, as before.
+- Why: on a slow or busy machine the live search drops to 100 weather plans and Nebraska's rainfall tipping point
+  moved from 0.75x to 0.85x. The saved result makes the example farms open in about a second with the same
+  numbers everywhere.
+- After any change to the engine or the assumptions, run `python -m engine.tipping_precache` (about 30 seconds)
+  and commit the three files. If nobody does, nothing breaks: the page computes live.

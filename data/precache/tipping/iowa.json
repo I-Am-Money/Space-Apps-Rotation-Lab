@@ -1,0 +1,481 @@
+{
+ "made": "2026-11-15",
+ "fingerprint": "4893b07562a9ac4bab66893bb959054374130b119e73941f9c9e28d154316495",
+ "farm_key": "0a1e95d7fd9ec72bbb3270abff75cf2ee128dd44ea63ebc0fef845793e681b93",
+ "result": {
+  "rainfall_curve": {
+   "x": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.2,
+    1.3
+   ],
+   "x_label": "Rainfall (1.0 = the real record)",
+   "current_x": 1.0,
+   "series": {
+    "Your current plan: Corn > Corn > Corn > Corn": [
+     142.20146448437396,
+     418.1039123193938,
+     584.0108529623244,
+     690.2785349360528,
+     765.5742901732242,
+     822.48093245173,
+     867.4893506958623,
+     902.713778013017,
+     930.2337686583195
+    ],
+    "Corn > Soybeans > Soybeans > Soybeans": [
+     526.4280848634859,
+     678.7429276153454,
+     775.4157626054572,
+     845.0778003334893,
+     898.5209800587935,
+     940.8685865953732,
+     977.2649937189465,
+     1008.4315749661873,
+     1034.633498149111
+    ],
+    "Corn > Soybeans > Corn > Soybeans": [
+     413.3553646782435,
+     602.7116267706506,
+     716.9906698905587,
+     796.2655180887224,
+     855.9966605467665,
+     902.5278407372472,
+     941.3487010779736,
+     973.9120924798307,
+     1000.616222625465
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      -247.83028616919438,
+      33.79900413203716,
+      256.8410363465721,
+      386.168704746907,
+      494.55435264981196,
+      581.8709042660851,
+      644.3215335346431,
+      690.7231637577055,
+      729.8628032852918
+     ],
+     "Corn > Soybeans > Soybeans > Soybeans": [
+      267.7552604050635,
+      433.6761486924383,
+      549.7755140006757,
+      634.586017813451,
+      705.6434472714894,
+      750.2868328112248,
+      796.2107445869341,
+      832.3388333349006,
+      864.2612909629014
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      95.29608609836036,
+      313.8326920309435,
+      454.15290740629223,
+      548.1259385298102,
+      632.1186036288814,
+      697.5934239765658,
+      738.0294174069899,
+      780.7146174150678,
+      813.6117461740401
+     ]
+    },
+    "p90": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      525.0786327407993,
+      754.1390462406627,
+      888.0215724617394,
+      952.6861424408016,
+      1000.9114889454331,
+      1046.4647829684418,
+      1073.1456086538155,
+      1096.0837413431968,
+      1107.782909325516
+     ],
+     "Corn > Soybeans > Soybeans > Soybeans": [
+      779.1031536131894,
+      907.3524078380358,
+      987.9266518562862,
+      1039.0121299100147,
+      1079.639122757025,
+      1114.2754954630511,
+      1147.633028994952,
+      1166.2959466074262,
+      1184.4176892470568
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      709.6680555312248,
+      862.8809947934345,
+      948.6605002395236,
+      1012.9777602494057,
+      1055.6115342466742,
+      1091.8184943698036,
+      1121.2811840111701,
+      1143.3165584099188,
+      1159.6106848648506
+     ]
+    }
+   },
+   "winner": [
+    "Corn > Soybeans > Soybeans > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans"
+   ],
+   "crossovers": [
+    0.55
+   ],
+   "crossover_details": [
+    {
+     "between": [
+      0.5,
+      0.6
+     ],
+     "from": "Corn > Soybeans > Soybeans > Soybeans",
+     "to": "Corn > Soybeans > Corn > Soybeans",
+     "at": 0.55,
+     "p10": 0.5,
+     "p90": 0.6,
+     "by": "settings"
+    }
+   ],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   }
+  },
+  "heat_curve": {
+   "x": [
+    0.0,
+    1.0,
+    2.0,
+    3.0
+   ],
+   "x_label": "Heat shift (degC added to every day's maximum)",
+   "current_x": 0.0,
+   "series": {
+    "Your current plan: Corn > Corn > Corn > Corn": [
+     822.48093245173,
+     808.7182758652408,
+     792.5601426411491,
+     766.2334800924299
+    ],
+    "Corn > Soybeans > Corn > Soybeans": [
+     902.5278407372472,
+     887.1069625855548,
+     868.8970027614827,
+     841.6909756644606
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      581.8709042660851,
+      560.176813067764,
+      540.1795849356843,
+      507.1076858569242
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      697.5934239765658,
+      673.4041205573898,
+      644.7663980036563,
+      615.6237921914192
+     ]
+    },
+    "p90": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      1046.4647829684418,
+      1037.5630134861715,
+      1027.1244224498257,
+      1002.9417823071772
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      1091.8184943698036,
+      1087.8036918165697,
+      1074.7970736352613,
+      1051.5256246252197
+     ]
+    }
+   },
+   "winner": [
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans"
+   ],
+   "crossovers": [],
+   "crossover_details": [],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   }
+  },
+  "water_curve": {
+   "x": [
+    0.0,
+    100.0,
+    200.0,
+    300.0,
+    400.0,
+    500.0
+   ],
+   "x_label": "Water supply (mm a year)",
+   "current_x": 0.0,
+   "series": {
+    "Your current plan: Corn > Corn > Corn > Corn": [
+     822.48093245173,
+     1013.4111878633681,
+     1078.618962132503,
+     1092.9131173159217,
+     1094.8879608307957,
+     1094.8879608307957
+    ],
+    "Corn > Soybeans > Corn > Soybeans": [
+     902.5278407372472,
+     1079.7746223340469,
+     1146.0319455736392,
+     1163.0468030418313,
+     1165.9461502226368,
+     1165.9808686485017
+    ]
+   },
+   "band": {
+    "p10": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      581.8709042660851,
+      865.5234685795178,
+      983.7971408439777,
+      1038.7248423424587,
+      1045.6167155885066,
+      1045.6167155885066
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      697.5934239765658,
+      934.7322262581686,
+      1043.3858000866826,
+      1103.1451737041082,
+      1111.2982836916308,
+      1112.0656516588117
+     ]
+    },
+    "p90": {
+     "Your current plan: Corn > Corn > Corn > Corn": [
+      1046.4647829684418,
+      1126.2947779735428,
+      1132.0574967153307,
+      1132.057496715331,
+      1132.057496715331,
+      1132.057496715331
+     ],
+     "Corn > Soybeans > Corn > Soybeans": [
+      1091.8184943698036,
+      1191.9029700802919,
+      1203.124817739426,
+      1207.9129386910924,
+      1207.9129386910927,
+      1207.9129386910927
+     ]
+    }
+   },
+   "winner": [
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans"
+   ],
+   "crossovers": [],
+   "crossover_details": [],
+   "metric": {
+    "name": "profit",
+    "badge": "estimated",
+    "label": "Average profit per hectare per year"
+   },
+   "note": "What if this farm had this much irrigation water a year (the same in dry years)? The cost of getting the water is not counted."
+  },
+  "map_2d": {
+   "rain_mult": [
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0,
+    1.1,
+    1.2,
+    1.3
+   ],
+   "water_mm": [
+    0.0,
+    100.0,
+    200.0,
+    300.0,
+    400.0,
+    500.0
+   ],
+   "winner": [
+    [
+     "Corn > Soybeans > Soybeans > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ],
+    [
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ],
+    [
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ],
+    [
+     "Corn > Soybeans > Soybeans > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ],
+    [
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ],
+    [
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans",
+     "Corn > Soybeans > Corn > Soybeans"
+    ]
+   ],
+   "labels": [
+    "Corn > Soybeans > Soybeans > Soybeans",
+    "Corn > Soybeans > Corn > Soybeans"
+   ],
+   "current": {
+    "rain_mult": 1.0,
+    "water_mm": 0.0,
+    "row": 0,
+    "col": 5,
+    "text": "rain only",
+    "winner": "Corn > Soybeans > Corn > Soybeans"
+   },
+   "note": "What if this farm had this much irrigation water a year (the same in dry years)? The cost of getting the water is not counted.",
+   "badge": "estimated"
+  },
+  "bands": {
+   "rainfall": [
+    {
+     "between": [
+      0.5,
+      0.6
+     ],
+     "from": "Corn > Soybeans > Soybeans > Soybeans",
+     "to": "Corn > Soybeans > Corn > Soybeans",
+     "at": 0.55,
+     "p10": 0.5,
+     "p90": 0.6,
+     "by": "settings"
+    }
+   ],
+   "heat": [],
+   "water": []
+  },
+  "note": "what-if adjustments to real years, not forecasts",
+  "example": false,
+  "headlines": [
+   "With the real weather record and your water, the best plan is Corn > Soybeans > Corn > Soybeans.",
+   "Rainfall: below about 0.55 x the record the best plan is Corn > Soybeans > Soybeans > Soybeans; above it, Corn > Soybeans > Corn > Soybeans (somewhere between 0.50 x the record and 0.60 x the record; decided by your risk and soil settings, not by the average result alone)."
+  ],
+  "notes": [
+   "The same crops in the same order, started in a different year, count as one plan.",
+   "What-if winners are searched among rotations of: Corn, Soybeans."
+  ],
+  "method": {
+   "climate_shift": "historical",
+   "scenarios_bands": 500,
+   "winner_source": "recommend() through engine/api.py",
+   "crops_searched": [
+    "Corn",
+    "Soybeans"
+   ],
+   "scenarios_winner": 500,
+   "coarse_map": false,
+   "seconds": 5.9
+  },
+  "climate": {
+   "mode": "historical",
+   "label": "Historical",
+   "what_if": "what-if, not a forecast",
+   "record": [
+    1981,
+    2025
+   ],
+   "badge": "observed",
+   "text": "Every real weather year from 1981 to 2025 counts once."
+  },
+  "current_plan": "Your current plan: Corn > Corn > Corn > Corn",
+  "winner_now": "Corn > Soybeans > Corn > Soybeans",
+  "metric": {
+   "name": "profit",
+   "badge": "estimated",
+   "label": "Average profit per hectare per year"
+  },
+  "badges": {
+   "weather": "observed",
+   "winner": "estimated",
+   "curves": "estimated",
+   "bands": "estimated",
+   "what_if_levels": "assumption"
+  }
+ }
+}

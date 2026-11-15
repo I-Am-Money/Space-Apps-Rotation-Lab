@@ -1,8 +1,7 @@
 # Limitations
 
 RotationLab gives modeled estimates for planning. It does not guarantee yield or profit and it is not a
-forecast. These limits are shown in the app and listed here (Build Spec v4, R22). Teammates: add anything you
-log to the "Logged by the team" section, or tell Person 3.
+forecast. These limits are shown in the app and listed here.
 
 ## Out of scope in this version (A10)
 
@@ -116,6 +115,11 @@ log to the "Logged by the team" section, or tell Person 3.
   key is configured.
 - **Tipping points map.** Each square re-runs the search for the best plan. Where two plans are nearly tied,
   neighbouring squares can show different winners, so a single odd square is not a finding on its own.
+- **Tipping points on a slow machine.** For a new farm the search uses all 500 weather plans only when that is
+  quick; otherwise it uses the first 100 for the what-if points and says so on the page, and a tipping point can
+  then land one step away (for example 0.85x rainfall instead of 0.75x). The three example farms are worked out
+  ahead of time with all 500 plans (`data/precache/tipping/`), and that saved result is shown only while the
+  engine code, the assumptions and the farm's data are exactly the ones it was made with.
 - **NASA map layers.** SMAP soil moisture and MODIS vegetation index tiles are shown for context and need an
   internet connection. They are never model inputs.
 
