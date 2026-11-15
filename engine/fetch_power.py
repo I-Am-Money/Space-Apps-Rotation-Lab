@@ -1,4 +1,6 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
+# TODO (Person 2 handoff, 2026-11-15 12:56 PM): the v4 section at the bottom (load_site_weather) works live (tested for
+# Iowa: 1981 to 2026-11-12, no NaN, ET0 included) but has NO unit tests yet. The v3 load_weather above is unchanged.
 """NASA POWER daily point data (community AG) -> contract DataFrame.
 
 load_weather(lat, lon) -> DataFrame indexed by daily date 1981-01-01..2025-12-31,
@@ -153,3 +155,136 @@ if __name__ == "__main__":
     import sys
     la, lo = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else _region_point()
     print(json.dumps(describe(load_weather(la, lo)), indent=2))
+
+
+# =====================================================================================================
+# Build Spec v4 weather loader (Person 2, task 2): any point on Earth, 1981 to the latest day NASA has.
+#
+# load_site_weather(lat, lon) -> daily DataFrame, columns tmax, tmin, tmean, rh, wind2, precip, srad, et0,
+# et0_hargreaves (True where ET0 came from the Hargreaves fallback) and filled (True where any input was
+# gap-filled). No -999 and no NaN ever leaves this function (v4 test "no -999 or NaN reaches the engine").
+#
+# Missing values (POWER uses -999):
+#   - trailing days NASA has not published yet are dropped (the record ends at the last complete day);
+#   - gaps of up to 3 days are interpolated;
+#   - longer gaps (in practice: solar radiation before 1984, when the POWER solar record starts) are filled
+#     with that variable's day-of-year mean and flagged in the `filled` column and in df.attrs["filled_days"].
+#     On those days ET0 uses the Hargreaves equation, which needs only Tmax and Tmin, so the filled solar,
+#     humidity or wind values never drive the water balance.
+# Cached through engine.cache (weather expires after 7 days; an expired copy is still served offline).
+# =====================================================================================================
+import datetime as _dt
+
+from engine import cache as _cache
+
+V4_START = "1981-01-01"
+SOURCE_NAME = "NASA POWER daily point API (community AG)"
+
+
+def _request_range(lat, lon, start: str, end: str) -> dict:
+    try:
+        return _request(lat, lon, start, end)
+    except Exception:
+        data = None
+        y0, y1 = int(start[:4]), int(end[:4])
+        for a in range(y0, y1 + 1, 5):
+            part = _request(lat, lon, f"{a}0101" if a > y0 else start, f"{min(a + 4, y1)}1231" if a + 4 < y1 else end)
+            if data is None:
+                data = part
+            else:
+                for k, v in part["properties"]["parameter"].items():
+                    data["properties"]["parameter"][k].update(v)
+        return data
+
+
+def _fetch_payload(lat: float, lon: float) -> dict:
+    end = (_dt.date.today() - _dt.timedelta(days=1)).strftime("%Y%m%d")
+    raw = _request_range(lat, lon, V4_START.replace("-", ""), end)
+    par = raw["properties"]["parameter"]
+    days = sorted(par[PARAMS[0]])
+    cols = {RENAME[k]: [None if (par[k].get(d) is None or par[k][d] <= -900) else par[k][d] for d in days]
+            for k in PARAMS}
+    return {"first_day": days[0], "last_day": days[-1], "n_days": len(days), "columns": cols,
+            "elevation_m": raw["geometry"]["coordinates"][2],
+            "grid_point": raw["geometry"]["coordinates"][:2],
+            "api_version": raw.get("header", {}).get("api", {}).get("version")}
+
+
+def _fill_series(s: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """(filled series, mask of days filled from the day-of-year mean). Short gaps are interpolated."""
+    if not s.isna().any():
+        return s, pd.Series(False, index=s.index)
+    short = s.interpolate(limit=MAX_INTERP_GAP, limit_area="inside")
+    isn = s.isna()
+    run = (isn != isn.shift()).cumsum()
+    run_len = isn.groupby(run).transform("sum")
+    long_gap = isn & (run_len > MAX_INTERP_GAP)
+    short[long_gap] = np.nan                                   # do not half-interpolate long gaps
+    clim = s.groupby(s.index.day_of_year).mean()
+    fill = pd.Series(s.index.day_of_year, index=s.index).map(clim)
+    out = short.where(~short.isna(), fill)
+    if out.isna().any():                                       # a day of year never observed: overall mean
+        out = out.fillna(s.mean())
+    return out, (long_gap | (short.isna() & ~long_gap))
+
+
+def frame_from_payload(payload: dict, lat: float, lon: float, meta: dict | None = None) -> pd.DataFrame:
+    """Build the clean daily frame (see module notes). Raises ValueError if NASA returned no usable days."""
+    from engine import et0 as _et0
+
+    idx = pd.date_range(pd.Timestamp(payload["first_day"]), periods=payload["n_days"], freq="D")
+    df = pd.DataFrame({k: pd.array(v, dtype="float64") for k, v in payload["columns"].items()}, index=idx).astype(float)
+    df.index.name = "date"
+    core = df[["tmax", "tmin", "precip"]].notna().all(axis=1)
+    if not core.any():
+        raise ValueError("NASA POWER returned no usable days for this point")
+    df = df.loc[:core[core].index[-1]]                         # drop the not-yet-published tail
+    missing = df.isna()
+    filled_any = pd.Series(False, index=df.index)
+    filled_days = {}
+    for c in list(df.columns):
+        df[c], m = _fill_series(df[c])
+        filled_days[c] = int(m.sum())
+        filled_any |= m
+    if df.isna().any().any():
+        raise ValueError("NASA POWER weather still has gaps after filling")
+    df["tmean"] = np.where(missing["tmean"], (df["tmax"] + df["tmin"]) / 2, df["tmean"])
+    elev = float(payload.get("elevation_m") or 0.0)
+    doy = df.index.day_of_year.to_numpy()
+    es = (_et0._sat_vp(df["tmax"].to_numpy()) + _et0._sat_vp(df["tmin"].to_numpy())) / 2
+    ea = np.clip(df["rh"].to_numpy(), 1, 100) / 100 * es
+    pm = _et0.et0_penman_monteith(df["tmax"], df["tmin"], df["srad"], np.maximum(df["wind2"], 0.5), ea, lat, doy, elev)
+    hg = _et0.et0_hargreaves(df["tmax"], df["tmin"], lat, doy)
+    use_hg = (missing[["rh", "wind2", "srad"]].any(axis=1) | filled_any).to_numpy()
+    df["et0"] = np.where(use_hg, hg, pm)
+    df["et0_hargreaves"] = use_hg
+    df["filled"] = filled_any.to_numpy()
+    df.attrs.update(lat=float(lat), lon=float(lon), elevation_m=elev, source=SOURCE_NAME, url=API,
+                    power_api_version=payload.get("api_version"), filled_days=filled_days,
+                    hargreaves_days=int(use_hg.sum()), first_day=str(df.index[0].date()),
+                    last_day=str(df.index[-1].date()),
+                    last_full_year=int(df.index[-1].year if (df.index[-1].month, df.index[-1].day) == (12, 31)
+                                       else df.index[-1].year - 1),
+                    data_as_of=(meta or {}).get("data_as_of"), stale=bool((meta or {}).get("stale", False)),
+                    badge="Observed")
+    return df
+
+
+def load_site_weather(lat: float, lon: float, refresh: str = "auto", precache: bool = False) -> pd.DataFrame:
+    """Clean daily weather for any point, 1981 to the latest published day, with ET0. See module notes.
+
+    refresh: "auto" (7-day expiry), "never" (use any cached copy, for instant demo sites), "force".
+    Raises engine.cache.DataUnavailable when there is no cached copy and NASA POWER cannot be reached.
+    """
+    lat, lon = float(lat), float(lon)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise ValueError("latitude must be -90..90 and longitude -180..180")
+    key = _cache.location_key(lat, lon)
+    payload, meta = _cache.fetch_cached("weather", key, lambda: _fetch_payload(lat, lon), SOURCE_NAME, API,
+                                        refresh=refresh, precache=precache)
+    return frame_from_payload(payload, lat, lon, meta)
+
+
+def full_years(weather: pd.DataFrame) -> pd.DataFrame:
+    """The frame cut to complete calendar years (what scenarios should sample from)."""
+    return weather.loc[:f"{int(weather.attrs.get('last_full_year', weather.index[-1].year - 1))}-12-31"]
