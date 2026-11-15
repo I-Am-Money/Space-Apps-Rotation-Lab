@@ -47,3 +47,24 @@ Claude Code (Anthropic) wrote this code and its tests under the team's direction
 - Contract note: the rule is to go through `engine/api.py`. `api.simulate` does not exist yet, so the optimizer falls back to `engine.simulate` directly, then to a flagged stand-in. Switch to `api.simulate` when it lands; nothing else changes.
 - Speed on 81 rotations by 100 scenarios: about 4 s the first time (numba compiles), 0.1 s after. Moving a slider only re-runs the pick selection. `numba` must be installed (it is in requirements.txt); without it the simulation falls back to slow pure Python (about 45 s for the same run).
 - All per-plan numbers are averages per plan year, in metric units per hectare. The UI converts to acres for display.
+
+## Address and crop-history autofill (US)
+
+Files: `engine/address.py`, `engine/fetch_cdl.py`, `ui/autofill.py`, plus a small hook in `ui/setup.py`.
+
+For DATA_SOURCES.md:
+- **US Census Bureau Geocoder** (https://geocoding.geo.census.gov/geocoder/, geographies/onelineaddress, benchmark Public_AR_Current): street address to latitude, longitude, state and county. Free, no key, US addresses only. Checked live on 2026-11-15.
+- **USDA NASS Cropland Data Layer**, read through the CropScape web service (https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLValue): the crop at a spot for each year, 2021 to 2025 at the time of writing. A satellite-based classification at 30 m for the lower 48 states. Coordinates are sent in EPSG:5070; the projection in `fetch_cdl.py` was checked against pyproj at six points across the US (difference under 0.01 m). Checked live on 2026-11-15 in Iowa, Kansas and Georgia.
+
+For LIMITATIONS.md:
+- The crop record is a classification, not a farm record. A pixel can be wrong, so the farmer confirms every year.
+- Lower 48 states only. Alaska and Hawaii get the location but no crop history; outside the US the farmer enters everything by hand.
+- Ownership and parcel boundaries are not connected. They come from county records, which need a paid or per-county source. The page says so and does not claim to verify ownership.
+- The crop service usually answers in about 3 seconds, but some requests hang. The code uses an 8 second timeout with 3 attempts, so a lookup takes about 5 to 25 seconds (23 seconds in a real test).
+- A street address lands on the farmhouse, where the satellite record says Developed. The code searches rings from 60 to 450 m around the address for the nearest cropland, uses that spot for the crop record and the pin, and tells the farmer how far away it is and in which direction. Tested on a real Iowa farm address (oats 60 m away). If no cropland is within 450 m, it says so.
+- Alfalfa and other crops this tool has no parameters for are left blank for the farmer.
+- Double-cropped years are shown as the first crop only, with a note.
+- The CDL "Millet" class is not mapped (it is not pearl millet); pasture, fallow and non-crop classes are left blank for the farmer.
+- Field outline from the CDL (a map around the pin) was tried and the service timed out, so it is not built.
+
+Privacy: the address is sent to the Census service only. It is held in memory for the session and never written to disk or logged.

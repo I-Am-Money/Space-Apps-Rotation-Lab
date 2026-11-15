@@ -41,3 +41,6 @@ After authenticated publication, deploy app.py with Python 3.11 and the existing
 ## GitHub publication follow-up — November 15
 
 The newly selected GitHub connection now permits branch/blob writes; the earlier 403 block above is historical. Refreshed main b1e3f2a includes Person 2 tipping and climate-shift modules. Those are merged, the owner tipping page calls through engine.api, and API recommendation scoring now separates climate modes and bypasses baseline memoization for transient what-if contexts. A regression test verifies this isolation. Publishing targets p4-app; main is not overwritten. NASS-key and disabled-zone limitations remain. Final test and publication outcome are reported with the pushed commit.
+
+
+Latest audit and host setup instructions: docs/notes/charvik.md, section "API, data and security audit". The provided NASS key is configured only in ignored local secrets; live NASS access timed out here, so authentication remains unverified. New safety fixes cover credential errors, source totals, currency, cache isolation, input checks, measurement climate context and provenance. No key is included in this handoff or repository.

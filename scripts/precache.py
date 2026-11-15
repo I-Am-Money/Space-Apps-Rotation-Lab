@@ -1,4 +1,4 @@
-# TODO: complete the 15-location run after api.get_site and the historical-yield pre-cache hook are exposed.
+# Source completion is reported per site; suppressed observations remain unavailable.
 # AI use: written with OpenAI Codex under the team's direction. See AI_USE.md.
 """Warm demo/validation locations through engine.api; report missing integrations honestly.
 

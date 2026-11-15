@@ -25,6 +25,9 @@ from __future__ import annotations
 import csv
 import io
 import os
+import math
+import re
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
 
@@ -36,6 +39,7 @@ from engine import cache
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSUMPTIONS = ROOT / "config" / "assumptions" / "us_data.yaml"
+SECRETS_PATH = ROOT / ".streamlit" / "secrets.toml"
 SOURCE = "USDA NASS Quick Stats"
 LB_KG = 0.45359237
 ACRE_HA = 0.40468564224
@@ -52,7 +56,7 @@ STATE_FIPS = {
     "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI", "56": "WY"}
 
 
-_PRECACHE = False      # True only inside precache_county(): answers go to the committed data/precache/
+_PRECACHE = ContextVar("nass_precache", default=False)  # isolated per request/thread
 
 
 class NassUnavailable(RuntimeError):
@@ -81,12 +85,27 @@ def usd_per_t_per_unit(crop: str) -> float:
     return 1000.0 / (float(crop_spec(crop)["price_lb_per_unit"]) * LB_KG)
 
 
+def _api_key() -> str:
+    # Respect an explicitly empty environment value (tests/disabled service).
+    if "NASS_API_KEY" in os.environ:
+        return os.environ["NASS_API_KEY"].strip()
+    import tomllib
+    try:
+        with SECRETS_PATH.open('rb') as stream:
+            value = tomllib.load(stream).get('NASS_API_KEY', '')
+        return value.strip() if isinstance(value, str) else ''
+    except (OSError, ValueError):
+        return ''
+
+
 def has_key() -> bool:
-    return bool(os.environ.get("NASS_API_KEY", "").strip())
+    return bool(_api_key())
 
 
 def split_fips(fips: str) -> tuple[str, str]:
     f = str(fips).strip().zfill(5)
+    if not re.fullmatch(r"[0-9]{5}", f) or f[:2] not in STATE_FIPS or f[2:] == "000":
+        raise ValueError("County FIPS must contain a valid two-digit state and three-digit county code")
     return f[:2], f[2:]
 
 
@@ -98,7 +117,8 @@ def parse_value(v):
     if not s or s in set(config()["nass"]["suppressed_codes"]["value"]) or s.startswith("("):
         return None
     try:
-        return float(s.replace(",", ""))
+        value = float(s.replace(",", ""))
+        return value if math.isfinite(value) and value >= 0 else None
     except ValueError:
         return None
 
@@ -117,7 +137,7 @@ _UTIL_WORDS = {"GRAIN", "SILAGE", "FORAGE", "SEED", "HAY", "HAYLAGE", "SUGAR", "
 
 def public_csv_allowed() -> bool:
     """The key-free website route is used only while pre-caching, or when NASS_PUBLIC_CSV=1 is set."""
-    return _PRECACHE or os.environ.get("NASS_PUBLIC_CSV", "").strip().lower() in ("1", "true", "yes")
+    return _PRECACHE.get() or os.environ.get("NASS_PUBLIC_CSV", "").strip().lower() in ("1", "true", "yes")
 
 
 def parse_data_item(item: str, commodity: str) -> dict:
@@ -168,21 +188,44 @@ def _get_public_csv(params: dict) -> list[dict]:
 
 def _get(params: dict) -> list[dict]:
     """One Quick Stats call. Returns the list of records ([] when NASS has no matching rows)."""
-    key = os.environ.get("NASS_API_KEY", "").strip()
+    key = _api_key()
     if not key:
         if public_csv_allowed():
             return _get_public_csv(params)
         raise NassUnavailable("NASS_API_KEY is not set")
-    r = requests.get(config()["nass"]["api_url"]["value"], params={**params, "key": key, "format": "JSON"},
-                     timeout=60)
-    if r.status_code == 400 and "invalid query" in r.text.lower():
-        return []                         # NASS answers 400 "bad request - invalid query" when nothing matches
-    r.raise_for_status()
-    data = r.json().get("data", [])
+    try:
+        r = requests.get(config()["nass"]["api_url"]["value"], params={**params, "key": key, "format": "JSON"},
+                         timeout=(5, 45))
+        if r.status_code == 400 and "invalid query" in r.text.lower():
+            return []  # Quick Stats uses this response for an empty selection too.
+        if r.status_code in (401, 403):
+            raise NassUnavailable("NASS authentication failed; check NASS_API_KEY in server secrets")
+        if r.status_code >= 400:
+            raise NassUnavailable(f"NASS service returned HTTP {r.status_code}; retry or use cached data")
+        body = r.json()
+        if not isinstance(body, dict) or not isinstance(body.get("data"), list):
+            raise NassUnavailable("NASS returned an invalid response; retry or use cached data")
+        data = body["data"]
+        if any(not isinstance(row, dict) for row in data):
+            raise NassUnavailable("NASS returned invalid records; retry or use cached data")
+    except (requests.RequestException, ValueError):
+        # requests exceptions contain the prepared URL, including the API key.
+        # Do not chain or return those errors to the UI/cache/logs.
+        raise NassUnavailable("NASS request failed; retry or use cached data") from None
     keep = ("year", "Value", "commodity_desc", "class_desc", "util_practice_desc", "prodn_practice_desc",
             "statisticcat_desc", "unit_desc", "short_desc", "reference_period_desc", "agg_level_desc",
-            "state_fips_code", "county_code", "source_desc", "freq_desc")
+            "state_fips_code", "county_code", "source_desc", "freq_desc", "domain_desc", "domaincat_desc")
     return [{k: d.get(k) for k in keep} for d in data]
+
+
+def check_connection() -> dict:
+    """Small uncached authenticated probe. Never returns the credential or request URL."""
+    rows = _get({'commodity_desc': 'CORN', 'statisticcat_desc': 'YIELD', 'agg_level_desc': 'COUNTY',
+                 'state_fips_code': '19', 'county_code': '169', 'year': 2023,
+                 'domain_desc': 'TOTAL', 'freq_desc': 'ANNUAL'})
+    if not rows:
+        raise NassUnavailable('The NASS probe returned no data; authentication and source availability are unverified')
+    return {'authenticated': True, 'records': len(rows), 'source': SOURCE}
 
 
 def query(kind_key: str, params: dict, refresh: str = "auto") -> tuple[list[dict], dict]:
@@ -190,7 +233,7 @@ def query(kind_key: str, params: dict, refresh: str = "auto") -> tuple[list[dict
     try:
         url = PUBLIC_URL if (not has_key() and public_csv_allowed()) else "https://quickstats.nass.usda.gov/api"
         return cache.fetch_cached("nass", kind_key, lambda: _get(params), SOURCE, url=url, refresh=refresh,
-                                  precache=_PRECACHE)
+                                  precache=_PRECACHE.get())
     except cache.DataUnavailable as e:
         raise NassUnavailable(str(e)) from e
 
@@ -201,17 +244,20 @@ def _county_records(fips: str, stat: str) -> tuple[list[dict], dict]:
     st, co = split_fips(fips)
     return query(f"county_{stat.lower().replace(' ', '_')}_{st}{co}",
                  {"source_desc": "SURVEY", "agg_level_desc": "COUNTY", "statisticcat_desc": stat,
-                  "state_fips_code": st, "county_code": co})
+                  "state_fips_code": st, "county_code": co, "sector_desc": "CROPS",
+                  "group_desc": "FIELD CROPS", "freq_desc": "ANNUAL", "domain_desc": "TOTAL"})
 
 
 def _state_records(state_fips: str, stat: str, commodity: str) -> tuple[list[dict], dict]:
     return query(f"state_{stat.lower().replace(' ', '_')}_{state_fips}_{commodity.lower()}",
                  {"source_desc": "SURVEY", "agg_level_desc": "STATE", "statisticcat_desc": stat,
-                  "state_fips_code": state_fips, "commodity_desc": commodity})
+                  "state_fips_code": state_fips, "commodity_desc": commodity, "freq_desc": "ANNUAL", "domain_desc": "TOTAL"})
 
 
 def _match(rec: dict, crop: str, practice: str | None = None, unit_key: str = "yield_unit") -> bool:
     s = crop_spec(crop)
+    if rec.get("domain_desc") not in (None, "", "TOTAL"):
+        return False
     if rec.get("commodity_desc") != s["commodity_desc"]:
         return False
     if s.get("class_desc") and unit_key == "yield_unit" and rec.get("class_desc") != s["class_desc"]:
@@ -245,14 +291,16 @@ def county_yields(fips: str, crop: str, practice: str | None = None, allow_state
 
     allow_state=True falls back to the state series (level="state") when the county has none. The hindcast
     keeps allow_state=False: validating a county model against a state number would overstate skill."""
-    recs, _ = _county_records(fips, "YIELD")
+    recs, meta = _county_records(fips, "YIELD")
     s = yield_series(recs, crop, practice)
     level = "county"
     if s.empty and allow_state:
         st, _co = split_fips(fips)
-        srecs, _ = _state_records(st, "YIELD", crop_spec(crop)["commodity_desc"])
+        srecs, meta = _state_records(st, "YIELD", crop_spec(crop)["commodity_desc"])
         s, level = yield_series(srecs, crop, practice), "state"
-    return pd.DataFrame({"year": s.index.astype(int), "yield_kg_ha": s.to_numpy(float), "level": level})
+    result = pd.DataFrame({"year": s.index.astype(int), "yield_kg_ha": s.to_numpy(float), "level": level})
+    result.attrs.update(meta)
+    return result
 
 
 def default_yield(fips: str, crop: str, n_years: int | None = None) -> dict | None:
@@ -274,13 +322,15 @@ def prices_received(state_fips: str, crop: str) -> dict | None:
     """Latest marketing-year price received in $/t: state, else national (labelled). None if neither."""
     s = crop_spec(crop)
     params = {"source_desc": "SURVEY", "statisticcat_desc": "PRICE RECEIVED", "commodity_desc": s["commodity_desc"],
-              "freq_desc": "ANNUAL", "reference_period_desc": "MARKETING YEAR"}
+              "freq_desc": "ANNUAL", "reference_period_desc": "MARKETING YEAR", "domain_desc": "TOTAL"}
     for level, extra in (("state", {"agg_level_desc": "STATE", "state_fips_code": state_fips}),
                          ("national", {"agg_level_desc": "NATIONAL"})):
         key = f"price_{level}_{state_fips if level == 'state' else 'us'}_{s['commodity_desc'].lower()}"
         recs, meta = query(key, {**params, **extra})
         best = None
         for r in recs:
+            if r.get("domain_desc") not in (None, "", "TOTAL"):
+                continue
             if r.get("unit_desc") != s["price_unit"]:
                 continue
             if s.get("price_class_desc") and r.get("class_desc") not in (s["price_class_desc"], None, ""):
@@ -310,6 +360,10 @@ def crops_grown(fips: str, recent_years: int = 5) -> list[str]:
     for crop in known_crops():
         s = crop_spec(crop)
         for r in recs:
+            if r.get("domain_desc") not in (None, "", "TOTAL"):
+                continue
+            if s.get("util_practice_desc") and r.get("util_practice_desc") not in (s["util_practice_desc"], None, ""):
+                continue
             if int(r["year"]) <= last - recent_years or r.get("commodity_desc") != s["commodity_desc"]:
                 continue
             if s.get("class_desc") and r.get("class_desc") not in (s["class_desc"],):
@@ -395,15 +449,18 @@ def us_defaults(fips: str) -> dict:
 def precache_county(fips: str, crops=None) -> dict:
     """Fetch every NASS query a county needs and write it to the committed pre-cache. Uses NASS_API_KEY when
     set, otherwise the public Quick Stats website download."""
-    global _PRECACHE
-    _PRECACHE = True
+    token = _PRECACHE.set(True)
     try:
         d = us_defaults(fips)
+        histories = {}
         for crop in crops or []:
-            county_yields(fips, crop)
+            df = county_yields(fips, crop)
+            histories[crop] = {"years": len(df), "level": "county", "available": not df.empty, "stored": bool(df.attrs.get("stored"))}
+        d["historical_yields"] = histories
+        d["historical_complete"] = bool(histories) and all(row["available"] and row["stored"] for row in histories.values())
         return d
     finally:
-        _PRECACHE = False
+        _PRECACHE.reset(token)
 
 
 if __name__ == "__main__":

@@ -38,6 +38,8 @@ def params() -> dict:
 def evpi_value(J) -> float:
     """EVPI from a matrix J[k, r] (k plausible values by r rotations). Never negative."""
     J = np.asarray(J, dtype=float)
+    if J.ndim != 2 or not J.shape[0] or not J.shape[1] or not np.isfinite(J).all():
+        raise ValueError('Value of information needs a finite, nonempty matrix of feasible rotation scores')
     return max(0.0, float(J.max(axis=1).mean() - J.mean(axis=0).max()))
 
 

@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from ui import autofill
 from streamlit_folium import st_folium
 from engine import api
 from ui.planner_model import (DEMO_SITES, record, area_value, provenance,
@@ -69,7 +70,7 @@ def open_preset(preset):
     """One click on an example farm: load the place, fill in the example answers and go straight to the result.
     The answers stay editable under 'Edit farm details'. If anything is missing the farmer lands on the form instead."""
     lat, lon = float(preset['lat']), float(preset['lon'])
-    for name in ('pin_lat', 'pin_lon', '_v4_farm_widgets', 'v4_inputs', 'v4_rec', 'v4_site', 'v4_location'):
+    for name in ('pin_lat', 'pin_lon', '_v4_farm_widgets', 'v4_inputs', 'v4_rec', 'v4_site', 'v4_location', 'v4_cdl_plan', '_v4_autoload'):
         st.session_state.pop(name, None)
     st.session_state.update(v4_lat=lat, v4_lon=lon, v4_screen='farm')
     if missing_api() or len(preset['plan']) != 4 or preset['acres'] <= 0:
@@ -123,6 +124,9 @@ def stamp(value=None, badges=None):
     from ui.components import badge
     st.markdown(' '.join(badge(label) for label in labels), unsafe_allow_html=True)
     st.caption('Data as of ' + str(asof or 'not supplied by engine'))
+    # Source notes (for example which USDA cost table was used) are information, shown once each, not warnings.
+    for note in dict.fromkeys(n for n in (record(value).get('notes') or []) if isinstance(n, str)):
+        st.caption(note)
 
 
 def style():
@@ -240,8 +244,9 @@ def farm():
     saved = st.session_state.get('_v4_farm_widgets', {})
     for name, value in saved.items():
         st.session_state.setdefault(name, value)
+    autofill.render()
     lat, lon = location_map()
-    if st.button('Load this location', type='primary'):
+    if st.button('Load this location', type='primary') or st.session_state.pop('_v4_autoload', False):
         if missing_api():
             st.warning('Location lookup is waiting for Person 1’s v4 engine/api.py. No global results have been calculated.')
         else:
@@ -269,9 +274,14 @@ def farm():
     current_currency = st.text_input('Currency code', value=getattr(site, 'currency', None) or '', key='v4_currency',
                                      help='Display label only. Enter all prices and costs in this same currency; no exchange conversion is performed.').strip().upper()
     site.currency = current_currency or None
+    if getattr(site, 'us_defaults', None) is not None and current_currency not in ('', 'USD'):
+        st.info('USDA prices and costs are in USD. Enter every price and cost in your selected currency; no automatic exchange conversion is available.')
     # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
     crops = list(record(record(site).get('us_defaults')).get('crops') or [])
     if crops:
+        for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):
+            if c in crops:
+                st.session_state.setdefault(f'v4_crop{i}', c)
         plan = [col.selectbox(f'Year {i+1} current crop', crops, key=f'v4_crop{i}', format_func=lambda c: crop_name(c).capitalize())
                 for i, col in enumerate(st.columns(4))]
     else:
@@ -297,6 +307,7 @@ def farm():
     soil, history = None, None
     with st.expander('Soil test · optional'):
         if st.checkbox('Add a soil test', key='v4_add_soil'):
+            st.caption('Recorded for your reference. These measurements do not change simulated water capacity or yield; a verified relation is not available yet.')
             soil = dict(organic_matter_pct=st.number_input('Organic matter (%)', 0., 100., value=None, key='v4_organic_matter'),
                         ph=st.number_input('pH', 0., 14., value=None, key='v4_ph'), texture=st.text_input('Texture', key='v4_texture'))
     with st.expander('Field history · optional'):
