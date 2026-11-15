@@ -1,6 +1,6 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
-# TODO (partial): uses Person 2's engine.yieldmodel.season_relative_yield (stand-in only if it is missing);
-# real US numbers need NASS county yields cached (python -m engine.fetch_nass --precache-validation, needs NASS_API_KEY).
+# Uses Person 2's engine.yieldmodel.season_relative_yield (stand-in only if it is missing). US numbers come from the
+# NASS county yields cached in data/precache/nass/ (python -m engine.fetch_nass --precache-validation).
 """Hindcast (engine-decision): single-season model yield vs ICRISAT district yield, per crop.
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times

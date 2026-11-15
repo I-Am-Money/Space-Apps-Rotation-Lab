@@ -12,6 +12,9 @@ Rules:
   * Suppressed county values ((D) withheld etc.) or no county series -> the state series, labelled
     level="state" with the note "State average: county data withheld or not published by NASS" (R2).
   * Key: environment variable NASS_API_KEY. It is never written to disk, logs or cache metadata.
+  * No key: the pre-cache command (and any run with NASS_PUBLIC_CSV=1) downloads the same Quick Stats records
+    through the public Quick Stats website's own spreadsheet download, which needs no key. That route is not
+    a documented API, so the app itself does not use it unless NASS_PUBLIC_CSV=1 is set.
   * Caching: engine.cache.fetch_cached(kind="nass"), 7-day expiry. Without a key (or offline) cached and
     pre-cached copies are still used; with no copy at all a NassUnavailable error is raised and
     us_defaults() returns empty values with badge "missing" so the UI asks the farmer. Nothing is invented.
@@ -19,6 +22,8 @@ Units out: kg/ha and US dollars per tonne (engine units are metric).
 """
 from __future__ import annotations
 
+import csv
+import io
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -34,6 +39,7 @@ ASSUMPTIONS = ROOT / "config" / "assumptions" / "us_data.yaml"
 SOURCE = "USDA NASS Quick Stats"
 LB_KG = 0.45359237
 ACRE_HA = 0.40468564224
+PUBLIC_URL = "https://quickstats.nass.usda.gov (website spreadsheet export, no key)"
 STATE_NOTE = "State average: county data withheld or not published by NASS"
 
 # US state FIPS -> postal code (ANSI/FIPS 5-2 state codes).
@@ -97,12 +103,75 @@ def parse_value(v):
         return None
 
 
+# ------------------------------------------------------------------------------------------- public CSV route
+# The Quick Stats website (https://quickstats.nass.usda.gov) lets anyone download a query as a spreadsheet
+# without a key: the page posts the query to /uuid/encode and downloads /data/spreadsheet/<id>.csv. The rows
+# are the same Quick Stats records as the API returns, but class, utilization, practice and unit are only
+# inside the "Data Item" text, so they are parsed back out here. The two word lists below are parsing
+# vocabulary (NASS names), not model parameters.
+
+_PRACTICE_START = ("IRRIGATED", "NON-IRRIGATED", "ORGANIC", "FOLLOWING", "NOT FOLLOWING", "CONTINUOUS")
+_UTIL_WORDS = {"GRAIN", "SILAGE", "FORAGE", "SEED", "HAY", "HAYLAGE", "SUGAR", "SYRUP", "PROCESSING",
+               "FRESH MARKET", "HAY & HAYLAGE", "GREENCHOP", "OIL"}
+
+
+def public_csv_allowed() -> bool:
+    """The key-free website route is used only while pre-caching, or when NASS_PUBLIC_CSV=1 is set."""
+    return _PRECACHE or os.environ.get("NASS_PUBLIC_CSV", "").strip().lower() in ("1", "true", "yes")
+
+
+def parse_data_item(item: str, commodity: str) -> dict:
+    """Split a Quick Stats "Data Item" (short_desc) into class, utilization, practice, statistic and unit.
+
+    "CORN, GRAIN, NON-IRRIGATED - YIELD, MEASURED IN BU / ACRE" ->
+      class ALL CLASSES, util GRAIN, practice NON-IRRIGATED, statistic YIELD, unit BU / ACRE."""
+    left, _, right = str(item).partition(" - ")
+    stat, _, unit = right.partition(", MEASURED IN ")
+    rest = left[len(commodity):] if commodity and left.startswith(commodity) else ""
+    tokens = [t.strip() for t in rest.split(",") if t.strip()]
+    util = [t for t in tokens if t in _UTIL_WORDS]
+    tokens = [t for t in tokens if t not in _UTIL_WORDS]
+    cut = next((i for i, t in enumerate(tokens) if t.startswith(_PRACTICE_START)), len(tokens))
+    return {"class_desc": ", ".join(tokens[:cut]) or "ALL CLASSES",
+            "util_practice_desc": ", ".join(util) or "ALL UTILIZATION PRACTICES",
+            "prodn_practice_desc": ", ".join(tokens[cut:]) or "ALL PRODUCTION PRACTICES",
+            "statisticcat_desc": stat.strip(), "unit_desc": unit.strip() or stat.strip()}
+
+
+def records_from_csv(text: str) -> list[dict]:
+    """Quick Stats website spreadsheet (CSV text) -> records shaped like the API's."""
+    out = []
+    for row in csv.DictReader(io.StringIO(text)):
+        item, commodity = row.get("Data Item") or "", row.get("Commodity") or ""
+        if not item:
+            continue
+        out.append({"year": row.get("Year"), "Value": row.get("Value"), "commodity_desc": commodity,
+                    **parse_data_item(item, commodity), "short_desc": item,
+                    "reference_period_desc": row.get("Period"), "agg_level_desc": row.get("Geo Level"),
+                    "state_fips_code": row.get("State ANSI"), "county_code": row.get("County ANSI"),
+                    "source_desc": row.get("Program"), "freq_desc": None})
+    return out
+
+
+def _get_public_csv(params: dict) -> list[dict]:
+    """The same query through the Quick Stats website's spreadsheet download (no key)."""
+    cfg = config()["nass"]
+    r = requests.post(cfg["public_encode_url"]["value"], data=params, timeout=60)
+    r.raise_for_status()
+    query_id = str(r.json()).strip()
+    r = requests.get(cfg["public_csv_url"]["value"].format(id=query_id), timeout=180)
+    r.raise_for_status()
+    return records_from_csv(r.text)
+
+
 # ------------------------------------------------------------------------------------------- raw query
 
 def _get(params: dict) -> list[dict]:
     """One Quick Stats call. Returns the list of records ([] when NASS has no matching rows)."""
     key = os.environ.get("NASS_API_KEY", "").strip()
     if not key:
+        if public_csv_allowed():
+            return _get_public_csv(params)
         raise NassUnavailable("NASS_API_KEY is not set")
     r = requests.get(config()["nass"]["api_url"]["value"], params={**params, "key": key, "format": "JSON"},
                      timeout=60)
@@ -119,8 +188,8 @@ def _get(params: dict) -> list[dict]:
 def query(kind_key: str, params: dict, refresh: str = "auto") -> tuple[list[dict], dict]:
     """Cached Quick Stats query. Returns (records, meta with data_as_of / stale / from_cache)."""
     try:
-        return cache.fetch_cached("nass", kind_key, lambda: _get(params), SOURCE,
-                                  url="https://quickstats.nass.usda.gov/api", refresh=refresh,
+        url = PUBLIC_URL if (not has_key() and public_csv_allowed()) else "https://quickstats.nass.usda.gov/api"
+        return cache.fetch_cached("nass", kind_key, lambda: _get(params), SOURCE, url=url, refresh=refresh,
                                   precache=_PRECACHE)
     except cache.DataUnavailable as e:
         raise NassUnavailable(str(e)) from e
@@ -147,6 +216,8 @@ def _match(rec: dict, crop: str, practice: str | None = None, unit_key: str = "y
         return False
     if s.get("class_desc") and unit_key == "yield_unit" and rec.get("class_desc") != s["class_desc"]:
         return False
+    if not s.get("class_desc") and unit_key == "yield_unit" and rec.get("class_desc") not in ("ALL CLASSES", None, ""):
+        return False                      # e.g. "RICE, LONG GRAIN" must not overwrite the all-rice yield
     if s.get("util_practice_desc") and rec.get("util_practice_desc") not in (s["util_practice_desc"], None, ""):
         return False
     if unit_key and rec.get("unit_desc") != s[unit_key]:
@@ -322,7 +393,8 @@ def us_defaults(fips: str) -> dict:
 
 
 def precache_county(fips: str, crops=None) -> dict:
-    """Fetch every NASS query a county needs and write it to the committed pre-cache (needs NASS_API_KEY)."""
+    """Fetch every NASS query a county needs and write it to the committed pre-cache. Uses NASS_API_KEY when
+    set, otherwise the public Quick Stats website download."""
     global _PRECACHE
     _PRECACHE = True
     try:

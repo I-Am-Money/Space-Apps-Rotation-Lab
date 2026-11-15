@@ -12,8 +12,16 @@ from engine import cache, fetch_ers, fetch_nass, us_rules
 
 @pytest.fixture
 def iso_cache(tmp_path, monkeypatch):
-    """Runtime cache in a temp folder; the committed pre-cache (ERS) stays readable."""
+    """Runtime cache in a temp folder; the committed pre-cache (ERS) stays readable, except the real NASS
+    pre-cache, which is hidden so the synthetic NASS records below are what the code sees."""
     monkeypatch.setattr(cache, "RUNTIME_DIR", tmp_path / "cache")
+    pre = tmp_path / "precache"
+    pre.mkdir()
+    for d in cache.PRECACHE_DIR.iterdir():
+        if d.is_dir() and d.name != "nass":
+            (pre / d.name).symlink_to(d, target_is_directory=True)
+    monkeypatch.setattr(cache, "PRECACHE_DIR", pre)
+    monkeypatch.delenv("NASS_PUBLIC_CSV", raising=False)
     monkeypatch.delenv("ROTATIONLAB_OFFLINE", raising=False)
     return tmp_path
 
@@ -179,3 +187,40 @@ def test_ers_cost_matches_raw_csv_and_falls_back_to_us(iso_cache):
     pn = fetch_ers.cost_for_county("13205", "peanut")             # sub-region matched by state
     assert pn["region"] == "Southern Seaboard (AL, GA)"
     assert fetch_ers.cost_for_county("19169", "potato") is None
+
+
+def test_public_csv_rows_parse_like_api_records(iso_cache, monkeypatch):
+    """The key-free Quick Stats website download: the header and Data Item wording are NASS's; the VALUES in
+    these rows are SYNTHETIC TEST DATA, not real NASS numbers."""
+    head = ('"Program","Year","Period","Week Ending","Geo Level","State","State ANSI","Ag District",'
+            '"Ag District Code","County","County ANSI","Zip Code","Region","watershed_code","Watershed",'
+            '"Commodity","Data Item","Domain","Domain Category","Value","CV (%)"')
+    def row(year, period, commodity, item, value):
+        return (f'"SURVEY","{year}","{period}","","COUNTY","IOWA","19","CENTRAL","50","STORY","169","","",'
+                f'"00000000","","{commodity}","{item}","TOTAL","NOT SPECIFIED","{value}",""')
+    text = "\n".join([head,
+        row(2020, "YEAR", "CORN", "CORN, GRAIN - YIELD, MEASURED IN BU / ACRE", "100"),
+        row(2021, "YEAR", "CORN", "CORN, GRAIN - YIELD, MEASURED IN BU / ACRE", " (D)"),
+        row(2020, "YEAR", "CORN", "CORN, GRAIN, NON-IRRIGATED - YIELD, MEASURED IN BU / ACRE", "80"),
+        row(2020, "YEAR", "CORN", "CORN, SILAGE - YIELD, MEASURED IN TONS / ACRE", "20"),
+        row(2020, "YEAR", "CORN", "CORN, GRAIN - YIELD, MEASURED IN BU / NET PLANTED ACRE", "90"),
+        row(2020, "YEAR - AUG FORECAST", "CORN", "CORN, GRAIN - YIELD, MEASURED IN BU / ACRE", "95"),
+        row(2020, "YEAR", "WHEAT", "WHEAT, SPRING, (EXCL DURUM), NON-IRRIGATED, CONTINUOUS CROP - YIELD, MEASURED IN BU / ACRE", "40"),
+        row(2020, "YEAR", "RICE", "RICE - YIELD, MEASURED IN LB / ACRE", "7,000"),
+        row(2020, "YEAR", "RICE", "RICE, LONG GRAIN - YIELD, MEASURED IN LB / ACRE", "6,000")])
+    recs = fetch_nass.records_from_csv(text)
+    wheat = [r for r in recs if r["commodity_desc"] == "WHEAT"][0]
+    assert wheat["class_desc"] == "SPRING, (EXCL DURUM)" and wheat["prodn_practice_desc"] == "NON-IRRIGATED, CONTINUOUS CROP"
+    assert fetch_nass.yield_series(recs, "maize").to_dict() == {2020: pytest.approx(100 * fetch_nass.kg_ha_per_unit("maize"))}
+    assert fetch_nass.yield_series(recs, "maize", "NON-IRRIGATED").to_dict() == {2020: pytest.approx(80 * fetch_nass.kg_ha_per_unit("maize"))}
+    assert fetch_nass.yield_series(recs, "rice").to_dict() == {2020: pytest.approx(7000 * fetch_nass.kg_ha_per_unit("rice"))}
+
+
+def test_public_csv_route_is_off_unless_precaching_or_opted_in(iso_cache, monkeypatch):
+    monkeypatch.delenv("NASS_API_KEY", raising=False)
+    monkeypatch.setattr(fetch_nass, "_get_public_csv", lambda p: (_ for _ in ()).throw(AssertionError("must not be called")))
+    with pytest.raises(fetch_nass.NassUnavailable):
+        fetch_nass._get({"statisticcat_desc": "YIELD"})
+    monkeypatch.setattr(fetch_nass, "_get_public_csv", lambda p: [])
+    monkeypatch.setenv("NASS_PUBLIC_CSV", "1")
+    assert fetch_nass._get({"statisticcat_desc": "YIELD"}) == []

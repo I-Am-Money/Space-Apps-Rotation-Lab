@@ -100,3 +100,20 @@ def test_us_and_india_rows_told_apart_after_csv_round_trip(tmp_path):
     rows = trust.validation_rows(SimpleNamespace(table=pd.read_csv(f, dtype={"fips": str}), sites=[]))
     assert [r["Country"] for r in rows] == ["India", "US"]
     assert rows[0]["ERS region"] == "Deccan Plateau (India)" and rows[0]["Status"] == "validated"
+
+
+def test_banner_still_warns_when_checked_but_model_does_not_track():
+    """Synthetic table: a county that was checked but has held-out r <= 0 is not shown as validated."""
+    s = _summary()
+    s.table.loc[:, "r"] = -0.3
+    b = trust.banner_for_site({"us_county_fips": "19169"}, s)
+    assert b["show"] and "did not track" in b["text"] and "-0.30" in b["text"]
+
+
+def test_validation_headline_is_computed_from_rows():
+    rows = [{"Status": "validated", "Country": "US", "Water": "rain", "r (held out)": v} for v in ("0.20", "0.60", "-0.10")]
+    rows += [{"Status": "validated", "Country": "India", "Water": "rain", "r (held out)": "0.40"},
+             {"Status": "no NASS data", "Country": "US", "Water": "rain", "r (held out)": "n/a"}]
+    lines = trust.validation_headline(rows)
+    assert lines[0].startswith("Mostly rainfed US counties: median held-out r = 0.20 across 3") and "1 of them" in lines[0]
+    assert lines[1].startswith("India districts: median held-out r = 0.40 across 1")

@@ -1,6 +1,6 @@
 # AI use: this file was written by Claude Code (Anthropic) under the team's direction, then reviewed by the team. See AI_USE.md.
-# TODO (partial): works and is tested; config/validation/results.csv is not generated yet because NASS county yields
-# need NASS_API_KEY. Then run: python -m engine.fetch_nass --precache-validation && python -m engine.correction
+# config/validation/results.csv was generated on 2026-11-15 from real NASS county yields (data/precache/nass/).
+# To rebuild: python -m engine.fetch_nass --precache-validation && python -m engine.correction
 """Hybrid bias correction (Build Spec v4, R12) and validation_summary() for api.py. Owner: Person 3.
 
 In counties with enough NASS history, a numpy linear regression of (actual - modeled yield) on season rain,

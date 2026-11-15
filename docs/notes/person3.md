@@ -5,11 +5,14 @@ into LIMITATIONS.md, DATA_SOURCES.md and AI_USE.md. No names, emails or photos o
 
 ## For LIMITATIONS.md
 
-- NASS: no `NASS_API_KEY` in the build environment (2026-11-15). `engine/fetch_nass.py` works against the
-  live API when the key is set, uses cached copies otherwise, and with neither returns "NASS data unavailable".
-  The UI then asks the farmer for yield and price. No yields are filled in. Validation shows "validation not run yet".
-- NASS query strings (class/util names, Census irrigated and cropland `short_desc`) follow the Quick Stats
-  naming but were not checked against a live query. Team to verify once a key is available.
+- NASS: no `NASS_API_KEY` in the build environment (2026-11-15). The 14 validation counties were downloaded
+  without a key through the public Quick Stats website spreadsheet export and cached in `data/precache/nass/`.
+  That export is not a documented API and was rate limited after about 50 downloads. The app does not call it
+  unless `NASS_PUBLIC_CSV=1`. Other US pins without a key show "NASS data unavailable" and ask the farmer.
+- US validation ran on real NASS county yields (31 county and crop pairs). Mostly rainfed: median held-out
+  r 0.42 (22 pairs, 7 at or below zero). Mostly irrigated: median -0.04 (9 pairs). See LIMITATIONS item 21.
+- The key-based API path has still never been run live. Class, use and practice names were checked against the
+  website export for the 14 counties.
 - Suppressed county data falls back to the state average, labelled. The hindcast never uses state numbers.
 - Default yield = mean of the latest 5 published county yields (team choice, range 3 to 10).
 - ERS costs: "operating costs" basis (seed, fertilizer, chemicals, fuel, repairs, custom work, irrigation
@@ -30,7 +33,7 @@ into LIMITATIONS.md, DATA_SOURCES.md and AI_USE.md. No names, emails or photos o
 - USDA ERS Commodity Costs and Returns, 9 crop CSVs, https://www.ers.usda.gov/data-products/commodity-costs-and-returns , downloaded 2026-11-15, cached in `data/precache/costs/`.
 - USDA ERS Farm Resource Regions county file, https://www.ers.usda.gov/sites/default/files/images/reglink.xls , downloaded 2026-11-15, cached in `data/precache/geo/`.
 - US Census 2023 Gazetteer counties (re-downloaded 2026-11-15 for Warren County KY and Colusa County CA).
-- USDA NASS Quick Stats API: code ready, nothing downloaded (no key).
+- USDA NASS Quick Stats, https://quickstats.nass.usda.gov , website spreadsheet export (no key), downloaded 2026-11-15 for the 14 validation counties, cached in `data/precache/nass/`.
 
 ## For AI_USE.md
 
