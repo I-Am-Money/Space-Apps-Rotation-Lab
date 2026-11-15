@@ -191,6 +191,8 @@ def render() -> None:
     if not a.empty:
         n_ph = int((a["Badge"] == "placeholder").sum())
         st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
+        for col in ("Value", "Range", "Unit"):
+            a[col] = a[col].map(lambda v: "" if v is None else str(v))
         st.dataframe(a, hide_index=True, use_container_width=True)
     for name in DOCS:
         with st.expander(name, expanded=(name == "Limitations")):
