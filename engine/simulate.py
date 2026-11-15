@@ -10,12 +10,19 @@ inputs    UserInputs (or a dict): water (mode, normal_mm, dry_mm), crop_override
 rotation  4 crop names; a year may be a list (double crop) or "fallow"; or an object/dict with crops and
           cover_crops. Shorter plans repeat to 4 years.
 scenarios engine.scenarios.Scenarios (bootstrap, historical or stress; optionally .adjust()-ed or
-          re-weighted by engine.climate_shift). Default: 500 bootstrap plans, seed 42.
+          changed by engine.climate_shift). Default: 500 bootstrap plans, seed 42.
+
+    what_if(rain_mult=, heat_shift_c=, water=, scenarios=, climate_shift=)   context manager
+          Every simulate() call inside the block runs under that what-if, whoever makes the call. This is how
+          engine/tipping.py asks api.recommend() "what would win with 30% less rain" without changing any
+          signature. Potential yields and planting dates stay those of the real farm.
 
 Units are metric: mm of water, kg/ha, degC. Every array's first axis is the scenario.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -169,6 +176,59 @@ def default_scenarios(site, kind: str = "bootstrap") -> SC.Scenarios:
     return scen
 
 
+_WHAT_IF: ContextVar = ContextVar("rotationlab_what_if", default=None)
+
+
+@contextmanager
+def what_if(rain_mult: float | None = None, heat_shift_c: float | None = None, water=None, scenarios=None,
+            climate_shift: str | None = None):
+    """Run every simulate() call inside the block under a what-if (not a forecast):
+
+    rain_mult      every day's rain times this            heat_shift_c   every day's maximum temperature plus this
+    water          a water answer (mode, normal_mm, dry_mm) used for the irrigation supply instead of the farm's
+    scenarios      a Scenarios set used instead of whatever the caller passes (before rain and heat are applied)
+    climate_shift  "historical" | "recent" | "trend": used when the caller passes no Scenarios set
+
+    The farm's own answers still set the potential yields (a typical yield was achieved with the farm's real
+    water and weather) and the planting dates. Blocks can be nested; an inner block keeps the outer settings it
+    does not name.
+    """
+    new = dict(_WHAT_IF.get() or {})
+    for k, v in (("rain_mult", rain_mult), ("heat_shift_c", heat_shift_c), ("water", water),
+                 ("scenarios", scenarios), ("climate_shift", climate_shift)):
+        if v is not None:
+            new[k] = v
+    token = _WHAT_IF.set(new)
+    try:
+        yield new
+    finally:
+        _WHAT_IF.reset(token)
+
+
+def current_what_if() -> dict:
+    """The what-if settings in force right now ({} outside a what_if block)."""
+    return dict(_WHAT_IF.get() or {})
+
+
+def _scenarios_in_force(site, scenarios) -> SC.Scenarios:
+    wi = _WHAT_IF.get() or {}
+    if wi.get("scenarios") is not None:
+        scen = wi["scenarios"]
+    elif isinstance(scenarios, SC.Scenarios):
+        scen = scenarios
+    else:                    # anything that is not a Scenarios set (None, a count, a placeholder list) = the default set
+        mode = wi.get("climate_shift") or "historical"
+        if mode != "historical":
+            from engine import climate_shift as CS
+            scen = CS.scenarios_for(site, mode)
+        else:
+            scen = default_scenarios(site)
+    if wi.get("rain_mult") is not None or wi.get("heat_shift_c") is not None:
+        scen = scen.adjust(1.0 if wi.get("rain_mult") is None else float(wi["rain_mult"]),
+                           0.0 if wi.get("heat_shift_c") is None else float(wi["heat_shift_c"]))
+    return scen
+
+
 def _is_irrigated(inputs) -> bool:
     mode = _get(_get(inputs, "water"), "mode")
     return bool(mode) and not str(mode).lower().startswith("rain")
@@ -225,11 +285,13 @@ def _rel_and_heat(tl, scen, bal, r):
 def simulate_many(site, inputs, rotations, scenarios=None) -> list:
     """simulate() for many rotations in one batch (same site, inputs and scenarios). Same order as given."""
     p = _site_parts(site)
-    # anything that is not a Scenarios set (None, a count, a placeholder list) means "the default set"
-    scen = scenarios if isinstance(scenarios, SC.Scenarios) else default_scenarios(site)
+    scen = _scenarios_in_force(site, scenarios)
     clim = site_climate(site)
     irrigated = _is_irrigated(inputs)
-    water = _get(inputs, "water")
+    water = (_WHAT_IF.get() or {}).get("water")
+    what_if_water = water is not None
+    if not what_if_water:
+        water = _get(inputs, "water")
     tls = [WB.build_timeline(rot, clim, irrigated=irrigated) for rot in rotations]
     zero = np.zeros((scen.n, WB.PLAN_YEARS_V4))
     results = [None if t.feasible else
@@ -251,6 +313,8 @@ def simulate_many(site, inputs, rotations, scenarios=None) -> list:
              "long-term temperature record.", scen.note]
     if not np.isfinite(supply).all():
         notes.append("Irrigated with no amount given: water supply treated as unlimited.")
+    if what_if_water:
+        notes.append("What-if water supply used instead of the farm's own answer (not a forecast).")
     for r, i in enumerate(ok):
         tl = tls[i]
         cash = tl.cash
