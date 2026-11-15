@@ -132,7 +132,7 @@ def stamp(value=None, badges=None):
 def style():
     st.markdown('''<style>
     :root{--primary-color:#24734d} input{accent-color:#24734d}
-    .stApp{background:#f6f8f3;color:#183b2b} .block-container{max-width:1240px;padding-top:2rem}
+    .stApp{background:#f6f8f3;color:#183b2b} .block-container{max-width:1240px;padding-top:4.25rem}
     h1,h2,h3{color:#183b2b;letter-spacing:-.035em} h1{font-size:clamp(2.4rem,6vw,4.8rem);line-height:1.03}
     [data-testid="stMetricValue"]{font-size:clamp(1.5rem,3vw,2.4rem)}
     [data-testid="stVerticalBlockBorderWrapper"]{background:#fff;border-radius:18px}
@@ -145,6 +145,12 @@ def style():
     [data-testid="stMetricLabel"],[data-testid="stMetricLabel"] *{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
     [data-testid="stMetricValue"],[data-testid="stMetricValue"] *{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.15}
     [data-testid="stMetricDelta"],[data-testid="stMetricDelta"] *{white-space:normal!important;overflow:visible!important}
+    .st-key-rl_nav [role="radiogroup"]{gap:.4rem;flex-wrap:wrap}
+    .st-key-rl_nav [role="radiogroup"] label{padding:.4rem .95rem;border-radius:999px;border:1px solid #cfdccf;background:#fff;cursor:pointer;margin:0}
+    .st-key-rl_nav label[data-testid="stRadioOption"]>div>div:not([data-testid="stMarkdownContainer"]){display:none}
+    .st-key-rl_nav label[data-testid="stRadioOption"]>div{gap:0}
+    .st-key-rl_nav [role="radiogroup"] label:has(input:checked){background:#24734d;border-color:#24734d}
+    .st-key-rl_nav [role="radiogroup"] label:has(input:checked) p{color:#fff;font-weight:600}
     @media(max-width:640px){.block-container{padding:1rem} h1{font-size:2.5rem}}
     </style>''', unsafe_allow_html=True)
 

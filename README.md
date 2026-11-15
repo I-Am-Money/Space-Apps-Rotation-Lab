@@ -5,6 +5,8 @@ NASA Space Apps 2026, challenge **Field Shift: Adapting Farms with NASA Data**.
 RotationLab uses NASA data to show any farmer how their climate is already changing, and which crop rotation
 will strengthen their soil and hold up as it keeps changing, without losing money.
 
+**Live app:** https://space-apps-rotation-lab-production.up.railway.app (no login needed)
+
 Results are modeled estimates for planning. They are not a guarantee of yield or profit.
 
 `main` runs version 4: any pin on Earth, with US auto-fill. Three example farms on the start screen (Iowa, Nebraska
