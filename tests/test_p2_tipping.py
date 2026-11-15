@@ -168,3 +168,29 @@ def test_with_the_real_feature_3_optimizer(weather):
     assert m["winner"][m["current"]["row"]][m["current"]["col"]] == tp["winner_now"]
     assert all(isinstance(v, str) and v != "Not worked out" for row in m["winner"] for v in row)
     assert tp["metric"]["name"] == "profit"
+
+
+def test_year_shifted_rotations_share_one_simulation(weather):
+    """The tipping search simulates 'maize, soybean, maize, soybean' once for both starting years."""
+    site = make_site(weather)
+    inp = make_inputs("irrigated", 120.0, 60.0)
+    a, b = ["maize", "soybean", "soybean", "maize"], ["soybean", "maize", "maize", "soybean"]      # b = a started 2 years later
+    direct = SIM.simulate_many(site, inp, [a, b])
+    with SIM.what_if(share_shifts=True):
+        shared = SIM.simulate_many(site, inp, [a, b, ["rice"] * 4])
+    assert [r.feasible for r in shared] == [True, True, True]
+    assert [y[0] for y in shared[1].crops] == b
+    # the shifted plan is the first plan with its plan years moved round: same numbers, renumbered years
+    assert np.array_equal(shared[1].yields_kg_ha, np.roll(shared[0].yields_kg_ha, -2, axis=1))
+    assert np.array_equal(shared[1].irrigation_mm, np.roll(shared[0].irrigation_mm, -2, axis=1))
+    assert shared[1].yields_kg_ha.mean() == pytest.approx(shared[0].yields_kg_ha.mean())
+    # and it agrees with simulating the shifted plan on its own to within sampling noise
+    for d, s in zip(direct, shared):
+        assert s.yields_kg_ha.mean(axis=0) == pytest.approx(d.yields_kg_ha.mean(axis=0), rel=0.03)
+        assert s.irrigation_mm.mean() == pytest.approx(d.irrigation_mm.mean(), rel=0.05)
+    # blocks of consecutive real years keep their order, so nothing is shared there
+    hist = SIM.default_scenarios(site, "historical")
+    with SIM.what_if(share_shifts=True):
+        h = SIM.simulate_many(site, inp, [a, b], hist)
+    plain = SIM.simulate_many(site, inp, [a, b], hist)
+    assert np.array_equal(h[1].yields_kg_ha, plain[1].yields_kg_ha)

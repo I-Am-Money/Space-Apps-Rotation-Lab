@@ -194,4 +194,4 @@ def test_result_fits_feature_3_optimizer(site):
     assert r.missing_yield == [] and {c["crop"] for c in r.cover_seasons} == {"cereal_rye"}
     bad = SIM.simulate(site, inp, {"crops": [["rice"]] * 4, "cover_crops": [False] * 4}, 41)
     assert not bad.feasible and bad.yields_kg_ha.shape == (500, 4) and (bad.yields_kg_ha == 0).all()
-    assert C.calories_per_kg("rice") == pytest.approx(3650 * 0.66) and C.calories_per_kg("maize") is None
+    assert C.calories_per_kg("rice") == pytest.approx(3650 * 0.66) and C.calories_per_kg("sunflower") is None

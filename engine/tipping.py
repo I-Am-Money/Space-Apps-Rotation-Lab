@@ -428,7 +428,7 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
         for p in points:
             r, h, k = p
             try:
-                with SIM.what_if(rain_mult=r, heat_shift_c=h, water=water_of[k], scenarios=scen):
+                with SIM.what_if(rain_mult=r, heat_shift_c=h, water=water_of[k], scenarios=scen, share_shifts=True):
                     winners[p] = same_rotation(ask(scen), prefer)
             except Exception as e:
                 winners[p] = None
