@@ -133,7 +133,7 @@ def render():
             stat("Rain in a typical year", f'{cl["annual_rain_mm"]:,.0f}', "mm", cl.get("badge", "observed"), yrs),
             stat("Of which June to September", f'{cl["monsoon_rain_mm"]:,.0f}', "mm", cl.get("badge", "observed"), "Regional estimate"),
         ])
-        stats([stat("Soil water held per metre", f'{soil["awc_mm_per_m"]:.0f}', "mm", soil.get("badge", "placeholder"), "Default until you enter a soil test")])
+        stats([stat("Soil water held per metre", f'{soil["awc_mm_per_m"]:.0f}', "mm", soil.get("badge", "placeholder"), "District estimate (SoilGrids). The model uses the farm soil unless you switch it.")])
         if cl.get("note"):
             md(f'<p class="rl-note">{html.escape(cl["note"])}. {badge(cl.get("badge", "observed"))}</p>')
 
@@ -143,7 +143,7 @@ def render():
         section("District yield history", "placeholder" if data.is_mock() else "observed",
                 "Average yields for the district, all farms together. Rice here mixes irrigated and rainfed fields.")
         charts.show(charts.yield_history(yh), "yh")
-        srcline("ICRISAT district-level yields as loaded by the app. Crops with no district record are not drawn.", "Data source")
+        srcline("District yields from a third-party panel built from ICRISAT data (Mendeley Data, doi 10.17632/ywp3y5j9vv.1), 1990 to 2015. The ICRISAT district tables themselves could not be downloaded. Crops with no district record are not drawn.", "Data source")
         with st.expander("Show these numbers as a table"):
             t = yh.pivot_table(index="year", columns="crop", values="yield_kg_ha").rename(columns=CROP_LABEL).round(0).reset_index().rename(columns={"year": "Year"})
             st.dataframe(t, hide_index=True, use_container_width=True)

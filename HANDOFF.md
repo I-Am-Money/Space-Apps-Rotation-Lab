@@ -58,4 +58,5 @@ Portal rules, read from the Space Apps site on 2026-11-14:
 5. When the team agrees, submit through the portal.
 
 ## Status at last push
-All tests passed (82). The frontend agent was cut off by a usage limit before it finished visually re-checking the canal and well inputs, farm totals, land-split slider and second Tipping Points heat map in the browser. Click through all five tabs on desktop and a phone width before relying on them.
+All 82 tests pass. All five tabs were opened in a browser on the real engine (no mock data, no errors, no names): My Field with canal and well overrides and the black-soil card, Compare Futures, My Priorities (land-split slider and farm totals present), Tipping Points, How Good Is This. Not yet checked: phone-width layout for the newest elements, the `/taste` design pass, and the second Tipping Points heat map by eye.
+Fixed in the last pass: `assumptions_table()` crashed on crops without prices; it now lists potential yields and the farm's 40 acres. The header shows a Draft note whenever model inputs are still unsourced placeholders (currently many: see How Good Is This?).

@@ -199,3 +199,13 @@ def compare_ids(p) -> tuple:
 
 def land_split(alt_id, p):
     return _land_split(alt_id, p)
+
+
+def placeholder_inputs() -> list:
+    """Names of model inputs still badged Placeholder (no verified source). Empty if none."""
+    try:
+        t = assumptions()
+        rows = t.to_dict("records") if hasattr(t, "to_dict") else list(t)
+        return [str(r.get("name")) for r in rows if str(r.get("badge", "")).lower() == "placeholder"]
+    except Exception:
+        return []

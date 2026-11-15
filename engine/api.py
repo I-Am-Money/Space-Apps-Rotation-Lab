@@ -547,16 +547,25 @@ def assumptions_table() -> pd.DataFrame:
                 walk(v, prefix + k + ".")
     walk(_yaml("assumptions.yaml"))
     pr = economics.load_prices()
-    for c in economics.CROPS:
+    for c in [c for c in economics.CROPS if c in pr["price_rs_per_quintal"]]:
         rows.append({"name": f"price.{c}", "value": pr["price_rs_per_quintal"][c], "range": None, "unit": "Rs/quintal",
                      "source": "config/prices_india.yaml" if pr["badges"][f"price_{c}"] != "placeholder" else "unverified placeholder, team to verify",
                      "badge": pr["badges"][f"price_{c}"]})
         rows.append({"name": f"operating_cost.{c}", "value": pr["operating_cost_rs_per_acre"][c], "range": None, "unit": "Rs/acre",
                      "source": "config/prices_india.yaml" if pr["badges"][f"opcost_{c}"] != "placeholder" else "unverified placeholder, team to verify",
                      "badge": pr["badges"][f"opcost_{c}"]})
-    for k in ("n_cost_rs_per_kg", "irrigation_cost_rs_per_m3", "soil_test_cost_rs", "water_measure_cost_rs", "farm_area_acres"):
+    pot = (_yaml("prices_india.yaml").get("potential_yield_kg_ha")) or {}
+    for c in [c for c in economics.CROPS if c in pr["price_rs_per_quintal"]]:
+        e = pot.get(c) or {}
+        v = e.get("value")
+        rows.append({"name": f"potential_yield.{c}", "value": v, "range": None, "unit": "kg/ha",
+                     "source": e.get("source", "no verified yield record, team to verify"),
+                     "badge": e.get("badge", "observed") if v is not None else "placeholder"})
+    for k in ("n_cost_rs_per_kg", "irrigation_cost_rs_per_m3", "soil_test_cost_rs", "water_measure_cost_rs"):
         rows.append({"name": k, "value": pr[k], "range": None, "unit": k.split("_rs_")[-1] if "_rs_" in k else "", "source": "config/prices_india.yaml"
                      if pr["badges"][k] != "placeholder" else "unverified placeholder, team to verify", "badge": pr["badges"][k]})
+    _f = farm_info()
+    rows.append({"name": "farm_area_acres", "value": _f["acres"], "range": None, "unit": "acres", "source": "config/farm.yaml (farm input)", "badge": _f["acres_badge"]})
     rows += [{"name": "et0_per_degC", "value": sc.ET0_PER_DEGC, "range": "0.02-0.05", "unit": "fraction per degC", "source": "team to verify", "badge": "assumption"},
              {"name": "awc_uncertainty_range", "value": 0.3, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
              {"name": "irrigation_uncertainty_range", "value": 0.5, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
