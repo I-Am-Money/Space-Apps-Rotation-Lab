@@ -1,4 +1,4 @@
-# RotationLab Feature 2 (Simulation and Tipping Points) settings. Owner: Person 2 (Max).
+# RotationLab Feature 2 (Simulation and Tipping Points) settings. Owner: Feature 2.
 # Read by engine/crops.py, engine/waterbalance.py, engine/yieldmodel.py, engine/scenarios.py, engine/tipping.py.
 # Every leaf has value, range, unit, source, badge. Badges: observed | assumption | placeholder.
 # "team to verify" = not read in a primary document; the value is flagged, not trusted.
@@ -88,7 +88,7 @@ crops:
     heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.5, range: [0.4, 0.6], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 3650, range: [3467, 3832], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Corn grain, yellow' (FDC ID 170288): 365 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/170288/nutrients", badge: observed}
   soybean:
     name: {value: "Soybeans", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
@@ -363,7 +363,7 @@ crops:
     heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.35, range: [0.25, 0.45], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not counted yet. USDA FoodData Central, SR Legacy, 'Seeds, sunflower seed kernels, dried' (FDC ID 170562) gives 584 kcal per 100 g (read from the FDC API on 2026-11-15, https://fdc.nal.usda.gov/fdc-app.html#/food-details/170562/nutrients), but that is for hulled kernels and the yield includes the hull: the kernel share (edible_fraction) is team to verify, so no calories are counted for this crop.", badge: placeholder}
     edible_fraction: {value: 1.0, range: [0.5, 1.0], unit: "-", source: "Yield includes the hull; the calorie value is for kernels. edible_fraction is team to verify. 1.0 overstates food calories until verified.", badge: placeholder}
   canola:
     name: {value: "Canola (rapeseed)", range: null, unit: "text", source: "Display name.", badge: observed}
@@ -400,7 +400,7 @@ crops:
     heat_tmax_c: {value: 30, range: [28, 32], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.75, range: [0.65, 0.85], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 770, range: [731, 808], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Potatoes, flesh and skin, raw' (FDC ID 170026): 77 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/170026/nutrients Yield is fresh tubers, the same basis as this value.", badge: observed}
   sugarbeet:
     name: {value: "Sugar beet", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}

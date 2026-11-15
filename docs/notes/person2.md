@@ -1,0 +1,131 @@
+# Notes from Person 2 (Feature 2: simulation and tipping points)
+
+Input for the team's LIMITATIONS.md, DATA_SOURCES.md and AI_USE.md, in the format asked for in
+`docs/notes/person3.md`. No names, emails or photos of team members.
+
+## What was built
+
+| File | State |
+|---|---|
+| `config/assumptions/simulation.yaml` | Working. Every Feature 2 setting: rules, runoff, fallow, 20 crops, 4 cover crops. Each leaf has value, range, unit, source and badge. |
+| `engine/crops.py` (v4 section) | Working. Crop library, climate normals, planting calendar, climate fit, calories per kg, residue. |
+| `engine/et0.py` | Working. FAO-56 Penman-Monteith daily, Hargreaves when inputs are missing. |
+| `engine/waterbalance.py` (v4 section) | Working. Continuous daily root-zone balance over the whole 4-year plan, compiled kernel. |
+| `engine/yieldmodel.py` (v4 section) | Working. FAO-33 yield response, heat penalty toggle, potential yield, single-season function for hindcasts. |
+| `engine/scenarios.py` (v4 section) | Working. Historical 4-year blocks, 500 bootstrap plans (seed 42), named stress tests labeled with real years. |
+| `engine/simulate.py` | Working. `simulate()`, `simulate_many()`, and the `what_if()` block. |
+| `engine/climate_shift.py` | Working. Historical, Recent, Continuing trend (R8). |
+| `engine/tipping.py`, `ui/tipping.py` | Working. Curves with bands, 2D map, plain Streamlit page (R18). |
+
+The v3 code above each "v4 section" is untouched and still passes its own tests.
+
+## For LIMITATIONS.md
+
+Simulation
+- Planting and harvest days are the same in every scenario. They come from the site's long-term day-of-year temperature
+  normals, not from each year's weather, so a late spring does not delay planting.
+- Planting rules (planting temperature, growing temperature limits, winter wheat vernalization and maturity), the heat
+  thresholds, the flowering window lengths and the harvest index are team rules of thumb. None was read in a primary
+  source. Each is marked "team to verify" in `simulation.yaml`.
+- Root depth is at its maximum from planting day (FAO-56 Table 22 gives a range; the middle is used). Young crops are
+  therefore credited with more soil water than they can reach.
+- Rice is simulated as an upland crop with full irrigation demand. Ponding, puddling and percolation losses of paddy
+  fields are not modeled.
+- Irrigation is applied with no losses: each day just enough to avoid stress, until the year's supply is used up.
+  Irrigation efficiency, application timing rules and the cost of water are not modeled.
+- The yearly water supply resets on 1 January. A dry year's supply is a straight line between the farmer's normal-year
+  and dry-year answers, by that year's rainfall. A "dry year" is a 1-in-10 dry year (team choice).
+- Runoff uses one SCS curve number for cropped days and one for fallow days per soil group. Slope, residue cover and
+  rainfall intensity are not modeled. Snow is treated as rain on the day it falls.
+- Cover crops use stand-in crop coefficients (winter wheat Kc from FAO-56 Table 12), because FAO-56 has no cover-crop
+  rows. Their benefit to soil water (less evaporation, more infiltration) is not modeled; only their water use is.
+- Yield response is the seasonal FAO-33 form (one Ky per crop), not the stage-by-stage form. Pests, disease, nutrients,
+  frost damage, waterlogging and lodging are not modeled.
+- Heat penalty: 1% of yield per day at or above the crop's heat threshold during the flowering window (carried over
+  from the v3 spec, team to verify).
+- Potential yield from a "typical yield" (the farmer's or the county's) is the typical yield divided by the model's
+  median share of potential for that crop on that farm (never divided by less than 0.25). This makes a typical year
+  reproduce the typical yield; it also means the same typical yield implies a lower potential on an irrigated farm.
+- A crop with no yield number (no farmer entry and no county number) is reported as a share of potential only; its
+  yield in kg is "not a number" and it is listed in `SimResult.missing_yield`. Nothing is filled in.
+- Double crops are simulated, but Feature 3's enumeration uses one crop per plan year.
+- Calories per kg are filled only for crops read from USDA FoodData Central on 2026-11-15 (see below). The others are
+  empty and not counted. Sunflower, canola and sugar beet are counted as zero or empty because the edible share of
+  the harvested product was not verified.
+
+Climate shift (R8). All three modes are what-ifs, not forecasts.
+- Recent: the 500 bootstrap plans are drawn again with the last 20 calendar years of the record twice as likely.
+  This is the same real years, picked more often. It is not a projection.
+- Continuing trend: a straight line is fitted to the record's yearly rainfall, yearly mean daily maximum temperature
+  and yearly reference evapotranspiration. Every real year is moved to the line's level 10 years after the record
+  ends. The line is fitted whether or not the trend is statistically clear, and no significance test is shown. A
+  year's rain is never scaled outside 0.5x to 1.5x, its ET0 never outside 0.8x to 1.25x (team guards).
+- The trend in NASA POWER rainfall can reflect changes in the underlying reanalysis as well as the climate.
+- Minimum temperature, planting dates and season lengths do not move with either mode.
+- Historical 4-year blocks and stress tests cannot be redrawn, so in Recent mode they are re-weighted instead.
+
+Tipping points (R18). What-if changes to real weather years, not forecasts.
+- Rainfall what-if: every day's rain times a factor. The number of rainy days and their timing do not change.
+- Heat what-if: degrees added to every day's maximum temperature. It changes the count of hot days at flowering only.
+  The effect of heat on evapotranspiration is set to 0 until a value is verified (`heat_shift_et0_pct_per_c`), so
+  the heat curve understates the damage of a hotter climate.
+- Water what-if on a rain-fed farm ("what if you had 100 mm of irrigation") counts the yield gain but not the cost of
+  getting the water, and assumes the same amount in dry years.
+- Potential yields and planting dates stay those of the farm today at every what-if point.
+- The winner away from the farm's current setting is searched with the first 100 of the 500 weather plans and among
+  rotations of at most 4 crops (the current plan's, the three picks', then the most profitable others). The curves
+  and their bands always use all 500 plans. With a short time budget the search uses fewer plans (never fewer than
+  40) and then a coarser map; the page says when it did.
+- The same crops in the same order, started in a different year, count as one plan on the map and the curves.
+- The band on a curve is the 10th to 90th percentile across weather plans of one plan's result. The range given for
+  a tipping point is the 10th to 90th percentile of where the two plans' averages are equal when the weather plans
+  are drawn again (200 draws, seed 42). When the winner changes because of the risk or soil settings rather than the
+  average, only the two grid values it lies between are reported.
+- If the recommendation engine cannot be used (missing price or cost, an error), the page ranks rotations itself by
+  average profit, or by share of potential yield when a price or cost is missing, and says so. That ranking ignores
+  soil health and bad-year protection.
+- Profit on the curves is yield x price - cost with the same prices and costs as Feature 3 (farmer's entries, else
+  the county numbers), fixed across scenarios and what-ifs. Only the first crop of each plan year is counted.
+
+## For DATA_SOURCES.md
+
+- NASA POWER daily (through `engine/fetch_power.py`): maximum and minimum temperature, humidity, wind, solar
+  radiation, precipitation, 1981 to the latest full year. Used for scenarios, climate normals, ET0 and the trend fit.
+- FAO Irrigation and Drainage Paper 56 (Allen et al. 1998), re-read from the FAO web copy on 2026-11-15:
+  Table 11 (crop stage lengths) and Table 12 (Kc) at https://www.fao.org/4/x0490e/x0490e0b.htm ;
+  Table 22 (root depth and depletion fraction p) at https://www.fao.org/4/x0490e/x0490e0e.htm ;
+  chapter 4 Example 18 for the ET0 test.
+- FAO Irrigation and Drainage Paper 66 (Steduto et al. 2012), Table 1, "Seasonal Ky values from FAO I&D Paper
+  No. 33", at https://www.fao.org/4/i2800e/i2800e02.pdf , read 2026-11-15.
+- USDA NRCS National Engineering Handbook Part 630, chapter 9, Table 9-1 (runoff curve numbers), read 2026-11-14 at
+  https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf .
+- USDA FoodData Central, SR Legacy, read from the FDC API on 2026-11-15 (https://fdc.nal.usda.gov): energy per
+  100 g. Each value in `simulation.yaml` names the food description and its FDC ID.
+- Not from a source (team rules of thumb, each marked "team to verify" in `simulation.yaml`): planting and growing
+  temperatures, heat thresholds, flowering window, harvest index, fallow evaporation settings, cover crop Kc.
+
+## For AI_USE.md
+
+Claude Code (Anthropic) wrote the Feature 2 code, its tests and its settings file under the team's direction. The
+team member directing it reviewed the results and made the decisions; they did not hand-write code. Crop parameters
+were read by the AI from the FAO and USDA pages listed above and each carries its table reference; values the AI
+could not read in a primary source are marked "team to verify" instead of being presented as sourced. No AI model
+runs inside Feature 2 at run time: the simulation, climate modes and tipping points are plain numerical code.
+
+## Wiring notes for the other owners
+
+- `engine.api.tipping_points(site, inputs, sliders)` can be `return engine.tipping.tipping_points(site, inputs, sliders)`.
+  The result is a dict with the A5 parts (`rainfall_curve`, `heat_curve`, `water_curve`, `map_2d`, `bands`) plus
+  `headlines`, `notes`, `method`, `climate`, `metric`, `badges` and `example: False`.
+- Page: `ui.tipping.render(site, inputs, sliders)`. With no arguments it reads `site`, `inputs` and `sliders` from
+  `st.session_state`. It keeps its result in `st.session_state["_tipping_result"]` until an input changes.
+- Climate setting in recommendations: build the scenario set with
+  `engine.climate_shift.scenarios_for(site, sliders["climate_shift"])` and pass it as `scenarios`, or wrap the call in
+  `with engine.climate_shift.use(mode):`. Recent and trend sets have equal weights, so plain averages are right.
+- The tipping search asks for the winner with `engine.api.recommend(site, inputs, sliders)` once that is the v4
+  function. Until then it calls `engine.optimize.recommend_picks` directly (the same transitional step Feature 3
+  takes to reach `simulate()`), and the result's `method.winner_source` says which one was used.
+- Inside `engine.simulate.what_if(...)` every `simulate()` call runs under that what-if. A cache that stores
+  recommendation results across calls must include `engine.simulate.current_what_if()` in its key.
+- Speed: a new farm's tipping analysis is 57 what-if points, each a recommendation over a short list of crops. With
+  four crops it took 20 to 45 seconds on the build machine. Pre-cache it for the demo presets.
