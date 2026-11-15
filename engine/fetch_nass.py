@@ -6,7 +6,7 @@ What it gives the engine, per county (5-digit FIPS):
   prices_received(state_fips, crop)  {"usd_per_t", "year", "level"}    (state, else national)
   crops_grown(fips)              list of engine crop ids with harvested area in the county
   irrigated_share(fips)          0..1 from the latest Census of Agriculture, or None
-  us_defaults(fips)              everything above in the shape of api.USDefaults (Charvik's get_site())
+  us_defaults(fips)              everything above in the shape of api.USDefaults (called by get_site())
 
 Rules:
   * Suppressed county values ((D) withheld etc.) or no county series -> the state series, labelled

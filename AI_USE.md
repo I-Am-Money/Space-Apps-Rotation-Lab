@@ -39,9 +39,23 @@ Files from the earlier version use the same idea in slightly different words ("w
 Code (Anthropic) under the team's direction"). A file a person wrote with no AI help should say so instead:
 `# AI use: written by the team without AI assistance. See AI_USE.md.`
 
-### Files still missing the header (2026-11-15), for their owners
+### Files still missing the header (checked 2026-11-15), for their owners
 
-- Person 1: `engine/optimize.py`, `engine/__main__.py`, `engine/configuration.py`, `engine/records.py`
-- Person 2: `engine/_water_kernel.py`, `engine/cache.py`
-- Person 4: `ui/data.py`, `tests/test_app.py`, `tests/test_controls.py`
+Owners: paste the header line above as line 1 of each file you own.
+
+- Engine lead: `engine/optimize.py`, `engine/__main__.py`, `engine/configuration.py`, `engine/records.py`
+- Data owner: `engine/_water_kernel.py`
+- App owner: `ui/data.py`, `tests/test_app.py`, `tests/test_controls.py`
 - Shared or earlier files: `scripts/prepare_deploy.py`, `tests/test_completion.py`, `tests/test_merge_audit.py`
+
+### US data and trust page (Feature 4)
+
+Claude Code wrote `engine/fetch_nass.py`, `engine/fetch_ers.py`, `engine/us_rules.py`, `ui/trust.py`, the NASS
+and weather wiring in `engine/hindcast.py` and `engine/correction.py`, their tests, and these docs, under the
+team's direction. ERS costs and regions come from the ERS files listed in `DATA_SOURCES.md`. Tests that need
+NASS data use synthetic records, labelled as synthetic in the test files. They are never used in the app.
+
+### How these docs are put together
+
+Each owner writes notes for LIMITATIONS, DATA_SOURCES and AI_USE in `docs/notes/person<N>.md`. Person 3
+compiles them into the top-level files.

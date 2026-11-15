@@ -43,15 +43,39 @@ log to the "Logged by the team" section, or tell Person 3.
     and crop names, not wording. A reply that passes the guard can still word things loosely. Without an API key
     the fixed template is used.
 
+## US data limits (Feature 4)
+
+16. **Default yields and prices.** Default yield is the mean of the latest 5 published NASS county yields
+    (team choice). If NASS withholds the county value, the state average is used and labelled "State
+    average". Prices are the latest marketing-year price received in the state, or the national price
+    (labelled). The hindcast never uses state numbers in place of county yields.
+17. **Costs.** USDA ERS costs are "operating costs" for the county's Farm Resource Region (latest year 2025).
+    They leave out land rent, unpaid labor and machinery capital recovery, because those are about the same
+    whichever rotation is picked. ERS covers only 9 field crops, so any other crop needs your own cost before
+    money numbers show. ERS does not split wheat into winter and spring. Rice uses the ERS U.S. average,
+    because ERS reports rice by its own rice areas, not by Farm Resource Region. A crop that ERS does not survey
+    in your region uses the U.S. average, labelled.
+18. **County to region map.** This uses the ERS county file (3,112 counties). Counties created after it, such as
+    the Connecticut planning regions from 2022, are not mapped and use the U.S. average.
+19. **Irrigated default.** A county is "mostly irrigated" when Census irrigated acres are at least half of its
+    cropland acres. The 50% threshold is a team choice. When the share is unknown, the app asks.
+20. **Orchards** are recognized by name from a fixed list (`config/assumptions/us_data.yaml`), not by NASS category.
+
 ## Blocked items and the fallback used
 
-16. **NASS yields not loaded yet (2026-11-15).** No `NASS_API_KEY` is set in this environment and the v4 NASS
-    fetcher is not on main yet, so the validation table shows "validation not run yet" or "no NASS data" for
-    every county. Nothing is filled in. Fallback: rerun `python -m engine.correction` once yields are cached.
-17. **v4 engine API not on main yet (2026-11-15).** Soil score, hindcast, correction and explanation modules are
-    built against the A5 interface in the build spec, with stand-ins inside their own files. They switch to the
-    real `engine/api.py` types when it lands.
-18. **India (ICRISAT) is not in the v4 validation.** The India loader works only for the earlier Telangana build.
+21. **NASS key missing (2026-11-15).** No `NASS_API_KEY` is set in the build environment. `engine/fetch_nass.py`
+    is finished and tested against synthetic NASS-shaped records, but no real NASS data has been downloaded.
+    Fallback: cached copies when they exist. Otherwise US pins show "NASS data unavailable" and ask the farmer
+    for yield and price, the same way pins outside the US work. The validation table shows "validation not run
+    yet". Nothing is filled in. When a key is available, run `python -m engine.fetch_nass --precache-validation`,
+    then `python -m engine.correction`.
+22. **NASS query names not checked live.** Commodity, class and practice strings, and the Census `short_desc`
+    names for irrigated and cropland acres, follow Quick Stats naming but have not been tried against the live
+    API. Team to verify.
+23. **v4 engine API and yield function not on main yet (2026-11-15).** Validation uses the stand-in yield model
+    (item 12) until the team's single-season yield function is merged. The trust page reads
+    `api.validation_summary()` once it exists and uses the same table from `engine/correction.py` until then.
+24. **India (ICRISAT) is not in the v4 validation.** The India loader works only for the earlier Telangana build.
 
 ## Logged by the team
 
