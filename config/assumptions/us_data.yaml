@@ -4,6 +4,8 @@
 
 nass:
   api_url: {value: "https://quickstats.nass.usda.gov/api/api_GET/", source: "NASS Quick Stats API docs, https://quickstats.nass.usda.gov/api"}
+  public_encode_url: {value: "https://quickstats.nass.usda.gov/uuid/encode", source: "Quick Stats website (https://quickstats.nass.usda.gov): the page posts a query here and gets back an id. Not a documented API; checked working 2026-11-15."}
+  public_csv_url: {value: "https://quickstats.nass.usda.gov/data/spreadsheet/{id}.csv", source: "Quick Stats website 'Spreadsheet' download for a query id. No key needed. Not a documented API; checked working 2026-11-15."}
   default_years_for_mean:
     value: 5
     range: [3, 10]

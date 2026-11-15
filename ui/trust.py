@@ -96,6 +96,7 @@ def validation_rows(summary) -> list[dict]:
             "County": f"{_s(r.get('county')) or _s(r.get('site'))}, {_s(r.get('state'))}".strip(", "),
             "Country": "US" if _s(r.get("fips")) else "India" if "India" in _s(r.get("region")) else "",
             "ERS region": _s(r.get("ers_region")) or _s(r.get("region")),
+            "Yield records": "USDA NASS county" if _s(r.get("fips")) else "ICRISAT district" if "India" in _s(r.get("region")) else "",
             "Crop": _s(r.get("crop")), "Water": _s(r.get("water")),
             "r (held out)": _fmt(r.get("r")) if ok else "n/a", "MAE t/ha": mae("mae"),
             "r corrected": _fmt(r.get("r_corrected")) if ok else "n/a", "MAE corrected t/ha": mae("mae_corrected"),
@@ -140,7 +141,12 @@ def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
     if here.empty:
         return {"show": True, "text": NOT_VALIDATED}
     r = here.iloc[0]
-    return {"show": False, "text": f"Checked against {'NASS county' if fips else 'district'} yields here ({r['crop']}): held-out r = "
+    what = "NASS county" if fips else "district"
+    if not pd.notna(r.get("r")) or float(r["r"]) <= 0:
+        # checked, but the model did not follow the real ups and downs on held-out years: still a warning
+        return {"show": True, "text": f"Not validated here: checked against {what} yields ({r['crop']}), but the model did "
+                                      f"not track them on held-out years (r = {_fmt(r.get('r'))}). See How Good Is This?"}
+    return {"show": False, "text": f"Checked against {what} yields here ({r['crop']}): held-out r = "
                                    f"{_fmt(r.get('r'))}. See How Good Is This?"}
 
 
@@ -177,6 +183,28 @@ def assumption_rows(files=None) -> list[dict]:
     return out
 
 
+def validation_headline(rows: list[dict]) -> list[str]:
+    """Plain sentences computed from the validated rows (nothing typed in by hand): the median held-out r for
+    mostly rainfed and mostly irrigated US counties, and for India districts."""
+    out = []
+    def med(sel):
+        v = sorted(float(r["r (held out)"]) for r in sel if r["r (held out)"] != "n/a")
+        if not v:
+            return None, 0
+        mid = len(v) // 2
+        return (v[mid] if len(v) % 2 else (v[mid - 1] + v[mid]) / 2), len(v)
+    ok = [r for r in rows if r["Status"] == "validated"]
+    for label, sel in (("Mostly rainfed US counties", [r for r in ok if r["Country"] == "US" and r["Water"] == "rain"]),
+                       ("Mostly irrigated US counties", [r for r in ok if r["Country"] == "US" and r["Water"] == "irrigated"]),
+                       ("India districts", [r for r in ok if r["Country"] == "India"])):
+        m, n = med(sel)
+        if n:
+            low = sum(1 for r in sel if r["r (held out)"] != "n/a" and float(r["r (held out)"]) <= 0)
+            out.append(f"{label}: median held-out r = {m:.2f} across {n} checks (one per place and crop); "
+                       f"{low} of them at or below zero.")
+    return out
+
+
 def doc_text(name: str) -> str:
     p = DOCS[name]
     return p.read_text() if p.exists() else f"{p.name} is missing."
@@ -202,20 +230,36 @@ def render() -> None:
     import streamlit as st
 
     st.header("How good is this?")
-    st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, "
-             "then compared it with what farmers actually harvested. The latest 8 years were never used to tune "
-             "anything, so those numbers show how the model does on years it has not seen.")
+    st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, and in "
+             "one India district with ICRISAT yield records, then compared it with what farmers actually "
+             "harvested. The latest 8 years of each record were never used to tune anything, so those numbers "
+             "show how the model does on years it has not seen.")
     summary = load_validation()
     rows = validation_rows(summary)
     st.subheader("Validation (hindcast)")
     us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
     if not us_ok:
-        st.warning("US counties are not validated yet: NASS county yields are not cached (they need a NASS API "
-                   "key). The US counties below are the ones that will be checked.")
+        st.warning("US counties are not validated yet: NASS county yields are not cached. The US counties below "
+                   "are the ones that will be checked.")
     st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
                "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
                "training years only.")
-    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    for line in validation_headline(rows):
+        st.write(line)
+    if any(r["Status"] == "validated" for r in rows):
+        st.caption("Results are mixed and shown as they came out. Each r comes from only 8 held-out years, so it "
+                   "is rough. The model tracks water stress, so it is expected to do worse where most fields are "
+                   "irrigated. Details are under Limitations below.")
+    shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
+    for country, title in (("US", "United States (USDA NASS county yields)"),
+                           ("India", "India (ICRISAT district yields; record ends 2017)")):
+        part = shown[shown["Country"] == country] if len(shown) else shown
+        if len(part):
+            st.caption(title)
+            st.dataframe(part.drop(columns=["Country"]), hide_index=True)
+    other = shown[~shown["Country"].isin(["US", "India"])] if len(shown) else shown
+    if len(other):
+        st.dataframe(other, hide_index=True)
     pts = site_points(summary)
     if len(pts):
         st.caption("Validation sites")

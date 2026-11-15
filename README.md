@@ -30,7 +30,8 @@ Optional keys go in environment variables or Streamlit secrets, never in the rep
 Without `NASS_API_KEY` the app still runs. US pins then use cached NASS copies if there are any, otherwise
 they ask you for yield and price. ERS costs are committed in `data/precache/` and need no key.
 
-To build the validation table (needs `NASS_API_KEY` once):
+To rebuild the validation table (with no `NASS_API_KEY`, the first command downloads the same records from
+the public Quick Stats website export; the results in the repo were made that way on 2026-11-15):
 
 ```sh
 .venv/bin/python -m engine.fetch_nass --precache-validation   # NASS county data for the 14 validation counties

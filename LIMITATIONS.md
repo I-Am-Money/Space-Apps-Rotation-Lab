@@ -62,17 +62,38 @@ log to the "Logged by the team" section, or tell Person 3.
     cropland acres. The 50% threshold is a team choice. When the share is unknown, the app asks.
 20. **Orchards** are recognized by name from a fixed list (`config/assumptions/us_data.yaml`), not by NASS category.
 
+## US validation results and how the NASS data was obtained
+
+21. **US validation results (run 2026-11-15) are mixed.** The hindcast ran on real USDA NASS county yields for
+    all 14 validation counties: 31 county and crop pairs gave results, and Sumner County, Kansas sorghum did not
+    (17 overlapping years, 20 needed). Numbers are in `config/validation/results.csv` and on the "How good is
+    this?" page, exactly as they came out.
+    - Mostly rainfed counties (22 pairs): held-out r runs from -0.43 to 0.87, median 0.42. It is 0.4 or better
+      in 12 pairs and below zero in 7. With the correction the median is 0.57 and 2 pairs are below zero.
+    - Mostly irrigated counties (9 pairs: Georgia, Mississippi Delta, Arkansas, California rice): held-out r
+      runs from -0.68 to 0.42, median -0.04. The water-limited model does not track irrigated yields. Treat
+      results in irrigated areas as unvalidated.
+    - The correction lowered the average error (MAE) in 22 of 31 pairs and raised held-out r in 19. It made
+      things worse in the rest.
+    - Each held-out r comes from only 8 years, so a single odd year can move it a lot. Example: the model has
+      no flooding or waterlogging, so it misses the 1993 Midwest flood year (Story County, Iowa corn was about
+      4,900 kg/ha; the model gave its maximum).
+    - In Lancaster County (Nebraska), Sumner County (Kansas) and Lubbock County (Texas) the comparison uses
+      NASS non-irrigated yields. NASS stopped publishing those between 2007 and 2018, so the held-out years
+      there are older (for example 2000 to 2007 for Kansas wheat), not the latest 8 calendar years.
+22. **NASS data came from the Quick Stats website, not the API (no key).** No `NASS_API_KEY` was available on
+    2026-11-15. The same Quick Stats records were downloaded through the public Quick Stats website's
+    spreadsheet export (https://quickstats.nass.usda.gov), which needs no key, and saved in
+    `data/precache/nass/`. This export is not a documented API and could change or be rate limited (it refused
+    requests for a while after about 50 downloads). The running app does not call it unless `NASS_PUBLIC_CSV=1`
+    is set. So: the 14 validation counties have real NASS yields, prices, crops grown and irrigated share
+    cached; any other US pin without a key still shows "NASS data unavailable" and
+    asks the farmer for yield and price. Nothing is filled in. Crop class, use and practice are read out of the
+    export's "Data Item" text; this was checked against every yield item in the 14 counties. The key-based API
+    path itself has still never been run live (team to verify once a key exists).
+
 ## Blocked items and the fallback used
 
-21. **NASS key missing (2026-11-15).** No `NASS_API_KEY` is set in the build environment. `engine/fetch_nass.py`
-    is finished and tested against synthetic NASS-shaped records, but no real NASS data has been downloaded.
-    Fallback: cached copies when they exist. Otherwise US pins show "NASS data unavailable" and ask the farmer
-    for yield and price, the same way pins outside the US work. The validation table shows "validation not run
-    yet". Nothing is filled in. When a key is available, run `python -m engine.fetch_nass --precache-validation`,
-    then `python -m engine.correction`.
-22. **NASS query names not checked live.** Commodity, class and practice strings, and the Census `short_desc`
-    names for irrigated and cropland acres, follow Quick Stats naming but have not been tried against the live
-    API. Team to verify.
 23. **v4 engine API not on main yet (2026-11-15).** The trust page reads `api.validation_summary()` once it
     exists and uses the same table from `engine/correction.py` until then.
 24. **India validation pack: one district.** The only India check is Nalgonda district, Telangana (ICRISAT/TCI

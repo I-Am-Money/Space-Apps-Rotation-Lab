@@ -107,6 +107,7 @@ def test_hindcast_reads_county_yields_through_fetch_nass(tmp_path, monkeypatch):
     site's NON-IRRIGATED practice; the latest 8 years are the test years."""
     from engine import cache, fetch_nass
     monkeypatch.setattr(cache, "RUNTIME_DIR", tmp_path)
+    monkeypatch.setattr(cache, "PRECACHE_DIR", tmp_path / "precache")     # the real pre-cached county must not answer
     monkeypatch.setenv("NASS_API_KEY", "test-key-not-real")
     recs = []
     for y in range(1990, 2024):
