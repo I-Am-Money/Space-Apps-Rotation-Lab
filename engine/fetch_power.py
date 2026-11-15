@@ -216,7 +216,7 @@ def _fetch_payload(lat: float, lon: float) -> dict:
 
 
 def _fill_series(s: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """(filled series, mask of days filled from the day-of-year mean). Short gaps are interpolated."""
+    """(filled series, mask of every filled day). Short gaps are interpolated."""
     if not s.isna().any():
         return s, pd.Series(False, index=s.index)
     short = s.interpolate(limit=MAX_INTERP_GAP, limit_area="inside")
@@ -230,7 +230,7 @@ def _fill_series(s: pd.Series) -> tuple[pd.Series, pd.Series]:
     out = short.where(~short.isna(), fill)
     if out.isna().any():                                       # a day of year never observed: overall mean
         out = out.fillna(s.mean())
-    return out, (long_gap | (short.isna() & ~long_gap))
+    return out, isn
 
 
 def frame_from_payload(payload: dict, lat: float, lon: float, meta: dict | None = None) -> pd.DataFrame:
@@ -243,6 +243,10 @@ def frame_from_payload(payload: dict, lat: float, lon: float, meta: dict | None 
     if df.index.has_duplicates or not df.index.is_monotonic_increasing:
         raise ValueError("NASA POWER dates must be unique and increasing")
     df = df.reindex(pd.date_range(df.index.min(), df.index.max(), freq="D"))
+    df = df.replace([np.inf, -np.inf], np.nan)
+    for name in ("precip", "wind2", "srad"):
+        df.loc[df[name] < 0, name] = np.nan
+    df.loc[~df["rh"].between(0, 100), "rh"] = np.nan
     core = df[["tmax", "tmin", "precip"]].notna().all(axis=1)
     if not core.any():
         raise ValueError("NASA POWER returned no usable days for this point")
@@ -256,6 +260,8 @@ def frame_from_payload(payload: dict, lat: float, lon: float, meta: dict | None 
         filled_any |= m
     if df.isna().any().any():
         raise ValueError("NASA POWER weather still has gaps after filling")
+    if (df["tmax"] < df["tmin"]).any():
+        raise ValueError("NASA POWER contains maximum temperatures below minimum temperatures")
     df["tmean"] = np.where(missing["tmean"], (df["tmax"] + df["tmin"]) / 2, df["tmean"])
     elev = float(payload.get("elevation_m") or 0.0)
     doy = df.index.day_of_year.to_numpy()

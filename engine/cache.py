@@ -60,9 +60,11 @@ class ArrayCache:
         with self._lock:
             if key in self._items:
                 self.bytes -= self._items.pop(key)[1]
+            if size > self.max_bytes:
+                return  # One large result must not defeat the memory budget.
             self._items[key] = value, size
             self.bytes += size
-            while self.bytes > self.max_bytes and len(self._items) > 1:
+            while self.bytes > self.max_bytes:
                 _, (_, old_size) = self._items.popitem(last=False)
                 self.bytes -= old_size
 
@@ -134,7 +136,13 @@ def _load(path: _Path):
     try:
         with _gzip.open(path, "rt", encoding="utf-8") as f:
             doc = _json.load(f)
-        return doc["payload"], doc["meta"]
+        meta = doc["meta"]
+        if not isinstance(meta, dict) or not isinstance(meta.get("source"), str):
+            return None
+        _dt.date.fromisoformat(meta["data_as_of"])
+        if int(meta.get("expiry_days", DEFAULT_EXPIRY_DAYS)) <= 0:
+            return None
+        return doc["payload"], meta
     except Exception:
         return None
 
@@ -144,7 +152,10 @@ def age_days(meta: dict, today: _dt.date | None = None) -> int:
 
 
 def is_fresh(meta: dict, today: _dt.date | None = None) -> bool:
-    return age_days(meta, today) < int(meta.get("expiry_days", DEFAULT_EXPIRY_DAYS))
+    try:
+        return 0 <= age_days(meta, today) < int(meta.get("expiry_days", DEFAULT_EXPIRY_DAYS))
+    except (ValueError, TypeError, KeyError):
+        return False
 
 
 def read(kind: str, key: str):
@@ -204,9 +215,11 @@ def fetch_cached(kind: str, key: str, fetcher, source: str, url: str = "", refre
         raise ValueError("refresh must be auto, never or force")
     cached = read(kind, key)
     if cached and refresh != "force" and (refresh == "never" or is_fresh(cached[1])):
+        meta = dict(cached[1], stale=not is_fresh(cached[1]), from_cache=True)
         if precache:
-            write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
-        return cached[0], dict(cached[1], stale=not is_fresh(cached[1]), from_cache=True)
+            promoted = write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
+            meta['stored'] = promoted['stored']
+        return cached[0], meta
     if not offline():
         try:
             payload = fetcher()
@@ -217,7 +230,9 @@ def fetch_cached(kind: str, key: str, fetcher, source: str, url: str = "", refre
     else:
         failure = "offline mode (ROTATIONLAB_OFFLINE)"
     if cached:
+        meta = dict(cached[1], stale=True, from_cache=True, refresh_error=failure)
         if precache:
-            write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
-        return cached[0], dict(cached[1], stale=True, from_cache=True, refresh_error=failure)
+            promoted = write(kind, key, cached[0], cached[1]["source"], cached[1].get("url", ""), precache=True, data_as_of=cached[1]["data_as_of"])
+            meta['stored'] = promoted['stored']
+        return cached[0], meta
     raise DataUnavailable(f"{source}: no cached copy for {kind}/{key} and the source is unreachable ({failure})")

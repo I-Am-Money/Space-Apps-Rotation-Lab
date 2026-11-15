@@ -221,14 +221,72 @@ def _rotation(value):
     return result
 
 
+def _currency_site(site):
+    """USDA defaults are USD; a display currency label never converts money."""
+    from copy import copy
+    currency = getattr(site, 'currency', None)
+    defaults = getattr(site, 'us_defaults', None)
+    if defaults is None or not currency or currency.upper() == 'USD':
+        return site
+    result = copy(site)
+    if isinstance(defaults, dict):
+        result.us_defaults = dict(defaults, prices={}, costs={})
+    else:
+        result.us_defaults = copy(defaults)
+        result.us_defaults.prices, result.us_defaults.costs = {}, {}
+    return result
+
+
+def _sliders(value):
+    """Validate public controls before spending time on model scoring."""
+    import math
+    if value is None:
+        value = Sliders()
+    elif isinstance(value, dict):
+        value = Sliders(**value)
+    for name, upper in (("bad_year", 1), ("water", 1), ("soil", 1), ("profit_tolerance_pct", 100)):
+        number = getattr(value, name)
+        if isinstance(number, bool) or not isinstance(number, (int, float)) or not math.isfinite(number) or not 0 <= number <= upper:
+            raise ValueError(f"{name} must be a finite number between 0 and {upper}")
+    return value
+
+
+def _check_inputs(inputs):
+    import math
+    plan = getattr(inputs, 'current_plan', None)
+    if not isinstance(plan, (list, tuple)) or len(plan) != YEARS_IN_PLAN:
+        raise ValueError('Enter a current crop for each of four plan years')
+    for year in plan:
+        crops = [year] if isinstance(year, str) else year
+        if not isinstance(crops, (list, tuple)) or len(crops) != 1:
+            raise NotImplementedError('Recommendations currently support one cash crop per year; multi-season simulations are available through simulate()')
+        if not isinstance(crops[0], str) or not crops[0].strip():
+            raise ValueError('Enter a supported crop ID for every plan year')
+    acres = getattr(inputs, 'farm_acres', None)
+    if isinstance(acres, bool) or not isinstance(acres, (int, float)) or not math.isfinite(acres) or acres <= 0:
+        raise ValueError('Farm area must be finite and greater than zero')
+    water = getattr(inputs, 'water', None)
+    if getattr(water, 'mode', None) not in ('rain', 'irrigated'):
+        raise ValueError('Water mode must be rain or irrigated')
+    if water.mode == 'irrigated':
+        values = (water.normal_mm, water.dry_mm)
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in values):
+            raise ValueError('Enter finite, nonnegative normal-year and dry-year irrigation supplies')
+        if water.dry_mm > water.normal_mm:
+            raise ValueError('Dry-year irrigation supply must not exceed normal-year supply')
+
+
 def recommend_details(site, inputs, sliders, most_food=False):
     from engine.optimize import score_candidates, assemble_recommendation
+    site = _currency_site(site)
     from engine.cache import ArrayCache
     from dataclasses import asdict
     import hashlib, json
     from pathlib import Path
     from engine import climate_shift, simulate as simulation
+    sliders = _sliders(sliders)
     mode = climate_shift.normalize_mode(sliders.climate_shift)
+    _check_inputs(inputs)
     # Tipping requests carry transient rain/heat/water/scenario overrides.
     # They must never reuse the ordinary farm's scored bundle.
     if simulation.current_what_if():
@@ -249,7 +307,10 @@ def recommend_details(site, inputs, sliders, most_food=False):
         with climate_shift.use(mode):
             bundle = score_candidates(site, inputs)
         _RECOMMEND_CACHE[key] = bundle
-    return assemble_recommendation(bundle, sliders, most_food=most_food)
+    # Each caller owns its returned lists/dicts; editing one session cannot poison
+    # a cached bundle reused by another farmer/session.
+    from copy import deepcopy
+    return deepcopy(assemble_recommendation(bundle, sliders, most_food=most_food))
 
 
 def recommend(site, inputs, sliders):
@@ -268,12 +329,15 @@ def tipping_points(site, inputs, sliders, progress=None):
         from engine.tipping import tipping_points as compute
     except ImportError as exc:
         raise NotImplementedError('Tipping-point estimates are not available in this build yet.') from exc
-    return compute(site, inputs, sliders, progress=progress)
+    return compute(_currency_site(site), inputs, _sliders(sliders), progress=progress)
 
 
 def question_value_details(site, inputs, sliders, test_costs=None):
     from engine.evpi import question_value as compute
-    return compute(site, inputs, sliders, test_costs=test_costs)
+    from engine import climate_shift
+    sliders = _sliders(sliders)
+    with climate_shift.use(sliders.climate_shift):
+        return compute(_currency_site(site), inputs, sliders, test_costs=test_costs)
 
 
 def question_value(site, inputs, sliders):
@@ -332,7 +396,8 @@ def precache_validation_site(spec, offline=False):
         raw = precache_county(spec['fips'], spec.get('crops'))
     except NassUnavailable:
         return {'complete': False, 'notes': {'nass': 'NASS historical yields unavailable: configure NASS_API_KEY or supply a real cache.'}}
-    return {'complete': raw.get('available', False), 'data_as_of': raw.get('data_as_of'),
+    return {'complete': bool(raw.get('available') and raw.get('historical_complete')),
+            'historical_yields': raw.get('historical_yields', {}), 'data_as_of': raw.get('data_as_of'),
             'notes': raw.get('notes', {}), 'badges': raw.get('badges', {})}
 
 
@@ -340,3 +405,9 @@ def cache_info():
     from engine import cache
     count = sum(1 for root in (cache.PRECACHE_DIR, cache.RUNTIME_DIR) if root.exists() for _ in root.rglob('*.json.gz'))
     return {'persistent': count > 0, 'stored_entries': count, 'backend': 'engine.cache'}
+
+
+def check_nass():
+    """Verify NASS credentials without exposing them or writing to cache."""
+    from engine.fetch_nass import check_connection
+    return check_connection()

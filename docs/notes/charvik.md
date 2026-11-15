@@ -41,3 +41,43 @@ Charvik's additions/integration were produced with OpenAI Codex assistance. Exis
 ## GitHub publication follow-up — November 15
 
 The newly selected GitHub connection now permits branch/blob writes; the earlier 403 block above is historical. Refreshed main b1e3f2a includes Person 2 tipping and climate-shift modules. Those are merged, the owner tipping page calls through engine.api, and API recommendation scoring now separates climate modes and bypasses baseline memoization for transient what-if contexts. A regression test verifies this isolation. Publishing targets p4-app; main is not overwritten. NASS-key and disabled-zone limitations remain. Final test and publication outcome are reported with the pushed commit.
+
+
+## API, data and security audit — November 15, after the GitHub publication
+
+The supplied screenshot contains a NASS Quick Stats credential. It was read into the git-ignored local .streamlit/secrets.toml with owner-only permissions, never placed in source, committed, printed or included in any upload. The runtime NASS endpoint and even its public documentation page timed out from this workspace. The key's format was read successfully, but live authentication is **unverified**; an outage/egress timeout is not evidence that the key is invalid. The official API docs were independently checked at https://quickstats.nass.usda.gov/api (record limit 50,000, domain_desc=TOTAL, authentication and field definitions).
+
+Working audit fixes:
+
+- engine/fetch_nass.py: remove credential-bearing request URLs from errors and suppress exception chaining; reject malformed response bodies, non-finite/negative observations and invalid FIPS; constrain survey queries to annual field-crop totals and exclude domain breakouts from parsed totals; isolate seed-writing state with ContextVar; carry history metadata and report missing or unwritten county histories as incomplete. Local CLI tools can read the ignored Streamlit secrets file when the environment variable is absent. An explicitly empty environment value disables the credential.
+- engine/api.py: validate sliders, four-year plans, area and water inputs before scoring; preserve climate modes for measurement-value calculations; return independent recommendation objects so one user's edits cannot mutate another user's cached results. Non-USD inputs cannot silently reuse USD prices/costs. One-cash-crop-per-year recommendation scoring is explicit; the lower-level simulator supports multi-season rotations, but the optimizer does not score them completely and now refuses them rather than undercounting.
+- engine/economics.py: invalid/missing prices or costs request farmer input; profit arithmetic rejects non-finite money and preserves source-specific badges (including estimated national prices and ERS costs).
+- engine/cache.py: ignore corrupt metadata, distrust future-dated freshness, respect the byte budget for a single oversized entry, and disclose failed seed promotion instead of claiming persistence.
+- engine/evpi.py: reject a non-finite/empty payoff matrix instead of silently reporting unknown value of information as zero.
+- engine/fetch_power.py: short interpolated weather gaps are also flagged as estimated; non-finite/physically invalid rain, wind, radiation and humidity are treated as missing; reject inverted daily temperature bounds.
+- engine/site.py, ui/setup.py and ui/planner_model.py: preserve availability/fallback notes and extra dataclass fields, show source limitations, distinguish missing automatic defaults, stop currency relabeling, and disclose that optional soil-test measurements do not yet alter yield/water capacity through an unverified relation.
+- app.py: Start again also removes the owner's tipping cache and recommendation/measurement widgets.
+- scripts/check_nass.py: a small safe authenticated preflight through engine.api, with no credential or raw exception text in output.
+- tests/conftest.py: isolate ambient server credentials from deterministic unit/UI tests. tests/test_audit_hardening.py adds regression coverage for the findings above.
+
+Verification: full pytest, undefined-name/static scan, Python compilation, pip dependency check, legacy source-data check, and real cached-source demo runs. The three demos exercised Historical, Recent and Trend modes, 16 rotations each and selected-climate measurement value; farmer yield/price/cost entries were explicitly hypothetical test inputs, not measured or auto-filled USDA values. Observed local timing: cold first scoring about 1.1 s, warm slider changes about 0.002 s. These are local warm-data measurements, not a guarantee for uncached pins.
+
+The 17-entry pre-cache plan remains incomplete: CA-Colusa and AR-Poinsett have no weather seed, and NASS history/defaults cannot be completed until a network reaches the live service. No US validation accuracy was invented. Zones remain disabled. Organic-matter measurement value remains uncomputed without a verified relation. Pixel-level UI review/screenshots are still a separate phase.
+
+### What the host owner must do
+
+Set NASS_API_KEY in the deployed app's server secrets (Streamlit hosting: Settings > Secrets), using the credential already supplied. Local secrets do not automatically transfer to a deployment. Do not put it in GitHub source. No other paid API key is required for the core model; explanations have a deterministic template fallback.
+
+From the project directory on a network that can reach NASS:
+
+```sh
+python scripts/check_nass.py
+# Continue only when authenticated is true:
+python scripts/precache.py --output output/precache.json
+python -m engine.correction
+python -m pytest -q
+```
+
+Review the reports for suppressed/missing source data; a successful connection alone does not mean every county series is available.
+
+Final audit verification: **475 tests passed** (one third-party pytest deprecation warning); selected undefined-name lint, Python compilation, dependency consistency and legacy source-data checks passed. All three real cached demo pipelines passed Historical/Recent/Trend and measurement-value smoke checks. The credential scan passed over every tracked/unignored file, including decompressed source caches.
