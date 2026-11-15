@@ -54,7 +54,11 @@ def stamp(value=None, badges=None):
     st.markdown(' '.join(badge(label) for label in labels), unsafe_allow_html=True)
     st.caption('Data as of ' + str(asof or 'not supplied by engine'))
     for note in dict.fromkeys(n for n in (record(value).get('notes') or []) if isinstance(n, str)):   # each note once
-        st.caption(note)
+        if 'unavailable' in note.lower() or 'unreachable' in note.lower():
+            logging.warning('Source note: %s', note)                # the technical detail goes to the log, not to the farmer
+            st.caption('Official county figures could not be loaded for this county right now. You can still continue by entering your own crops, yields, prices and costs below.')
+        else:
+            st.caption(note)
 
 
 def style():
@@ -190,13 +194,28 @@ def farm():
     # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
     crops = list(record(record(site).get('us_defaults')).get('crops') or [])
     if crops:
-        for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):
+        found = st.session_state.get('v4_cdl_plan') or []
+        blank = {i for i, c in enumerate(found) if not c}                  # years the satellite record could not name as a crop
+        for i, c in enumerate(found):
             if c in crops:
                 st.session_state.setdefault(f'v4_crop{i}', c)
-        st.caption('Your usual four-year rotation, one crop a year. If you used the address lookup, these are the last four years from the satellite record.')
-        plan = [col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=crop_name) for i, col in enumerate(st.columns(4))]
+        st.caption('Your usual four-year rotation, one crop a year, oldest first. If you used the address lookup, these are the '
+                   'last four years from the satellite record.')
+        plan = []
+        for i, col in enumerate(st.columns(4)):
+            if i in blank and f'v4_crop{i}' not in st.session_state:
+                plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=crop_name, index=None, placeholder='Choose a crop'))
+            else:
+                plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=crop_name))
+        plan = [c or '' for c in plan]
+        if blank:
+            st.caption('Left empty on purpose: ' + ', '.join(f'Year {i+1}' for i in sorted(blank)) + '. The satellite record shows a crop this tool '
+                       'does not plan there (for example alfalfa or pasture). Choose the crop you want counted for that year.')
     else:
-        st.caption('Type the crop you grow in each of four years, for example maize, soybean, wheat.')
+        st.caption('Type the crop you grow in each of four years, for example corn, soybeans, wheat.')
+        for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):       # keep the crop history the farmer confirmed
+            if c:
+                st.session_state.setdefault(f'v4_crop_text{i}', c)
         plan = [col.text_input(f'Year {i+1}', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
     st.subheader('3. Your farm and its water')
     acres = st.number_input('How big is your farm? (acres)', min_value=0., value=0., key='v4_farm_acres')

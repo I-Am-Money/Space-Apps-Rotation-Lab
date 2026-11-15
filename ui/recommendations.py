@@ -212,6 +212,8 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
            crops=None, recommend_fn=None) -> dict | None:
     st.header("Your best crop plans")
     st.caption(DISCLAIMER)
+    st.caption("Year 1 is your next growing season, then Years 2, 3 and 4 follow it. Each plan was tested against hundreds of real past "
+               "four-year stretches of weather (1981 to 2025), so no forecast is involved.")
     answer = st.container()                                   # the plans are shown first, the controls sit under them
     with st.expander("Change what matters to you", expanded=False):
         sliders = read_sliders(key)

@@ -146,9 +146,9 @@ def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
     if not pd.notna(r.get("r")) or float(r["r"]) <= 0:
         # checked, but the model did not follow the real ups and downs on held-out years: still a warning
         return {"show": True, "text": f"Not validated here: checked against {what} yields ({r['crop']}), but the model did "
-                                      f"not track them on held-out years (r = {_fmt(r.get('r'))}). See How Good Is This?"}
+                                      f"not track them on held-out years (r = {_fmt(r.get('r'))}). See the page Can I trust this?"}
     return {"show": False, "text": f"Checked against {what} yields here ({r['crop']}): held-out r = "
-                                   f"{_fmt(r.get('r'))}. See How Good Is This?"}
+                                   f"{_fmt(r.get('r'))}. See the page Can I trust this?"}
 
 
 # ------------------------------------------------------------------------------------------- assumptions

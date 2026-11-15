@@ -15,6 +15,7 @@ import requests
 
 URL = "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress"
 MAX_LEN = 200
+ATTEMPTS = 3
 
 
 class AddressNotFound(ValueError):
@@ -27,13 +28,18 @@ class AddressLookupError(RuntimeError):
 
 @lru_cache(maxsize=32)
 def _lookup(address: str) -> dict:
-    try:
-        r = requests.get(URL, params={"address": address, "benchmark": "Public_AR_Current", "vintage": "Current_Current",
-                                      "format": "json"}, timeout=30, headers={"User-Agent": "RotationLab/1.0"})
-        r.raise_for_status()
-        matches = r.json()["result"]["addressMatches"]
-    except (requests.RequestException, ValueError, KeyError) as e:
-        raise AddressLookupError("The address service could not be reached. Try again, or click your field on the map.") from e
+    last = None
+    for _ in range(ATTEMPTS):                       # one network blip should not send a farmer away
+        try:
+            r = requests.get(URL, params={"address": address, "benchmark": "Public_AR_Current", "vintage": "Current_Current",
+                                          "format": "json"}, timeout=(5, 15), headers={"User-Agent": "RotationLab/1.0"})
+            r.raise_for_status()
+            matches = r.json()["result"]["addressMatches"]
+            break
+        except (requests.RequestException, ValueError, KeyError) as e:
+            last = e
+    else:
+        raise AddressLookupError("The address service could not be reached. Try again, or click your field on the map.") from last
     if not matches:
         raise AddressNotFound("No United States match for that address. Include the street number, town and state, "
                               "or click your field on the map. This lookup covers US addresses only.")

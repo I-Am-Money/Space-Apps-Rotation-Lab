@@ -145,3 +145,23 @@ def test_no_cropland_anywhere_near_says_so_and_still_lets_the_farmer_apply(monke
     assert not at.exception and "no cropland within about 450 m" in _text(at)
     at.button(key="v4_addr_yes").click().run()
     assert at.session_state["_v4_pending_pin"] == (42.2, -93.62)
+
+
+def test_unknown_year_stays_empty_on_the_farm_form_and_blocks_calculation(monkeypatch):
+    """A year the satellite record could not name as a crop must not be filled with a guess."""
+    def page():
+        import streamlit as st
+        from ui import setup as su
+        import dataclasses
+        Site = dataclasses.make_dataclass("Site", ["us_defaults", "country", "us_state", "currency", "data_as_of"])   # the form reads dataclass sites
+        st.session_state["v4_site"] = Site({"crops": ["maize", "soybean", "oats"]}, "US", "IA", "USD", "2026-11-15")
+        st.session_state["v4_location"] = (42.03, -93.62)
+        st.session_state["v4_cdl_plan"] = [None, "maize", "maize", "oats"]
+        su.farm()
+    # the form needs the engine for map layers and defaults; only the crop boxes matter here
+    from engine import api
+    monkeypatch.setattr(api, "gibs_layers", lambda: [], raising=False)
+    at = AppTest.from_function(page, default_timeout=60).run()
+    boxes = {b.label: b for b in at.selectbox if b.label.startswith("Year")}
+    assert boxes["Year 1"].value is None and boxes["Year 2"].value == "maize" and boxes["Year 4"].value == "oats"
+    assert any("Left empty on purpose: Year 1" in c.value for c in at.caption)

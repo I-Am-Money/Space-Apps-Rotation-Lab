@@ -196,3 +196,15 @@ def test_nearest_cropland_is_none_when_there_is_no_cropland_nearby(monkeypatch):
     cdl._history.cache_clear()
     monkeypatch.setattr(requests, "get", lambda *a, **k: cdl_reply("Grass/Pasture"))
     assert cdl.nearest_cropland(42.49518, -91.05475) is None
+
+
+def test_address_lookup_retries_after_a_network_blip(monkeypatch):
+    address._lookup.cache_clear()
+    calls = {"n": 0}
+    def flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise requests.ConnectTimeout("blip")
+        return Resp(js=CENSUS_OK)
+    monkeypatch.setattr(requests, "get", flaky)
+    assert address.geocode("123 Main St, Ames, IA")["county"] == "Story" and calls["n"] == 2

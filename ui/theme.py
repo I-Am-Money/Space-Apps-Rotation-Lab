@@ -219,11 +219,19 @@ h3{font-size:1.3rem!important;line-height:1.2!important;margin:1.4rem 0 .3rem!im
 .stButton>button p,.stDownloadButton>button p{font-size:1.05rem!important;font-weight:700;max-width:none;color:inherit!important}
 .stButton>button:hover{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .stButton>button:active{transform:translateY(1px)}
+.stButton button,.stDownloadButton button{min-height:46px}                      /* also buttons wrapped by a help tooltip */
+.stButton button p{font-weight:700}
 .stButton>button[kind="primary"]{background:var(--accent);color:#fff;border-color:var(--accent)}
 .stButton>button[kind="primary"]:hover{background:%(accent_dark)s;border-color:%(accent_dark)s;color:#fff}
 .stButton>button:disabled{background:var(--sunken);color:var(--ash);border-color:var(--line)}
 input,textarea,div[data-baseweb="select"]>div{font-size:1.05rem!important;min-height:44px}
 [data-testid="stNumberInput"] button{min-height:44px}
+
+/* wide tables (the source lists on the trust page) scroll inside their own box, never the whole page */
+[data-testid="stMain"]{overflow-x:hidden}
+.stMarkdown table{display:block;max-width:100%%;overflow-x:auto;border-collapse:collapse;margin:.4rem 0 1rem}
+.stMarkdown th,.stMarkdown td{min-width:7.5rem;padding:.45rem .65rem;vertical-align:top;font-size:.95rem;border-bottom:1px solid var(--line);text-align:left}
+.stMarkdown th{font-weight:700;color:var(--ink2);border-bottom:1.5px solid var(--ink)}
 
 /* page steps */
 .st-key-rl_nav{border-bottom:1px solid var(--line);margin:.2rem 0 1.2rem}
