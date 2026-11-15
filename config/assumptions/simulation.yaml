@@ -106,7 +106,7 @@ crops:
     heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
     flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
     harvest_index: {value: 0.42, range: [0.32, 0.52], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
-    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    kcal_per_kg: {value: 4460, range: [4237, 4683], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Soybeans, mature seeds, raw' (FDC ID 174270): 446 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/174270/nutrients", badge: observed}
   wheat_winter:
     name: {value: "Winter wheat", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
