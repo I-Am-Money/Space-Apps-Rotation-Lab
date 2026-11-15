@@ -1,0 +1,11 @@
+.git
+.venv
+.env
+.streamlit/secrets.toml
+__pycache__
+.pytest_cache
+output
+data/cache
+assets/screens
+data/raw/icrisat_mendeley
+data/raw/sources

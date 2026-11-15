@@ -10,12 +10,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from collections import OrderedDict
 
-MODEL = "claude-sonnet-5-5"
+MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 SYSTEM_PROMPT = ("Explain to a farmer in plain English, 3 to 4 sentences, use only the numbers provided, "
                  "do not add facts, do not recommend beyond the model output.")
 CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "cache"
-_MEM: dict[str, dict] = {}
+_MEM = OrderedDict()
 
 
 def input_hash(inputs: dict) -> str:
@@ -49,20 +50,13 @@ def template_explanation(inputs: dict) -> str:
     return " ".join(s[:4])
 
 
-def explain(inputs: dict) -> dict:
+def explain(inputs: dict, use_api: bool = True) -> dict:
     """Return {'text', 'source'} where source is 'model' or 'template'. Never raises."""
-    key = input_hash(inputs)
+    key = input_hash({"inputs": inputs, "model": MODEL, "api": bool(use_api and os.environ.get("ANTHROPIC_API_KEY"))})
     if key in _MEM:
         return _MEM[key]
-    f = CACHE_DIR / f"explain_{key}.json"
-    try:
-        if f.exists():
-            _MEM[key] = json.loads(f.read_text())
-            return _MEM[key]
-    except Exception:
-        pass
     result = {"text": template_explanation(inputs), "source": "template"}
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if use_api and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             import anthropic
 
@@ -74,12 +68,9 @@ def explain(inputs: dict) -> dict:
             text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
             if text:
                 result = {"text": text, "source": "model"}
-                try:
-                    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-                    f.write_text(json.dumps(result))
-                except Exception:
-                    pass
         except Exception:
             pass
     _MEM[key] = result
+    while len(_MEM) > 128:
+        _MEM.popitem(last=False)
     return result

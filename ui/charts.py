@@ -29,7 +29,24 @@ def _layout(fig, h=380, xt=None, yt=None, legend=True):
 
 
 def show(fig, key):
-    st.plotly_chart(fig, use_container_width=True, config=CONFIG, key=key)
+    st.plotly_chart(fig, width="stretch", config=CONFIG, key=key)
+
+
+def offline_map(region):
+    import json
+    from pathlib import Path
+    outline = json.loads((Path(__file__).resolve().parents[1] / "assets/nalgonda_outline.json").read_text())
+    fig = go.Figure()
+    for ring in outline["outlines"]:
+        xy = np.asarray(ring)
+        fig.add_scatter(x=xy[:, 0], y=xy[:, 1], mode="lines", fill="toself", fillcolor=T["accent_soft"],
+                        line=dict(color=T["accent"], width=2), hoverinfo="skip", showlegend=False)
+    fig.add_scatter(x=[region["lon"]], y=[region["lat"]], mode="markers+text", text=["NASA POWER district point"],
+                    textposition="top center", marker=dict(size=12, color=T["rice"]), showlegend=False,
+                    hovertemplate="Nalgonda district centroid<br>%{y:.3f} N, %{x:.3f} E<extra></extra>")
+    _layout(fig, 400, xt="Longitude", yt="Latitude", legend=False)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1)
+    return fig
 
 
 def yield_history(df):
@@ -127,10 +144,10 @@ def residue_lines(rots):
 def pareto(df, top_id, base_id="rice-rice-rice-rice"):
     fig = go.Figure()
     fig.add_scatter(x=df.mean_profit, y=df.worst10_profit, mode="markers", showlegend=False,
-                    marker=dict(size=8, color=df.water_stress_mm, colorscale=[[0, "#dfe8de"], [1, T["rice"]]], opacity=0.9, line=dict(color=T["surface"], width=1),
-                                colorbar=dict(title=dict(text="Stress, mm", side="top", font=dict(size=12)), thickness=12, len=0.8, tickfont=dict(size=12), x=1.0, xpad=6)),
-                    text=[plan_label(p) for p in df.plan], customdata=df.water_stress_mm,
-                    hovertemplate="%{text}<br>Average: Rs %{x:,.0f}<br>Bad years: Rs %{y:,.0f}<br>Water stress: %{customdata:,.0f} mm<extra></extra>")
+                    marker=dict(size=8, color=df.irrigation_mm, colorscale=[[0, "#dfe8de"], [1, T["rice"]]], opacity=0.9, line=dict(color=T["surface"], width=1),
+                                colorbar=dict(title=dict(text="Irrigation, mm", side="top", font=dict(size=12)), thickness=12, len=0.8, tickfont=dict(size=12), x=1.0, xpad=6)),
+                    text=[plan_label(p) for p in df.plan], customdata=df.irrigation_mm,
+                    hovertemplate="%{text}<br>Average: Rs %{x:,.0f}<br>Bad years: Rs %{y:,.0f}<br>Irrigation: %{customdata:,.0f} mm<extra></extra>")
     fr = df[df.on_frontier].sort_values("mean_profit")
     fig.add_scatter(x=fr.mean_profit, y=fr.worst10_profit, mode="lines", name="Best trade-offs", line=dict(color=T["ink"], width=2, dash="dot"), hoverinfo="skip")
     t = df[df.id == top_id].iloc[0]
@@ -143,7 +160,7 @@ def pareto(df, top_id, base_id="rice-rice-rice-rice"):
         fig.add_scatter(x=[b.mean_profit], y=[b.worst10_profit], mode="markers+text", name="Our farm today", text=["Our farm today"], textposition="bottom right",
                         textfont=dict(size=14, color=T["ink"]), marker=dict(size=15, color="#ffffff", line=dict(color=T["ink"], width=3)),
                         hovertemplate="Our farm today (rice every year)<extra></extra>")
-    _layout(fig, 460, xt="Average plan profit over 4 years (Rs per acre)", yt="Profit in the worst 10% of seasons (Rs per acre)", legend=False)
+    _layout(fig, 460, xt="Average plan profit over 4 years (Rs per acre)", yt="Profit in the worst 10% of weather sequences (Rs per acre)", legend=False)
     return fig
 
 
@@ -197,6 +214,12 @@ def tipping_grid(g, irr_now, colors, xkey="rain_mult", ykey="irrigation_mm", xt=
     if xs:
         fig.add_scatter(x=xs, y=ys, mode="lines+markers", name="Shift to rice", line=dict(color=T["ink"], width=2.5, dash="dash", shape="hv"),
                         marker=dict(size=6, color=T["ink"]), hovertemplate="Rice-majority wins above %{y:,.0f} mm<extra></extra>", showlegend=False)
+    band = g.get("boundary_band")
+    if band:
+        fig.add_scatter(x=g[xkey], y=band["p90"], mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False)
+        fig.add_scatter(x=g[xkey], y=band["p10"], mode="lines", line=dict(width=0), fill="tonexty",
+                        fillcolor="rgba(22,38,43,0.15)", name="Boundary, 10th-90th percentile", showlegend=False,
+                        hovertemplate="Bootstrap lower boundary: %{y:,.0f} mm<extra></extra>")
     fx, fy = farm if farm else (1.0, irr_now)
     fig.add_scatter(x=[fx], y=[fy], mode="markers",
                     marker=dict(size=18, color="#ffffff", line=dict(color=T["ink"], width=3.5)), hovertemplate="Our farm today<extra></extra>", showlegend=False)
@@ -213,13 +236,15 @@ def crossover(xo, colors):
     if band.get("p10") is not None and band.get("p90") is not None:
         fig.add_vrect(x0=band["p10"], x1=band["p90"], fillcolor=T["accent"], opacity=0.14, line_width=0, annotation_text="10th to 90th percentile", annotation_position="top left", annotation_font=dict(size=12, color=T["ink2"]))
     names = xo["candidates"]
-    P = np.array(xo["mean_profit"])
-    show = []
+    P = np.array(xo["J"])
+    show = ["rice-rice-rice-rice"] if "rice-rice-rice-rice" in names else []
     for c in xo.get("crossovers", []):
         for k in (c["from"], c["to"]):
             if k not in show:
                 show.append(k)
-    show = show[:4] or [xo["winner"][0]]
+    if xo["winner"][0] not in show:
+        show.append(xo["winner"][0])
+    show = show[:5]
     cols = {k: colors[k] for k in show}
     for k in show:
         fig.add_scatter(x=xo["rain_mult"], y=P[:, names.index(k)], mode="lines", name=plan_label(k), line=dict(color=cols[k], width=3),
@@ -227,7 +252,7 @@ def crossover(xo, colors):
     if xo.get("crossovers"):
         c0 = xo["crossovers"][0]["rain_mult"]
         fig.add_vline(x=c0, line=dict(color=T["ink"], dash="dash", width=2), annotation_text=f"Switch near {c0:.2f}", annotation_position="bottom right", annotation_font=dict(size=14))
-    _layout(fig, 380, xt="Monsoon rainfall compared with usual (1.0 = usual)", yt="Mean plan profit (Rs per acre)", legend=False)
+    _layout(fig, 380, xt="Monsoon rainfall compared with usual (1.0 = usual)", yt="Priority score, J (Rs per acre)", legend=False)
     return fig, [(plan_label(k), cols[k]) for k in show]
 
 
@@ -236,9 +261,9 @@ def late_monsoon(lm, colors):
     items = []
     for i, (k, r) in enumerate(lm["rotations"].items()):
         items.append((plan_label(k), colors[k]))
-        fig.add_scatter(x=lm["days"], y=r["mean_profit"], mode="lines+markers", name=plan_label(k), line=dict(width=2.5, color=colors[k]),
+        fig.add_scatter(x=lm["days"], y=r["J"], mode="lines+markers", name=plan_label(k), line=dict(width=2.5, color=colors[k]),
                         marker=dict(size=8, line=dict(color=T["surface"], width=2)), hovertemplate="%{x} days late: Rs %{y:,.0f}<extra>" + plan_label(k) + "</extra>")
-    _layout(fig, 320, xt="Days the early monsoon rain arrives late", yt="Mean plan profit (Rs per acre)", legend=False)
+    _layout(fig, 320, xt="Days onset and sowing are delayed", yt="Priority score, J (Rs per acre)", legend=False)
     return fig, items
 
 
@@ -251,3 +276,22 @@ def hindcast_scatter(d, crop, farm=None):
     _layout(fig, 400, xt="District yield, change from trend (kg per ha)", yt="Model yield, change from trend (kg per ha)")
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     return fig
+
+
+def validation_history(d, crop, farm=None):
+    """Untransformed yield histories; farm observations are never fabricated anomalies."""
+    import pandas as pd
+    fig = go.Figure()
+    fig.add_scatter(x=d["years"], y=d["observed"], mode="lines+markers", name="District observed", line=dict(color=T["ink"], width=2))
+    fig.add_scatter(x=d["years"], y=d["modeled"], mode="lines", name="Model", line=dict(color=CROP_COLOR[crop], width=2.5))
+    if farm and farm.get("rows"):
+        rows = pd.DataFrame(farm["rows"])
+        rows = rows[rows.crop == crop]
+        if not rows.empty:
+            totals = rows.groupby("year")[["yield_quintals", "area_acres"]].sum()
+            values = totals.yield_quintals * 100 / (totals.area_acres * .404686)
+            fig.add_scatter(x=values.index, y=values, mode="markers", name="Farm records (local input)",
+                            marker=dict(symbol="diamond", size=12, color=T["jowar"], line=dict(color=T["ink"], width=1)))
+    if d.get("heldout_years"):
+        fig.add_vrect(x0=min(d["heldout_years"]) - .5, x1=max(d["heldout_years"]) + .5, fillcolor=T["accent"], opacity=.08, line_width=0)
+    return _layout(fig, 340, xt="Year (shaded years held out)", yt="Yield (kg per hectare)")

@@ -4,7 +4,9 @@ Primary source: ICRISAT/TCI DLD, http://data.icrisat.org/dld/src/crops.html
 (1966 onward, apportioned; CC BY 4.0). From the build environment that host
 timed out (TCP), so the primary files could NOT be downloaded programmatically.
 
-Data actually used, in priority order:
+Current data: checksum-verified ICRISAT/TCI apportioned CSV recovered from World
+Bank archive RR_IND_2025_488, 52 Nalgonda rows (1966-2017). See SOURCE.json.
+Data loader priority:
  1. data/raw/icrisat_dld/*.csv  : DLD CSVs the team downloads by hand (see
     docs/INDIA_DATA.md, "Manual steps"). Any crop covered, 1966+.
  2. data/raw/icrisat_mendeley/  : FALLBACK, a published third-party panel built
@@ -131,6 +133,8 @@ def _tidy_wide(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     cols = {c.upper().strip(): c for c in df.columns}
     for label, crop in CROP_LABELS.items():
+        if label == "SORGHUM" and any(c.startswith("KHARIF SORGHUM YIELD") for c in cols):
+            continue  # Do not average kharif sorghum with annual/rabi-inclusive sorghum.
         yc = next((o for u, o in cols.items() if u.startswith(label + " YIELD")), None)
         ac = next((o for u, o in cols.items() if u.startswith(label + " AREA")), None)
         if yc is None:
@@ -156,7 +160,7 @@ def _load_all() -> tuple[pd.DataFrame, str]:
         if len(d):
             frames.append(d); src.append(f"DLD:{f.name}")
     if frames:
-        return pd.concat(frames, ignore_index=True), "ICRISAT DLD manual CSV " + ",".join(src)
+        return pd.concat(frames, ignore_index=True), "ICRISAT/TCI DLD CSV " + ",".join(src) + " (World Bank archive RR_IND_2025_488; see icrisat_dld/SOURCE.json)"
     m = _slim_mendeley()
     if len(m):
         return _tidy_wide(m), ("FALLBACK Mendeley doi:10.17632/ywp3y5j9vv.1 (ICRISAT DLD derived, "
@@ -198,7 +202,7 @@ def _raw_cfg_district() -> str:
 
 def year_counts(df: pd.DataFrame) -> dict:
     """Years of positive yield per crop id (0 = crop absent from the loaded files)."""
-    return {c: int((df["crop"] == c).sum()) for c in ("rice", "jowar", "bajra", "ragi", "pigeonpea")}
+    return {c: int(df.loc[df["crop"] == c, "year"].nunique()) for c in ("rice", "jowar", "bajra", "ragi", "pigeonpea")}
 
 
 def detrend(years: np.ndarray, y: np.ndarray) -> np.ndarray:

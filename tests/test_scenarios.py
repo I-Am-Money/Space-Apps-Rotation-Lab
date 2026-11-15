@@ -25,7 +25,7 @@ def test_stress_tests_use_actual_years():
     assert t["source_year"] == int(a["years"][np.argmin(sc.monsoon_rain(a))])
     assert str(t["source_year"]) in t["label"]
     assert np.allclose(t["scen"]["precip"][0, 1], a["precip"][np.argmin(sc.monsoon_rain(a))])
-    assert set(st) == {"driest monsoon in year 2", "hottest summer in year 3", "latest monsoon onset in year 1", "low canal release year"}
+    assert set(st) == {"driest monsoon in year 2", "hottest kharif season in year 3", "latest monsoon onset in year 1", "low canal release year"}
     c = st["low canal release year"]
     assert c["source_year"] == int(a["years"][np.argmin(a["upstream"])]) and str(c["source_year"]) in c["label"]
 

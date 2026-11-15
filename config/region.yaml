@@ -56,9 +56,9 @@ upstream_points:             # NASA POWER points in the Krishna basin UPSTREAM o
     reason: "Srisailam Dam is built at the confluence of the Tungabhadra and Krishna; its catchment is 206,040 km2 against 214,185-215,000 km2 for Nagarjuna Sagar (Wikipedia infoboxes), so about 96 percent of Nagarjuna Sagar's catchment lies above it. Closest of the five to Nalgonda (about 0.3 degree), so it may share a POWER cell with local rain."
     source: "Wikidata Q1552235 coordinate; en.wikipedia.org/wiki/Srisailam_Dam, Nagarjuna_Sagar_Dam; accessed 2026-11-14"
 upstream_caveat: "The mean of five 0.5 degree POWER points is a proxy for basin rainfall, not catchment inflow. Reservoir operations, evaporation, diversions and the Godavari-style inter-state sharing are not modelled."
-crop_selection:                # owned by india-data
-  millets: [bajra]             # PROVISIONAL: bajra is the only millet with real Nalgonda yields in the files we could fetch
-  year_counts: {rice: 26, jowar: 0, bajra: 26, ragi: 0, pigeonpea: 0}   # 0 = crop absent from the fetched file, NOT zero yield
-  years_covered: "1990-2015"
-  status: provisional_fallback_data
-  source: "Mendeley doi:10.17632/ywp3y5j9vv.1 (ICRISAT DLD derived, unapportioned) rows Dist Name=Nalgonda; the file has rice and pearl millet only. Official ICRISAT DLD CSVs (jowar, ragi, pigeonpea, 1966+) not reachable (data.icrisat.org times out; Dataverse DOI 10.21421/D2/XFB1BZ holds documentation only). Re-count and re-pick once the owner places the DLD CSVs in data/raw/icrisat_dld/ (python -m engine.fetch_icrisat)."
+crop_selection:
+  millets: [bajra, jowar]
+  year_counts: {rice: 52, jowar: 52, bajra: 52, ragi: 17, pigeonpea: 52}
+  years_covered: "1966-2017"
+  status: verified_archived_dld
+  source: "ICRISAT/TCI apportioned DLD crop table, archived in World Bank reproducibility package RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409. Nalgonda district code 59, source state label Telangana. 52 positive-yield years each for rice, kharif sorghum, bajra and pigeonpea; ragi 17. Both most-complete millets selected. Kharif sorghum used instead of annual sorghum. See data/raw/icrisat_dld/SOURCE.json for archive member, checksum and extraction details."

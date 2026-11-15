@@ -55,7 +55,7 @@ def test_hindcast_machinery_on_synthetic_observed():
     obs = pd.DataFrame({"year": yrs, "crop": opt.MILLETS[0], "yield_kg_ha": mod * 0.9 + 20 * (yrs - yrs[0])})
     h = hc.hindcast(a, 140.0, 400.0, observed=obs, farm=None)
     c = h["per_crop"][opt.MILLETS[0]]
-    assert c["pearson_r"] > 0.99 and c["heldout_r"] > 0.9 and len(c["heldout_years"]) == 10
+    assert c["pearson_r"] > 0.99 and c["heldout_r"] > 0.9 and len(c["heldout_years"]) == 8
     assert h["farm_records"] is None
 
 

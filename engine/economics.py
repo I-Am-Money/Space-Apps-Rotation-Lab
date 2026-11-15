@@ -31,8 +31,8 @@ PLACEHOLDER = {
     "operating_cost_rs_per_acre": {"rice": 28000.0, "jowar": 11000.0, "bajra": 9000.0, "pigeonpea": 13000.0},
     "n_cost_rs_per_kg": 13.0,
     "irrigation_cost_rs_per_m3": 3.0,
-    "soil_test_cost_rs": 300.0,
-    "water_measure_cost_rs": 1500.0,
+    "soil_test_cost_rs": None,
+    "water_measure_cost_rs": None,
     "farm_area_acres": 5.0,
 }
 PLACEHOLDER_NOTE = "unverified dev placeholder, no source; team to verify / replace via config/prices_india.yaml"
@@ -94,7 +94,8 @@ def _load_prices(path) -> dict:
         raw = yaml.safe_load(open(path)) or {}
     badges, src = {}, {}
     price = _crop_dict(_find(raw, PRICE_KEYS))
-    op = _crop_dict(_find(raw, OPCOST_KEYS))
+    op_node = _find(raw, OPCOST_KEYS) or {}
+    op = _crop_dict(op_node)
     out = {"price_rs_per_quintal": {}, "operating_cost_rs_per_acre": {}}
     for c in CROPS:
         if c not in PLACEHOLDER["price_rs_per_quintal"] and c not in price:
@@ -104,7 +105,8 @@ def _load_prices(path) -> dict:
         else:
             out["price_rs_per_quintal"][c], badges[f"price_{c}"] = PLACEHOLDER["price_rs_per_quintal"][c], "placeholder"
         if c in op:
-            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = op[c], "assumption"
+            meta = next((op_node[n] for n in ALIASES[c] if n in op_node), {})
+            out["operating_cost_rs_per_acre"][c], badges[f"opcost_{c}"] = op[c], meta.get("badge", "assumption") if isinstance(meta, dict) else "assumption"
         elif c not in PLACEHOLDER["operating_cost_rs_per_acre"] and c not in price:
             continue
         else:
@@ -120,6 +122,11 @@ def _load_prices(path) -> dict:
         else:
             out[k], badges[k] = PLACEHOLDER[k], "placeholder"
     out["badges"] = badges
+    farm_path = ROOT / "config/farm.yaml"
+    if farm_path.exists():
+        acres = (yaml.safe_load(farm_path.read_text()) or {}).get("farm", {}).get("acres")
+        if acres is not None:
+            out["farm_area_acres"], badges["farm_area_acres"] = float(acres), "local"
     out["fixed_prices_note"] = "Prices are fixed across all scenarios (no price model); the price slider scales all crops together."
     out["source_file_found"] = path.exists()
     return out
@@ -155,7 +162,8 @@ def plan_economics(plan, sim: dict, price_mult: float = 1.0, prices: dict | None
 
 def economics_badges(prices: dict) -> dict:
     b = prices["badges"]
+    costs = [v for k, v in b.items() if k.startswith("opcost_")]
     return {"profit": "modeled",
             "prices": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("price_")) else "observed",
-            "operating_cost": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("opcost_")) else "assumption",
+            "operating_cost": "placeholder" if "placeholder" in costs else "local" if costs and all(v == "local" for v in costs) else "assumption",
             "irrigation_cost": b["irrigation_cost_rs_per_m3"], "n_cost": b["n_cost_rs_per_kg"]}

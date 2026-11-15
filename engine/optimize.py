@@ -1,18 +1,22 @@
-"""Rotation optimisation (engine-decision): 256 sequences, J score, Pareto frontier, reports.
+"""Rotation optimisation: configured four-year sequences, J score, Pareto frontier, reports.
 
-J = (1-lam)*mean_profit + lam*worst10_profit - w*scale*water_stress
- scale (rupees per mm) = (max-min mean_profit over the 256) / (max-min water_stress), so w=1 trades the
- whole profit spread against the whole water-stress spread. Computed from the model, not hardcoded.
+J = (1-lam)*mean_profit + lam*worst10_profit - w*scale*irrigation_mm.
+Scale (rupees/acre/mm) is the profit spread divided by the irrigation spread at the
+base settings. This is a modeled preference scale, not a market price for water.
 """
 from __future__ import annotations
 
 import itertools
 import math
+from contextvars import ContextVar
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
 
 from engine import economics
+from engine.cache import ArrayCache
+from engine.configuration import version as configuration_version
 
 BASELINE_ID = "A"
 CROPS: list = []
@@ -51,9 +55,11 @@ def configure(millets=None, region_path=None):
 
 configure()
 _SIM = None
-_SIM_CACHE: dict = {}
-_ARR_CACHE: dict = {}
-SIM_PARAMS: dict = {}       # passed to simulate_batch (water_source, median_season_rain_mm, ...)
+_SIM_CACHE = ArrayCache(192 * 1024 * 1024)
+_ARR_CACHE = ArrayCache(96 * 1024 * 1024)
+_SIM_CONTEXT = ContextVar("rotationlab_sim_params", default=())
+_SPLIT_CONTEXT = ContextVar("rotationlab_water_split", default=())
+_ECON_CONTEXT = ContextVar("rotationlab_economics", default=())
 
 
 def set_simulator(fn):
@@ -81,9 +87,9 @@ def plan_id(plan) -> str:
 
 def worst_fraction_mean(x: np.ndarray, frac: float = 0.10) -> float:
     """Mean of the lowest ceil(frac*S) values (at least 1)."""
-    x = np.sort(np.asarray(x, float))
+    x = np.asarray(x, float)
     k = max(1, int(math.ceil(frac * len(x))))
-    return float(x[:k].mean())
+    return float(np.partition(x, k - 1)[:k].mean())
 
 
 def prefetch(plans, scenset, awc: float, irr: float) -> None:
@@ -96,6 +102,16 @@ def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
     concatenation does not change the rice water-availability scaling."""
     if _SIM is not None:          # test stand-in: per-plan simulator
         return
+    if len(scensets) > 1 and sum(ss.n for ss in scensets) > 2000:
+        chunk, count = [], 0
+        for ss in scensets:
+            if chunk and count + ss.n > 2000:
+                prefetch_multi(plans, chunk, awc, irr)
+                chunk, count = [], 0
+            chunk.append(ss); count += ss.n
+        if chunk:
+            prefetch_multi(plans, chunk, awc, irr)
+        return
     todo, seen = [], set()
     for ss in scensets:
         for p in plans:
@@ -104,7 +120,7 @@ def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
     if not todo:
         return
     from engine.waterbalance import simulate_batch
-    keys = ["et0", "precip", "tmax"] + (["upstream_season_rain"] if all("upstream_season_rain" in ss.scen for ss in scensets) else [])
+    keys = ["et0", "precip", "tmax"] + [k for k in ("upstream_season_rain", "onset_doy") if all(k in ss.scen for ss in scensets)]
     cat = {k: np.concatenate([ss.scen[k] for ss in scensets]) for k in keys}
     res = simulate_batch(cat, todo, float(awc), float(irr), params_for(irr))
     off = 0
@@ -112,37 +128,82 @@ def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
         n = ss.n
         for r, p in enumerate(todo):
             _SIM_CACHE[_sim_key(p, ss, awc, irr)] = {
-                k: (v[r, off:off + n] if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
+                k: (v[r, off:off + n].copy() if isinstance(v, np.ndarray) and v.ndim >= 2 and v.shape[0] == len(todo) else v)
                 for k, v in res.items() if k not in ("plans", "daily")}
         off += n
 
 
-SPLIT: dict = {}            # {"base_canal": .., "base_well": ..}: how the irrigation slider is split in canal_and_well mode
-
-
 def set_sim_params(split=None, **kw):
-    SIM_PARAMS.clear()
-    SIM_PARAMS.update({k: v for k, v in kw.items() if v is not None})
-    SPLIT.clear()
-    SPLIT.update(split or {})
+    kw["_configuration_version"] = configuration_version()
+    _SIM_CONTEXT.set(tuple(sorted((k, v) for k, v in kw.items() if v is not None)))
+    _SPLIT_CONTEXT.set(tuple(sorted((split or {}).items())))
+
+
+def set_economic_params(overrides=None):
+    _ECON_CONTEXT.set(tuple(sorted((overrides or {}).items())))
+
+
+@contextmanager
+def simulation_overrides(**values):
+    params = dict(_SIM_CONTEXT.get())
+    params.update(values)
+    token = _SIM_CONTEXT.set(tuple(sorted(params.items())))
+    try:
+        yield
+    finally:
+        _SIM_CONTEXT.reset(token)
+
+
+def current_prices():
+    import copy
+    prices = economics.load_prices()
+    if not _ECON_CONTEXT.get():
+        return prices
+    prices = copy.deepcopy(prices)
+    for key, value in _ECON_CONTEXT.get():
+        if key.startswith("cost."):
+            crop = key.split(".", 1)[1]
+            prices["operating_cost_rs_per_acre"][crop] = value
+            prices["badges"][f"opcost_{crop}"] = "local"
+        else:
+            prices[key] = value
+            prices["badges"][key] = "local"
+    return prices
+
+
+@contextmanager
+def irrigation_sweep(level, reference):
+    """Scale entered source capacities with total supply in a what-if sweep."""
+    params = dict(_SIM_CONTEXT.get())
+    factor = float(level) / float(reference) if reference > 0 else 0.
+    changes = {key: params[key] * factor for key in ("canal_supply_mm", "well_supply_mm") if key in params}
+    if reference <= 0 and level > 0:
+        split = dict(_SPLIT_CONTEXT.get())
+        total = sum(split.values())
+        if total > 0:
+            changes = {key: float(level) * split[base] / total for key, base in
+                       (("canal_supply_mm", "base_canal"), ("well_supply_mm", "base_well")) if key in params}
+    with simulation_overrides(**changes):
+        yield
 
 
 def params_for(irr: float) -> dict | None:
     """simulate_batch params for a given irrigation level. In canal_and_well mode physics ignores the
     irrigation argument, so the slider (total base supply, mm) scales base_canal and base_well in their
     assumption ratio (rain linkage kept). Explicit canal_supply_mm / well_supply_mm stay as fixed overrides."""
-    prm = dict(SIM_PARAMS)
-    if prm.get("water_source") == "canal_and_well" and SPLIT:
-        tot = SPLIT["base_canal"] + SPLIT["base_well"]
-        prm["base_canal"] = float(irr) * SPLIT["base_canal"] / tot
-        prm["base_well"] = float(irr) * SPLIT["base_well"] / tot
+    prm = dict(_SIM_CONTEXT.get())
+    split = dict(_SPLIT_CONTEXT.get())
+    if prm.get("water_source") == "canal_and_well" and split:
+        tot = split["base_canal"] + split["base_well"]
+        prm["base_canal"] = float(irr) * split["base_canal"] / tot
+        prm["base_well"] = float(irr) * split["base_well"] / tot
     return prm or None
 
 
 def _sim_key(plan, scenset, awc, irr):
     # irrigation only matters when the plan contains rice: drop it from the key otherwise
     return (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4) if "rice" in plan else None,
-            tuple(sorted(SIM_PARAMS.items())))
+            tuple(sorted((params_for(irr) or {}).items())))
 
 
 def sim_plan(plan, scenset, awc: float, irr: float) -> dict:
@@ -158,11 +219,13 @@ def sim_plan(plan, scenset, awc: float, irr: float) -> dict:
 
 
 def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dict:
-    key = (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4), round(float(price_mult), 4))
-    a = _ARR_CACHE.get(key)
+    key = (_sim_key(plan, scenset, awc, irr), float(price_mult), _ECON_CONTEXT.get(),
+           economics.PRICES_PATH.stat().st_mtime_ns)
+    # Explicit price dictionaries may differ from the configured prices.
+    a = _ARR_CACHE.get(key) if prices is None else None
     if a is None:
         sim = sim_plan(plan, scenset, awc, irr)
-        eco = economics.plan_economics(plan, sim, price_mult, prices)
+        eco = economics.plan_economics(plan, sim, price_mult, prices or current_prices())
         a = {"profit": eco["profit"], "profit_year": eco["profit_year"],
              "stress": (np.asarray(sim["etm_mm"]) - np.asarray(sim["eta_mm"])).sum(1),
              "irrig": np.asarray(sim["irrig_mm"]).sum(1),
@@ -170,7 +233,8 @@ def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dic
              "yield": np.asarray(sim["yield_kg_ha"]), "eco": eco,
              "irrig_canal": (np.asarray(sim["irrig_canal_mm"]).sum(1) if "irrig_canal_mm" in sim else None),
              "irrig_well": (np.asarray(sim["irrig_well_mm"]).sum(1) if "irrig_well_mm" in sim else None)}
-        _ARR_CACHE[key] = a
+        if prices is None:
+            _ARR_CACHE[key] = a
     return a
 
 
@@ -182,13 +246,13 @@ def metrics(a: dict) -> dict:
             "irrigation_well_mm": float("nan") if a.get("irrig_well") is None else float(a["irrig_well"].mean())}
 
 
-def objective(mean, worst10, stress, lam, w, scale):
-    return (1 - lam) * mean + lam * worst10 - w * scale * stress
+def objective(mean, worst10, irrigation, lam, w, scale):
+    return (1 - lam) * mean + lam * worst10 - w * scale * irrigation
 
 
-def compute_scale(mean_profit, stress) -> float:
+def compute_scale(mean_profit, irrigation) -> float:
     dp = float(np.max(mean_profit) - np.min(mean_profit))
-    ds = float(np.max(stress) - np.min(stress))
+    ds = float(np.max(irrigation) - np.min(irrigation))
     return dp / ds if ds > 1e-9 else 0.0
 
 
@@ -200,7 +264,7 @@ def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None) -> pd.
         m = metrics(rotation_arrays(p, scenset, awc, irr, price_mult))
         rows.append({"id": plan_id(p), "plan": list(p), **m})
     df = pd.DataFrame(rows)
-    scale = compute_scale(df.mean_profit.values, df.water_stress_mm.values)
+    scale = compute_scale(df.mean_profit.values, df.irrigation_mm.values)
     df.attrs["scale"] = scale
     return rescore(df, lam, w, scale)
 
@@ -209,7 +273,7 @@ def rescore(df: pd.DataFrame, lam, w, scale=None) -> pd.DataFrame:
     scale = df.attrs.get("scale", 0.0) if scale is None else scale
     df = df.copy()
     df.attrs["scale"] = scale
-    df["J"] = objective(df.mean_profit, df.worst10_profit, df.water_stress_mm, lam, w, scale)
+    df["J"] = objective(df.mean_profit, df.worst10_profit, df.irrigation_mm, lam, w, scale)
     df["rank"] = df.J.rank(ascending=False, method="first").astype(int)
     df["on_frontier"] = pareto_mask(df.mean_profit.values, df.worst10_profit.values)
     return add_deltas(df)
@@ -237,13 +301,20 @@ def delta_vs_baseline(row) -> dict:
 def pareto_mask(x, y) -> np.ndarray:
     """True for points not dominated in (x, y), both maximised."""
     x, y = np.asarray(x, float), np.asarray(y, float)
-    order = np.lexsort((-y, -x))
+    order = np.argsort(-x, kind="stable")
     mask = np.zeros(len(x), bool)
     best = -np.inf
-    for i in order:
-        if y[i] > best + 1e-12:
-            mask[i] = True
-            best = y[i]
+    start = 0
+    while start < len(order):
+        end = start + 1
+        while end < len(order) and x[order[end]] == x[order[start]]:
+            end += 1
+        group = order[start:end]
+        top = y[group].max()
+        if top > best + 1e-12:
+            mask[group[np.abs(y[group] - top) <= 1e-12]] = True
+        best = max(best, top)
+        start = end
     return mask
 
 
@@ -259,7 +330,7 @@ def _count_pairs(plan, same):
 
 def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price_mult=1.0, prices=None) -> dict:
     """strategies: name -> plan. Text is generated from computed numbers and fixed rules only."""
-    prices = prices or economics.load_prices()
+    prices = prices or current_prices()
     top = df.sort_values("J", ascending=False).iloc[0]
     top_arr = rotation_arrays(top["plan"], scenset, awc, irr, price_mult, prices)
     a_arr = rotation_arrays(REF["A"], scenset, awc, irr, price_mult, prices)

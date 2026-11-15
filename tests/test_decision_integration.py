@@ -36,7 +36,14 @@ def test_real_millet_uses_less_irrigation_than_rice():
 
 def test_real_compare_and_tipping_run():
     c = api.compare(["A", "B", "C"], {})
-    assert len(c["rotations"]["A"]["stress_tests"]) == 3
+    tests = c["rotations"]["A"]["stress_tests"]
+    assert {t["test"] for t in tests} == {
+        "driest monsoon in year 2", "latest monsoon onset in year 1",
+        "hottest kharif season in year 3", "low canal release year",
+    }
+    low_canal = next(t for t in tests if t["test"] == "low canal release year")
+    a = api.annual()
+    assert low_canal["source_year"] == int(a["years"][np.argmin(a["upstream"])])
     t = api.tipping_points({})
     assert t["evpi_awc"]["value"] >= 0
 
@@ -53,7 +60,8 @@ def test_real_prices_use_yaml_msp_with_badges():
     from engine import economics
     pr = economics.load_prices()
     assert pr["price_rs_per_quintal"]["rice"] == 2441.0 and pr["badges"]["price_rice"] == "observed"
-    assert pr["badges"]["opcost_rice"] == "placeholder"
+    assert pr["badges"]["opcost_rice"] == "assumption"
+    assert pr["operating_cost_rs_per_acre"]["rice"] > 0
 
 
 def test_real_batch_matches_per_plan_and_is_fast():

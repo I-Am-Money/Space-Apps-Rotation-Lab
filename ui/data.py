@@ -1,5 +1,4 @@
-"""Engine access. Uses engine.api; falls back to engine.mock_api per call when the real module (or one of its
-own imports or data files) is missing, and records that so the app can show a visible banner."""
+"""Cached engine access. Toy data is available only through explicit design-preview mode."""
 from __future__ import annotations
 
 import streamlit as st
@@ -9,12 +8,10 @@ from engine import mock_api
 import os
 import re
 
-try:
-    if os.environ.get("ROTATIONLAB_MOCK") == "1":
-        raise ImportError("mock forced for design review")
-    from engine import api  # type: ignore
-except ImportError:
+if os.environ.get("ROTATIONLAB_MOCK") == "1":
     api = mock_api
+else:
+    from engine import api
 
 CROPS = ["rice", "jowar", "bajra", "pigeonpea"]
 try:  # the engine decides which crops are candidates (iteration 2: selected millets only)
@@ -79,7 +76,10 @@ CANAL_LABEL = "Proxy for canal releases based on upstream monsoon rain; actual r
 WELL_LABEL = "Simplified recharge proxy."
 DEFAULTS = dict(irrigation_mm=BASE_IRR, use_soil_test=False, soil_awc=140, rot0="rice", rot1="rice", rot2="rice", rot3="rice",
                 lam=30, w=30, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
-                canal_override=False, canal_supply=None, well_override=False, well_supply=None, soil_mode="farm", split_acres=None)
+                canal_override=False, canal_supply=None, well_override=False, well_supply=None, soil_mode="farm", split_acres=None,
+                heat_enabled=True, use_cost_overrides=False, cost_values={}, irrigation_cost=None, soil_test_cost=None, water_test_cost=None,
+                water_value=float(_assump("water_value_rs_m3", 1)))
+DEFAULTS["full_tipping"] = False
 ROT_NAME = {"A": "A: our farm today", "B": "Rotation B", "C": "Rotation C", "current": "Your rotation"}
 ROT_SHORT = {"A": "A: all rice", "B": "B: rice and jowar", "C": "C: rice, pigeon pea, jowar"}
 
@@ -96,6 +96,8 @@ def plan_label(plan) -> str:
 def init_state():
     """User inputs live in session_state['_v'] so they survive tabs whose widgets are not rendered (lazy tabs)."""
     st.session_state.setdefault("_v", dict(DEFAULTS))
+    for key, value in DEFAULTS.items():
+        st.session_state["_v"].setdefault(key, value)
     st.session_state["_mock"] = False
 
 
@@ -114,10 +116,16 @@ def bind(name) -> dict:
 
 def params() -> dict:
     s = V()
-    return dict(lam=s["lam"] / 100, w=s["w"] / 100, irrigation_mm=float(s["irrigation_mm"]),
+    return dict(lam=s["lam"] / 100, w=s["w"] / 100,
+                irrigation_mm=float(s["irrigation_mm"]) if s["water_source"] != "canal_and_well" else None,
                 awc_mm_per_m=float(s["soil_awc"]) if s["use_soil_test"] else None,
                 current_rotation=[s["rot0"], s["rot1"], s["rot2"], s["rot3"]], price_mult=1.0,
                 water_source=s["water_source"], soil_mode=s["soil_mode"],
+                heat_enabled=bool(s["heat_enabled"]),
+                water_value_rs_m3=float(s["water_value"]),
+                boundary_scenarios=500 if s["full_tipping"] else 150,
+                **({"operating_costs": s["cost_values"], "irrigation_cost_rs_per_m3": s["irrigation_cost"],
+                    "soil_test_cost_rs": s["soil_test_cost"], "water_measure_cost_rs": s["water_test_cost"]} if s["use_cost_overrides"] else {}),
                 **({"canal_supply_mm": float(s["canal_supply"])} if s["canal_override"] and s["canal_supply"] is not None else {}),
                 **({"well_supply_mm": float(s["well_supply"])} if s["well_override"] and s["well_supply"] is not None else {}),
                 **({"canal_release_factor": float(s["canal_factor"])} if s["water_source"] == "canal" else {}),
@@ -129,10 +137,7 @@ def is_mock() -> bool:
 
 
 def _call(name, *args):
-    try:
-        return getattr(api, name)(*args), False
-    except (ImportError, FileNotFoundError, AttributeError):
-        return getattr(mock_api, name)(*args), True
+    return getattr(api, name)(*args), api is mock_api
 
 
 MSG = {"get_field_summary": "Loading the field record.",
@@ -143,14 +148,15 @@ MSG = {"get_field_summary": "Loading the field record.",
 
 
 def _wrap(name):
-    def raw(*args):
+    def raw(source_version, *args):
         return _call(name, *args)
 
     raw.__name__ = raw.__qualname__ = "engine_" + name  # cache_data keys on the name, so each wrapper needs its own
     cached = st.cache_data(show_spinner=False, max_entries=64, ttl=900)(raw)
 
     def outer(*args):
-        val, mock = cached(*args)
+        from engine.configuration import version
+        val, mock = cached(version(include_data=True), *args)
         if mock:
             st.session_state["_mock"] = True
         return val
@@ -161,9 +167,20 @@ field_summary = _wrap("get_field_summary")
 _compare = _wrap("compare")
 recommend = _wrap("recommend")
 tipping = _wrap("tipping_points")
-hindcast = _wrap("hindcast")
+_hindcast = _wrap("hindcast")
 _land_split = _wrap("land_split")
 assumptions = _wrap("assumptions_table")
+
+
+def hindcast(p):
+    records = st.session_state.get("farm_records")
+    if records:
+        # Uploaded observations stay in this session, outside the shared result cache.
+        value, mock = _call("hindcast", dict(p, farm_records=records))
+        if mock:
+            st.session_state["_mock"] = True
+        return value
+    return _hindcast(p)
 
 
 def compare(ids, p):

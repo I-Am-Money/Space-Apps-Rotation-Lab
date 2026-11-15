@@ -31,9 +31,13 @@ def land_split_panel(alt_id: str, alt_name: str, key: str, p: dict) -> None:
     m, dm = row("total_profit_mean"); w, dw = row("total_profit_worst10"); irr, di = row("total_irrigation_m3")
     stats([
         stat("Total profit, average", fmt_rs(m), "", b, delta_html(dm, "Rs {:,.0f}") + " against all rice"),
-        stat("Total profit, worst 10% of seasons", fmt_rs(w), "", b, delta_html(dw, "Rs {:,.0f}") + " against all rice"),
+        stat("Total profit, worst 10% of weather sequences", fmt_rs(w), "", b, delta_html(dw, "Rs {:,.0f}") + " against all rice"),
         stat("Total irrigation water", f"{irr:,.0f}", "m3", b, delta_html(di, "{:,.0f} m3", good_when_up=False) + " against all rice"),
     ])
+    if ls.get("irrigation_canal_m3") is not None and ls.get("irrigation_well_m3") is not None:
+        st.caption(f'Canal: {ls["irrigation_canal_m3"][i]:,.0f} m3; wells: {ls["irrigation_well_m3"][i]:,.0f} m3. Total rain plus irrigation: {ls["total_water_m3"][i]:,.0f} m3 over four years.')
+    if "best_acres_rice" in ls:
+        st.caption(f'Model’s highest-scoring split at these inputs: {ls["best_acres_rice"]} acres in rice, {int(total) - ls["best_acres_rice"]} in the alternative.')
     fig = go.Figure()
     fig.add_scatter(x=xs, y=ls["total_profit_mean"], mode="lines", name="Average", line=dict(color=T["rice"], width=3), hovertemplate="%{x:.0f} acres in rice: Rs %{y:,.0f}<extra>Average</extra>")
     fig.add_scatter(x=xs, y=ls["total_profit_worst10"], mode="lines", name="Worst 10%", line=dict(color=T["bajra"], width=3), hovertemplate="%{x:.0f} acres in rice: Rs %{y:,.0f}<extra>Worst 10%</extra>")
@@ -41,4 +45,4 @@ def land_split_panel(alt_id: str, alt_name: str, key: str, p: dict) -> None:
     fig.add_annotation(x=max(xs), y=ls["total_profit_mean"][j], text="All rice (our farm today)", showarrow=False, xanchor="right", yanchor="bottom", font=dict(size=12, color=T["ink2"]))
     charts._layout(fig, 320, xt=f"Acres in rice (of {total:,.0f})", yt="Total profit over 4 years (Rs)", legend=False)
     charts.show(fig, f"split_chart_{key}")
-    srcline("Model output for the whole farm. Blue is the average, clay red is the worst 10% of seasons.", "Source")
+    srcline("Model output for the whole farm. Blue is the average, clay red is the worst 10% of weather sequences.", "Source")

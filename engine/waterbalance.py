@@ -15,8 +15,8 @@ Design
   the pond is drained at harvest (counted as runoff).
 - Mass closure (whole 4-year run, per scenario): rain + irrigation = ETa + percolation + runoff + change in storage.
 
-Performance: simulate_batch vectorises over rotations x scenarios and loops only over days;
-simulate_plan is the R = 1 case.
+Performance: the production kernel compiles daily loops, reuses identical plan prefixes,
+and parallelizes independent weather sequences. simulate_plan is the R = 1 case.
 """
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ def _rice_phase(Dr, et0T, rainT, supply, well, kc, perc, hmax, taw, inv, dcol, r
     return Dr, out
 
 
-def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: float,
+def _simulate_fixed_reference(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: float,
                    irrigation_available_mm: float, params: dict | None = None) -> dict:
     """Vectorised simulation of R plans over S scenarios. Arrays are [R,S,4] ([R,S] for storage/closure)."""
     params = params or {}
@@ -294,6 +294,106 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
     if rec_on:
         res["daily"] = daily
     return res
+
+
+def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: float,
+                   irrigation_available_mm: float, params: dict | None = None) -> dict:
+    """Continuous accounting with scenario-specific onset, crop stages and heat stress.
+
+    Inputs without onset metadata retain the fixed-calendar behavior for standalone
+    physics use. API scenarios always carry detected rainfall onset.
+    """
+    from engine._water_kernel import run
+    params = params or {}
+    crops = load_crops(params)
+    ids = list(CROP_IDS)
+    plans = [list(p) for p in plans]
+    if not plans or any(len(p) != 4 or any(c not in ids for c in p) for p in plans):
+        raise ValueError("Each rotation must contain four supported crop IDs")
+    arrays = [np.ascontiguousarray(scen[k], dtype=float) for k in ("et0", "precip", "tmax")]
+    et0, rain, tmax = arrays
+    if et0.ndim != 3 or et0.shape[1:] != (4, 365) or any(a.shape != et0.shape for a in arrays):
+        raise ValueError("Weather arrays must have the same [scenario, 4, 365] shape")
+    if not all(np.isfinite(a).all() for a in arrays) or (et0 < 0).any() or (rain < 0).any():
+        raise ValueError("Weather must be finite; rain and ET0 cannot be negative")
+    awc, base = float(awc_mm_per_m), float(irrigation_available_mm)
+    if not np.isfinite(awc) or awc <= 0 or not np.isfinite(base) or base < 0:
+        raise ValueError("Soil capacity must be positive and irrigation nonnegative")
+    ns = rain.shape[0]
+    starts = np.empty((ns, 4, len(ids)), dtype=np.int64)
+    for ci, cid in enumerate(ids):
+        if "onset_doy" in scen:
+            lag = A(params, "monsoon.rice_sowing_lag_days" if cid == "rice" else "monsoon.rainfed_sowing_lag_days")
+            starts[:, :, ci] = np.minimum(365, np.asarray(scen["onset_doy"], dtype=int) + int(lag))
+        else:
+            starts[:, :, ci] = crops[cid].sowing_doy - 1
+    rice_rain = rain[:, :, 151:304].sum(-1)  # Jun-Oct local recharge; fixed seasonal window
+    median = float(params.get("median_local_rain", params.get("median_season_rain_mm", np.median(rice_rain))))
+    source = params.get("water_source", "unset")
+    def supply(value):
+        a = np.asarray(value, float)
+        if a.ndim == 1:
+            a = a[:, None]
+        a = np.broadcast_to(a, (ns, 4)).copy()
+        if not np.isfinite(a).all() or (a < 0).any():
+            raise ValueError("Irrigation supplies must be finite and nonnegative")
+        return a
+    canal = np.zeros((ns, 4)); well = canal.copy()
+    if source == "canal_and_well":
+        if params.get("canal_supply_mm") is not None:
+            canal = supply(params["canal_supply_mm"])
+        else:
+            upstream = np.asarray(scen["upstream_season_rain"], float)
+            med_up = float(params.get("median_upstream_rain", np.median(upstream)))
+            canal = supply(A(params, "rice_irrigation.base_canal") * (np.maximum(upstream, 0) / max(med_up, 1e-9)) ** A(params, "rice_irrigation.k_canal"))
+        well = supply(params["well_supply_mm"]) if params.get("well_supply_mm") is not None else supply(
+            A(params, "rice_irrigation.base_well") * (rice_rain / max(median, 1e-9)) ** A(params, "rice_irrigation.k_well"))
+        well = np.minimum(well, A(params, "rice_irrigation.max_well"))
+    elif source == "canal":
+        canal = supply(base * np.asarray(A(params, "rice_irrigation.canal_release_factor")) ** A(params, "rice_irrigation.canal_exponent_k"))
+    elif source in ("unset", "borewell", "tank"):
+        # Fixed-calendar calls keep their historical season window for backwards compatibility.
+        if "onset_doy" not in scen:
+            c = crops["rice"]
+            rice_rain = rain[:, :, c.sowing_doy - 1:c.sowing_doy - 1 + c.season_days].sum(-1)
+            median = float(params.get("median_season_rain_mm", np.median(rice_rain)))
+        well = supply(base * (rice_rain / max(median, 1e-9)) ** A(params, "rice_irrigation.recharge_exponent_k"))
+    else:
+        raise ValueError(f"Unsupported water source: {source}")
+    cp = [crops[c] for c in ids]
+    kc = np.zeros((len(ids), 365))
+    for i, c in enumerate(cp):
+        kc[i, :c.season_days] = c.kc_curve()
+    group = A(params, "hydrology.hydrologic_group")
+    dcol = awc * max(c.root_depth_m for c in cp)
+    heat_on = bool(A(params, "heat.enabled"))
+    thresholds = np.array([A(params, "heat.rice_threshold_c" if c == "rice" else "heat.pigeonpea_threshold_c" if c == "pigeonpea" else "heat.millet_threshold_c") for c in ids])
+    seen, owners = {}, np.zeros((len(plans), 4), dtype=np.int64)
+    for r, plan in enumerate(plans):
+        for y in range(4):
+            prefix = tuple(plan[:y + 1])
+            owners[r, y] = seen.setdefault(prefix, r)
+    raw, storage, daily = run(
+        np.array([[ids.index(c) for c in p] for p in plans], dtype=np.int64), owners, et0, rain, tmax, starts, kc,
+        np.array([c.season_days for c in cp]), np.array([c.root_depth_m for c in cp]), np.array([c.p for c in cp]),
+        np.array([c.ky for c in cp]), np.array([c.ym_kg_ha for c in cp]), np.stack([rotation_factor(p, params) for p in plans]),
+        canal, well, awc, dcol, float(A(params, f"hydrology.cn_crop_group_{group}")),
+        float(A(params, f"hydrology.cn_fallow_group_{group}")), float(A(params, "hydrology.ia_ratio")),
+        float(A(params, "fallow.kc")), awc * float(A(params, "fallow.evap_depth_m")), float(A(params, "fallow.depletion_fraction")),
+        float(A(params, "hydrology.init_depletion_frac")), float(A(params, "rice_irrigation.percolation_seepage_mm_day")),
+        float(A(params, "rice_irrigation.puddling_water_mm")), float(A(params, "rice_irrigation.bund_height_mm")),
+        heat_on, float(A(params, "heat.penalty_per_day")), thresholds,
+        np.array([sum(c.stages_days[:2]) for c in cp]), int(A(params, "heat.flowering_window_days")), bool(params.get("record_daily")))
+    keys = ("yield_kg_ha", "eta_mm", "etm_mm", "rain_mm", "irrig_mm", "irrig_needed_mm", "runoff_mm", "drainage_mm", "puddle_mm",
+            "rain_total_mm", "eta_total_mm", "runoff_total_mm", "drainage_total_mm", "irrig_total_mm", "irrig_canal_mm", "irrig_well_mm",
+            "supply_canal_mm", "supply_well_mm", "heat_days")
+    out = dict(zip(keys, raw))
+    out.update(storage_change_mm=storage, dcol_mm=dcol, plans=plans,
+               sowing_doy=np.stack([starts[:, y, ids.index(p[y])] + 1 for p in plans for y in range(4)]).reshape(len(plans), 4, ns).transpose(0, 2, 1))
+    out["closure_error_mm"] = (out["rain_total_mm"] + out["irrig_total_mm"] - out["eta_total_mm"] - out["runoff_total_mm"] - out["drainage_total_mm"]).sum(-1) - storage
+    if params.get("record_daily"):
+        out["daily"] = dict(zip(("dr", "ks", "eta", "need"), daily))
+    return out
 
 
 def simulate_plan(scen: dict, plan: Sequence[str], awc_mm_per_m: float, irrigation_available_mm: float,

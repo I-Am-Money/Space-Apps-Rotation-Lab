@@ -16,7 +16,8 @@ SOURCES = [
     ("NASA SMAP mission", "https://smap.jpl.nasa.gov/", "Opened in a browser."),
     ("NASA Earth Observatory, NDVI", "https://science.nasa.gov/earth/earth-observatory/measuring-vegetation-ndvi-evi/", "Opened in a browser: NDVI is the most common satellite measure of the density of plant growth."),
     ("FAO Paper 56, evapotranspiration", "https://www.fao.org/4/x0490e/x0490e04.htm", "Opened in a browser: evapotranspiration is water lost from soil by evaporation plus from the crop by transpiration."),
-    ("ICRISAT Dataverse: District Level Data (DLD) and Dashboard for Agriculture and Allied-sectors in India", "https://doi.org/10.21421/D2/XFB1BZ", "Opened in a browser: the dataset page title matches (persistent id doi:10.21421/D2/XFB1BZ)."),
+    ("ICRISAT/TCI district crop table, World Bank archive", "https://reproducibility.worldbank.org/catalog/409", "Apportioned Nalgonda, code 59: 1966-2017. All selected crops have 52 positive-yield years. Source member checksum is recorded in the cache."),
+    ("Government kharif MSP and national A2+FL unit costs, 2026-27", "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1", "Prices are observed official figures. Converting national unit costs to per-acre crop budgets is an explicit model assumption, not a measured Telangana cost."),
 ]
 
 
@@ -41,10 +42,12 @@ def render():
         with c1:
             section("Model against district yields", b, "Each dot is a year, with the long-run trend removed from both. On the dotted line the model matches the district.")
             charts.show(charts.hindcast_scatter(d, crop), "hc")
-            srcline("District yields from ICRISAT against single-season model output, both detrended. District rice mixes irrigated and rainfed fields.", "Data source")
+            srcline("ICRISAT/TCI apportioned district yields, archived by the World Bank, against single-season model output. District rice mixes farms, irrigation regimes and seasons.", "Data source")
+            charts.show(charts.validation_history(d, crop, h.get("farm_records")), "validation_history")
+            st.caption(d.get("level_note", ""))
             if h.get("farm_records"):
                 md(f'{badge("local")} Your farm records were provided and are listed below.')
-                st.dataframe(pd.DataFrame(h["farm_records"]["rows"]), hide_index=True, use_container_width=True)
+                st.dataframe(pd.DataFrame(h["farm_records"]["rows"]), hide_index=True, width="stretch")
             else:
                 md('<p class="rl-note">No farm records were provided, so only district data is shown.</p>')
         with c2:
@@ -67,13 +70,14 @@ def render():
                                     water_stress_mm="Water stress (mm)", irrigation_mm="Irrigation (mm)"))
         num = [c for c in bt.columns if c not in ("Strategy", "Rotation")]
         bt[num] = bt[num].round(0).astype(int)
-        st.dataframe(bt, hide_index=True, use_container_width=True)
+        st.dataframe(bt, hide_index=True, width="stretch")
 
     section("Every assumption", None, "Each row says where its value comes from. Rows marked team to verify have no confirmed source yet.")
     try:
-        a = data.assumptions().copy()
+        a = data.assumptions(p).copy()
         a["value"] = a["value"].astype(str); a["range"] = a["range"].astype(str).replace({"None": ""})
-        st.dataframe(a.rename(columns=str.title), hide_index=True, use_container_width=True)
+        st.dataframe(a.rename(columns=str.title), hide_index=True, width="stretch")
+        st.download_button("Download assumptions and sources (CSV)", a.to_csv(index=False).encode(), "rotationlab-assumptions.csv", "text/csv")
     except Exception as e:  # engine output changing under us: say so, never crash the page
         md(f'<div class="rl-nodata">{badge("placeholder")} The assumptions table could not be built by the engine ({html.escape(type(e).__name__)}: {html.escape(str(e))}). The values are in <code>config/assumptions.yaml</code> and <code>config/prices_india.yaml</code>.</div>')
 
@@ -90,3 +94,5 @@ def render():
 
     section("Data sources")
     md('<ul class="rl-src">' + "".join(f'<li><a href="{u}" target="_blank" rel="noopener">{html.escape(n)}</a><div class="st">{html.escape(s)}</div></li>' for n, u, s in SOURCES) + "</ul>")
+    section("AI use")
+    st.markdown((LIMITS_FILE.parent / "AI_USE.md").read_text().split("\n", 2)[-1])

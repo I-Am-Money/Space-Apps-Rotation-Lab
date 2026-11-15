@@ -1,8 +1,13 @@
 .env
 .venv/
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/
 .playwright-mcp/
 .streamlit/secrets.toml
 SUBMISSION_CHECKLIST.md
+output/
+data/cache/
+*.nbc
+*.nbi

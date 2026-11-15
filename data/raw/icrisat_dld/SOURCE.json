@@ -1,0 +1,13 @@
+{
+  "url": "https://reproducibility.worldbank.org/catalog/409/download/1152",
+  "catalog": "https://reproducibility.worldbank.org/catalog/409",
+  "member": "RR_IND_2025_488/Reproducbility Package/raw/DLD/Apportioned/Crops_Area Production Yield.csv",
+  "member_sha256": "7857decb1a196a54aac71a0f841af43c3bac98b3b90744aadca18b1859cea6f3",
+  "member_crc32": 49234040,
+  "member_bytes": 9263222,
+  "extraction": "Nalgonda rows retained; source CSV columns unchanged",
+  "accessed": "2026-11-14",
+  "extracted_file": "nalgonda_apportioned_1966_2017.csv",
+  "extracted_sha256": "e6875adece36b9222b52cd23cc11b7ad2544e04b406dd179474cbaa131dbeb15",
+  "license": "ICRISAT/TCI DLD CC BY 4.0, as declared in the World Bank catalog; retain source attribution."
+}

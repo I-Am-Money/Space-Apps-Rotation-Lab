@@ -36,15 +36,15 @@ def candidate_plans(df, k: int = 10, extra=()):
 def _stack(plans, scenset, awc, irr, price_mult):
     opt.prefetch(plans, scenset, awc, irr)
     A = [opt.rotation_arrays(p, scenset, awc, irr, price_mult) for p in plans]
-    return np.stack([a["profit"] for a in A]), np.stack([a["stress"] for a in A])
+    return np.stack([a["profit"] for a in A]), np.stack([a["irrig"] for a in A])
 
 
-def _J(profit, stress, lam, w, scale):
-    """profit, stress [..., S] -> J [...]. worst10 via partition."""
+def _J(profit, irrigation, lam, w, scale):
+    """Profit and irrigation arrays [..., S] -> J [...]."""
     S = profit.shape[-1]
     k = max(1, int(np.ceil(0.1 * S)))
-    worst = np.sort(profit, axis=-1)[..., :k].mean(-1)
-    return opt.objective(profit.mean(-1), worst, stress.mean(-1), lam, w, scale)
+    worst = np.partition(profit, k - 1, axis=-1)[..., :k].mean(-1)
+    return opt.objective(profit.mean(-1), worst, irrigation.mean(-1), lam, w, scale)
 
 
 def _first_crossover(winners, Jm, ms):
@@ -116,13 +116,19 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
     dlt = [[None] * len(rain_levels) for _ in irr_levels]
     iA = names.index(opt.plan_id(opt.REF[opt.BASELINE_ID]))
     scs = [scenset.derive(rain_mult=m) for m in rain_levels]
+    rng = np.random.default_rng(42)
+    counts = np.stack([np.bincount(rng.integers(0, scenset.n, scenset.n), minlength=scenset.n) for _ in range(200)])
+    rice_wins = np.zeros((200, len(irr_levels), len(rain_levels)), dtype=bool)
     for i, irr in enumerate(irr_levels):
-        opt.prefetch_multi(cands, scs, awc, irr)           # one batched call per irrigation level
-        for j, sc_ in enumerate(scs):
-            p, s = _stack(cands, sc_, awc, irr, pm)
-            k = int(_J(p, s, lam, w, scale).argmax())
-            win[i][j] = names[k]
-            dlt[i][j] = float(p[k].mean() - p[iA].mean())
+        with opt.irrigation_sweep(irr, params["irrigation_mm"]):
+            opt.prefetch_multi(cands, scs, awc, irr)
+            for j, sc_ in enumerate(scs):
+                p, s = _stack(cands, sc_, awc, irr, pm)
+                k = int(_J(p, s, lam, w, scale).argmax())
+                win[i][j] = names[k]
+                dlt[i][j] = float(p[k].mean() - p[iA].mean())
+                winners = _bootstrap_scores(p, s, counts, lam, w, scale).argmax(1)
+                rice_wins[:, i, j] = np.array([_rice_share(names[k]) >= .5 for k in winners])
     # water level at which the winner turns rice-heavy (>= 50% rice years), per rainfall column
     thr = []
     for j in range(len(rain_levels)):
@@ -140,8 +146,29 @@ def decision_grid(scenset, awc, params, scale, cands, irr_levels, rain_levels=GR
         text = (f"At normal rainfall, rice-majority rotations win once available irrigation reaches about {thr[j1]:.0f} mm per season; "
                 f"below that the model shifts land from rice to millets or pigeon pea.")
     text += f" Winners compared among {len(cands)} candidate rotations. {FRAME}."
+    band = {"p10": [], "p90": [], "share_with_boundary": [], "n_boot": 200}
+    for j in range(len(rain_levels)):
+        exists = rice_wins[:, :, j].any(1)
+        thresholds = np.asarray(irr_levels)[rice_wins[:, :, j].argmax(1)][exists]
+        for quantile, key in ((10, "p10"), (90, "p90")):
+            band[key].append(float(np.percentile(thresholds, quantile)) if len(thresholds) else None)
+        band["share_with_boundary"].append(float(exists.mean()))
     return {"rain_mult": list(map(float, rain_levels)), "irrigation_mm": list(map(float, irr_levels)),
-            "winner": win, "baseline_id": opt.BASELINE_ID, "delta_mean_profit_vs_baseline": dlt, "rice_shift_threshold_mm": thr, "text": text, "badge": "modeled"}
+            "winner": win, "baseline_id": opt.BASELINE_ID, "delta_mean_profit_vs_baseline": dlt, "rice_shift_threshold_mm": thr,
+            "boundary_band": band, "text": text, "badge": "modeled"}
+
+
+def _bootstrap_scores(profit, irrigation, counts, lam, w, scale):
+    """Exact resampled lower-tail means from counts; sort each plan only once."""
+    n = profit.shape[-1]
+    k = max(1, int(np.ceil(.1 * n)))
+    order = np.argsort(profit, axis=-1)
+    ordered = np.take_along_axis(profit, order, axis=-1)
+    weights = counts[:, order]
+    before = weights.cumsum(-1) - weights
+    tail = np.minimum(weights, np.maximum(k - before, 0))
+    worst = np.einsum("brs,rs->br", tail, ordered) / k
+    return opt.objective(counts @ profit.T / n, worst, counts @ irrigation.T / n, lam, w, scale)
 
 
 def late_monsoon_curve(scenset, awc, irr, params, scale, plans, days=LATE_DAYS):
@@ -162,7 +189,7 @@ def late_monsoon_curve(scenset, awc, irr, params, scale, plans, days=LATE_DAYS):
     for r, pl in enumerate(plans):
         k = max(1, int(np.ceil(0.1 * P.shape[-1])))
         out["rotations"][opt.plan_id(pl)] = {"mean_profit": P[:, r].mean(-1).tolist(),
-            "worst10_profit": np.sort(P[:, r], -1)[..., :k].mean(-1).tolist(), "water_stress_mm": St[:, r].mean(-1).tolist(),
+            "worst10_profit": np.sort(P[:, r], -1)[..., :k].mean(-1).tolist(), "irrigation_mm": St[:, r].mean(-1).tolist(),
             "J": Jm[:, r].tolist(),
             "delta_mean_profit_vs_baseline": None if iA is None else (P[:, r].mean(-1) - P[:, iA].mean(-1)).tolist()}
     names = [opt.plan_id(p) for p in plans]
@@ -183,8 +210,9 @@ def evpi(scenset, params, scale, cands, vary: str, values, base_awc, base_irr, t
     J = []
     for v in values:
         awc, irr = (v, base_irr) if vary == "awc" else (base_awc, v)
-        p, s = _stack(cands, scenset, awc, irr, pm)
-        J.append(_J(p, s, lam, w, scale))
+        with opt.irrigation_sweep(irr, base_irr):
+            p, s = _stack(cands, scenset, awc, irr, pm)
+            J.append(_J(p, s, lam, w, scale))
     J = np.stack(J)                                   # [K,R]
     perfect = float(J.max(1).mean())
     now = float(J.mean(0).max())
@@ -193,12 +221,15 @@ def evpi(scenset, params, scale, cands, vary: str, values, base_awc, base_irr, t
     return {"value": val, "perfect_info_value": perfect, "no_info_value": now, "values": list(map(float, values)),
             "best_without_info": names[int(J.mean(0).argmax())],
             "best_by_value": [names[i] for i in J.argmax(1)],
-            "test_cost": float(test_cost_per_acre), "test_cost_badge": cost_badge, "worth_measuring": bool(val > test_cost_per_acre),
+            "test_cost": None if test_cost_per_acre is None else float(test_cost_per_acre), "test_cost_badge": cost_badge,
+            "worth_measuring": None if test_cost_per_acre is None else bool(val > test_cost_per_acre),
             "label": label, "badge": "modeled", "n_candidates": len(cands),
             "units": "Rs/acre over the 4-year plan, same units as J"}
 
 
 def evpi_text_awc(e):
+    if e["test_cost"] is None:
+        return f"Perfect soil information is worth up to {e['value']:,.0f} Rs/acre over four years. No verified test quote is available; compare a real quote with this upper bound."
     return (f"Expected value of perfect information on soil water capacity: {e['value']:,.0f} Rs/acre over 4 years "
             f"(uniform over {len(e['values'])} values from {min(e['values']):.0f} to {max(e['values']):.0f} mm/m). "
             f"Soil test cost {e['test_cost']:,.0f} Rs/acre ({e['test_cost_badge']}): "
@@ -207,6 +238,8 @@ def evpi_text_awc(e):
 
 
 def evpi_text_irr(e):
+    if e["test_cost"] is None:
+        return f"Is it worth measuring your borewell or tank capacity? Perfect irrigation information is worth up to {e['value']:,.0f} Rs/acre over four years. No verified measurement quote is available; compare a real quote with this upper bound."
     return ("Is it worth measuring your borewell or tank capacity before deciding? "
             f"Expected value of perfect information on available irrigation water: {e['value']:,.0f} Rs/acre over 4 years "
             f"(uniform over {len(e['values'])} values from {min(e['values']):.0f} to {max(e['values']):.0f} mm). "
@@ -225,6 +258,8 @@ def _short(pid):
 def upstream_local_grid(scenset, awc, irr, params, scale, cands, levels=UL_LEVELS, n_scen=UL_N_SCEN):
     """Upstream rain multiplier (x, canal proxy) vs local rain multiplier (y, wells + crop rain); cell = winning
     rotation among the candidates. One batched simulation for all cells (first n_scen bootstrap plans)."""
+    if params.get("water_source") != "canal_and_well":
+        return {"available": False, "reason": "Select canal and well to compare upstream and local rain.", "badge": "modeled"}
     if "upstream_season_rain" not in scenset.scen:
         return {"available": False, "reason": "no upstream rain data (engine.fetch_upstream not available)", "badge": "modeled"}
     lam, w, pm = params["lam"], params["w"], params.get("price_mult", 1.0)

@@ -14,6 +14,28 @@
 #  [NEH9-1]  USDA NRCS National Engineering Handbook Part 630 ch.9 Table 9-1, p.9-2 (July 2004)
 #            https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf
 
+decision:
+  water_value_rs_m3: {value: 1, range: [0, 5], unit: Rs per cubic metre saved, source: "Editable planning preference from the water-price-proxy objective, not a water bill or observed market price. Default 1 Rs/m3 is an explicit assumption, team to verify preference locally; equals 10 Rs per mm per hectare.", badge: assumption}
+
+monsoon:
+  search_start_doy: {value: 152, range: [152, 152], unit: day-of-year, source: "Planning rule: search after June 1, not an official IMD onset definition.", badge: assumption}
+  search_end_doy: {value: 273, range: [244, 273], unit: day-of-year, source: "End of September search cutoff; no qualifying onset means no planting. Team to verify.", badge: assumption}
+  wet_window_days: {value: 5, range: [3, 7], unit: days, source: "Transparent planning onset rule, team to verify.", badge: assumption}
+  wet_window_mm: {value: 25, range: [20, 50], unit: mm, source: "Transparent planning onset rule, team to verify.", badge: assumption}
+  followup_days: {value: 20, range: [15, 30], unit: days, source: "Reject false onset followed by a long dry spell; team to verify.", badge: assumption}
+  max_dry_spell_days: {value: 10, range: [7, 15], unit: days, source: "Reject a 10-day run below the dry-day threshold after the wet window; team to verify.", badge: assumption}
+  dry_day_mm: {value: 1, range: [0.5, 2], unit: mm/day, source: "Dry-day threshold in the planning onset rule; team to verify.", badge: assumption}
+  rice_sowing_lag_days: {value: 14, range: [0, 30], unit: days, source: "Paddy establishment lag after detected onset; assumption, team to verify locally.", badge: assumption}
+  rainfed_sowing_lag_days: {value: 0, range: [0, 14], unit: days, source: "Rainfed crops planted at detected onset; assumption, team to verify locally.", badge: assumption}
+
+heat:
+  enabled: {value: true, range: [false, true], unit: toggle, source: "Optional flowering heat sensitivity from the build spec. Assumption, not locally calibrated.", badge: assumption}
+  penalty_per_day: {value: 0.01, range: [0, 0.02], unit: yield fraction/day, source: "Build-spec sensitivity assumption: 1% per threshold-exceeding flowering day, team to verify.", badge: assumption}
+  rice_threshold_c: {value: 35, range: [33, 38], unit: degC, source: "Flowering heat sensitivity threshold, assumption, team to verify.", badge: assumption}
+  millet_threshold_c: {value: 38, range: [35, 42], unit: degC, source: "Flowering heat sensitivity threshold, assumption, team to verify.", badge: assumption}
+  pigeonpea_threshold_c: {value: 35, range: [33, 40], unit: degC, source: "Flowering heat sensitivity threshold, assumption, team to verify.", badge: assumption}
+  flowering_window_days: {value: 20, range: [10, 30], unit: days, source: "First 20 days of the mid-season stage used as a flowering-window proxy; team to verify.", badge: assumption}
+
 crops:
   rice:
     kc_ini:   {value: 1.05, range: [1.05, 1.05], unit: "-", source: "FAO-56 Table 12, row Rice: 1.05 / 1.20 / 0.90-0.60 (ini/mid/end). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}

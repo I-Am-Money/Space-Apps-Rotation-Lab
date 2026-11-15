@@ -29,31 +29,38 @@ msp:
     msp_prev_season_rs_per_quintal: 8000
     cost_a2fl_rs_per_quintal_allindia: 5496
     margin_pct: 54
+  ragi:
+    variety: "Ragi"
+    msp_rs_per_quintal: 5205
+    msp_prev_season_rs_per_quintal: 4886
+    cost_a2fl_rs_per_quintal_allindia: 3470
+    margin_pct: 50
   cost_note: >
     PIB "Cost" column is the all-India weighted average cost of production per quintal
     (all paid-out costs plus imputed family labour, i.e. A2+FL), projected for 2026-27.
     It is per quintal, not per acre, and is not state-specific.
 
-# Operating cost per acre: NOT found in a verifiable state-level (Telangana/AP) form.
+# Operating cost per acre: explicit national A2+FL proxy; no farm/state observation claimed.
 # CACP cost-of-cultivation state tables were not reachable. Team to fill from CACP
 # "Cost of Cultivation / Production" reports (cacp.da.gov.in), Cost A2+FL, Telangana or AP.
 operating_cost_rs_per_acre:
-  rice:      {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  jowar:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  bajra:     {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
-  pigeonpea: {value: null, badge: placeholder, source: "TEAM_TO_FILL (CACP state cost of cultivation, A2+FL)"}
+  rice: {"value": 25170.92, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 1627 Rs/quintal times detrended district potential yield 3822.904 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
+  jowar: {"value": 8018.47, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 2682 Rs/quintal times detrended district potential yield 738.779 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
+  bajra: {"value": 5983.42, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 1858 Rs/quintal times detrended district potential yield 795.766 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
+  ragi: {"value": 34062.71, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 3470 Rs/quintal times detrended district potential yield 2425.669 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
+  pigeonpea: {"value": 13674.95, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 5496 Rs/quintal times detrended district potential yield 614.838 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
 
 # Potential yield Ym = 90th percentile of linearly detrended district yields (kg/ha),
 # computed by engine/fetch_icrisat.py for Nalgonda (pre-2016 undivided district).
-# Rice and bajra come from the fallback panel (1990-2015). Crops absent from the files we
-# could fetch (jowar, ragi, pigeonpea) stay null placeholders until the DLD CSVs are supplied.
+# Values come from the checksum-verified ICRISAT/TCI apportioned district table archived by the World Bank.
+# Ragi has only 17 positive-yield years and is not selected for the optimizer.
 potential_yield_kg_ha:
   district: Nalgonda
-  rice:      {value: 3377.6, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Nalgonda 1990-2015 (26 yrs); mixes irrigated and rainfed"}
-  bajra:     {value: 872.6, badge: observed, source: "P90 detrended, ICRISAT DLD via Mendeley doi:10.17632/ywp3y5j9vv.1, Nalgonda 1990-2015 (26 yrs; 2014 and 2015 both exactly 500, check against the DLD CSV)"}
-  jowar:     {value: null, badge: placeholder, source: "no jowar column in the fetched file; needs ICRISAT DLD sorghum CSV (docs/INDIA_DATA.md)"}
-  ragi:      {value: null, badge: placeholder, source: "no ragi column in the fetched file; needs ICRISAT DLD finger millet CSV"}
-  pigeonpea: {value: null, badge: placeholder, source: "no pigeonpea column in the fetched file; needs ICRISAT DLD pigeonpea CSV"}
+  rice: {"value": 3822.904, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
+  jowar: {"value": 738.779, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
+  bajra: {"value": 795.766, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
+  ragi: {"value": 2425.669, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (17 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
+  pigeonpea: {"value": 614.838, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
 
 # Costs of information (EVPI cards). No source: team estimates only.
 soil_test_cost_rs:
@@ -64,3 +71,12 @@ borewell_or_tank_capacity_measurement_cost_rs:
   value: null
   badge: placeholder
   source: "TEAM_TO_FILL (quote from a local borewell yield test / tank survey)"
+
+n_cost_rs_per_kg:
+  value: 12.8743961353
+  badge: assumption
+  source: "Urea-equivalent nitrogen price: official subsidized 45 kg urea bag MRP Rs 266.50 / (45 * 0.46 nitrogen fraction). Model saving proxy, not a local purchase receipt. PIB, 14 June 2026, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2272695&lang=2&reg=3."
+irrigation_cost_rs_per_m3:
+  value: 0
+  badge: assumption
+  source: "Additional charge only. National A2+FL proxy budgets already include irrigation and pump energy (PIB 2026-27 MSP footnote). Zero prevents double counting; enter an incremental local charge to vary costs with water use. This does not claim irrigation is free."

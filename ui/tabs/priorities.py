@@ -1,4 +1,5 @@
 import html
+import os
 
 import streamlit as st
 
@@ -14,7 +15,7 @@ def explain_inputs(rec, tp, p):
     d = dict(top_rotation=plan_label(t["plan"]), runner_up=plan_label(r["plan"]), top_mean_profit=round(t["mean_profit"]),
              top_worst10_profit=round(t["worst10_profit"]), top_water_stress_mm=round(t["water_stress_mm"]),
              runner_up_mean_profit=round(r["mean_profit"]), runner_up_worst10_profit=round(r["worst10_profit"]),
-             bad_year_weight=p["lam"], water_stress_weight=p["w"], irrigation_input_mm=p["irrigation_mm"])
+             bad_year_weight=p["lam"], irrigation_saving_weight=p["w"], irrigation_input_mm=p["irrigation_mm"])
     if tp:
         co = tp["rainfall_crossover"].get("crossovers") or []
         d["rain_crossover"] = co[0]["rain_mult"] if co else None
@@ -33,29 +34,39 @@ def render():
                   help="Left: maximise the average result. Right: care most about the worst seasons.")
         md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Plan for an average year</span><span>Protect me in bad years</span></div>')
     with c2:
-        st.slider("How much do you care about water stress?", 0, 100, value=data.V()["w"], format="%d", **data.bind("w"))
+        st.slider("How much do you want to save irrigation water?", 0, 100, value=data.V()["w"], format="%d", **data.bind("w"))
         md('<div style="display:flex;justify-content:space-between;font-size:.86rem;color:var(--ink2);margin-top:-.6rem"><span>Not much</span><span>A lot</span></div>')
+        with st.expander("Value assigned to saving water"):
+            st.number_input("Planning value of saved water (Rs per m3)", min_value=0., max_value=5., value=float(data.V()["water_value"]), step=.1, **data.bind("water_value"))
+            st.caption("A preference value used by the recommendation, separate from your irrigation bill. It stays fixed across scenarios and tipping-point sweeps.")
 
     p = data.params()
     with st.spinner(data.MSG["recommend"]):
         rec = data.recommend(p)
     mdf = rec["metrics"]
+    export = mdf.copy()
+    export["plan"] = export["plan"].map(data.plan_label)
+    st.download_button("Download all rotation scores (CSV)", export.to_csv(index=False).encode(), "rotationlab-rotation-scores.csv", "text/csv")
     base = mdf[mdf.id == "rice-rice-rice-rice"].iloc[0]
     t = rec["top"]
     b = "placeholder" if data.is_mock() else "modeled"
-    ex = explain.explain(explain_inputs(rec, None, p))
+    use_ai = False
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        use_ai = st.checkbox("Use Claude to explain these computed results", value=False, key="use_ai_explanation",
+            help="Sends computed recommendation totals to Anthropic. The app works without this option.")
+    ex = explain.explain(explain_inputs(rec, None, p), use_api=use_ai)
     src = "Written by Claude from the numbers above." if ex["source"] == "model" else "Written from a fixed template using the numbers above."
     md(f'<div class="rl-hero"><p style="margin:0;font-size:.9rem;opacity:.85">Recommended for these priorities {badge(b)}</p>'
        f'<h4>{html.escape(plan_label(t["plan"]))}</h4>{ribbon(t["plan"])}<p style="margin:.7rem 0 .3rem">{html.escape(ex["text"])}</p>'
        f'<p style="margin:0;font-size:.82rem;opacity:.8">{src} Modeled estimate, for planning only.</p></div>')
     stats([
         stat("Average over 4 years", fmt_rs(t["mean_profit"]), "per acre", b, delta_html(t["mean_profit"] - base.mean_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["mean_profit"])),
-        stat("Worst 10% of seasons", fmt_rs(t["worst10_profit"]), "per acre", b, delta_html(t["worst10_profit"] - base.worst10_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["worst10_profit"])),
+        stat("Worst 10% of weather sequences", fmt_rs(t["worst10_profit"]), "per acre", b, delta_html(t["worst10_profit"] - base.worst10_profit, "Rs {:,.0f}") + " per acre against our farm today. " + _farm.per_farm_note(t["worst10_profit"])),
         stat("Water shortfall", f'{t["water_stress_mm"]:,.0f}', "mm", b, delta_html(t["water_stress_mm"] - base.water_stress_mm, "{:,.0f} mm", good_when_up=False) + " against our farm today"),
     ])
 
     section("Every possible rotation, plotted", b,
-            "Each dot is one of the 256 ways to fill four years. Higher and further right is better. Darker blue means more water stress.")
+            f"Each dot is one of the {len(mdf)} ways to fill four years. Higher and further right is better. Darker blue means more irrigation water.")
     charts.show(charts.pareto(rec["metrics"], t["id"]), "pareto")
     _farm.land_split_panel(t["id"], data.plan_label(t["plan"]), "pri", p)
     srcline(f"Model output for all {len(mdf)} rotations over {rec['n_scenarios']:,} resampled weather sequences.", "Source")

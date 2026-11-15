@@ -15,8 +15,12 @@ CROP_IDS = ("rice", "jowar", "bajra", "ragi", "pigeonpea")
 MILLETS = ("jowar", "bajra", "ragi")
 
 
-@lru_cache(maxsize=1)
 def load_assumptions() -> dict:
+    return _read_assumptions(ASSUMPTIONS_PATH.stat().st_mtime_ns)
+
+
+@lru_cache(maxsize=2)
+def _read_assumptions(version) -> dict:
     """Flat dict: dotted name -> leaf dict(value, range, unit, source, badge)."""
     raw = yaml.safe_load(ASSUMPTIONS_PATH.read_text())
     flat = {}
@@ -76,7 +80,7 @@ class CropParams:
 def _ym_from_prices(crop: str):
     if not PRICES_PATH.exists():
         return None
-    d = yaml.safe_load(PRICES_PATH.read_text()) or {}
+    d = _prices_data(PRICES_PATH.stat().st_mtime_ns)
     y = d.get("potential_yield_kg_ha")
     if not isinstance(y, dict) or crop not in y:
         return None
@@ -86,12 +90,18 @@ def _ym_from_prices(crop: str):
     return None if v is None else float(v)
 
 
+@lru_cache(maxsize=2)
+def _prices_data(version):
+    return yaml.safe_load(PRICES_PATH.read_text()) or {}
+
+
 def load_crops(params: dict | None = None) -> dict[str, CropParams]:
     out = {}
     for c in CROP_IDS:
         g = lambda k: A(params, f"crops.{c}.{k}")
         ym = _ym_from_prices(c)
-        ym_badge = "observed"
+        meta = (_prices_data(PRICES_PATH.stat().st_mtime_ns).get("potential_yield_kg_ha") or {}).get(c, {})
+        ym_badge = meta.get("badge", "modeled") if isinstance(meta, dict) else "modeled"
         if ym is None:
             ym, ym_badge = float(A(params, f"ym_kg_ha.{c}")), "placeholder"
         if params and f"ym_kg_ha.{c}" in params:
@@ -102,4 +112,10 @@ def load_crops(params: dict | None = None) -> dict[str, CropParams]:
         out[c] = CropParams(c, float(g("kc_ini")), float(g("kc_mid")), float(g("kc_end")),
                             tuple(int(x) for x in g("stages_days")), float(g("root_depth_m")),
                             float(g("p")), float(g("ky")), int(g("sowing_doy")), ym, badges)
+        item = out[c]
+        if len(item.stages_days) != 4 or any(n <= 0 for n in item.stages_days) or item.season_days > 365:
+            raise ValueError(f"{c}: use four positive crop-stage lengths totaling at most 365 days")
+        values = [item.kc_ini, item.kc_mid, item.kc_end, item.root_depth_m, item.p, item.ky, item.ym_kg_ha]
+        if not np.isfinite(values).all() or min(values) < 0 or item.root_depth_m <= 0 or not 0 < item.p < 1 or not 1 <= item.sowing_doy <= 365:
+            raise ValueError(f"{c}: invalid crop coefficients, root depth, depletion fraction or calendar")
     return out

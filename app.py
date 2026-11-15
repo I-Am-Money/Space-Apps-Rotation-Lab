@@ -1,4 +1,5 @@
 import html
+import inspect
 import sys
 from pathlib import Path
 
@@ -19,6 +20,10 @@ p = data.params()
 with st.spinner(data.MSG["recommend"]):
     rec = data.recommend(p)
 top = rec["top"]
+if not data.is_mock() and any(v == "placeholder" for v in rec.get("badges", {}).get("econ_detail", {}).values()):
+    st.warning("Profit rankings use unverified cost inputs. Review the assumptions in How Good Is This? before using a recommendation.")
+elif not data.is_mock():
+    st.caption("Cost basis: national A2+FL unit costs converted using district potential yields, unless replaced by local inputs. This is a planning assumption, not a farm cost observation.")
 base_plan = ["rice"] * 4
 same = top["plan"] == base_plan
 md(f"""<div class="rl-mast"><div>
@@ -31,11 +36,17 @@ banner = st.empty()
 md(f'<div class="rl-strip"><span><strong>{html.escape(JUDGMENT)}</strong></span><span>{html.escape(REGIONAL)}</span></div>')
 
 TABS = ["My Field", "Compare Futures", "My Priorities", "Tipping Points", "How Good Is This?"]
-tabs = st.tabs(TABS, key="nav", on_change="rerun")
-for tab, mod in zip(tabs, (field, compare, priorities, tipping, hindcast)):
-    with tab:
-        if tab.open:
-            mod.render()
+VIEWS = (field, compare, priorities, tipping, hindcast)
+if "on_change" in inspect.signature(st.tabs).parameters:
+    tabs = st.tabs(TABS, key="nav", on_change="rerun")
+    for tab, mod in zip(tabs, VIEWS):
+        with tab:
+            if tab.open:
+                mod.render()
+else:
+    # Older Streamlit releases lack lazy tabs. Keep only the selected view running.
+    active = st.segmented_control("View", TABS, default=TABS[0], key="nav") or TABS[0]
+    VIEWS[TABS.index(active)].render()
 
 if data.is_mock():
     banner.markdown('<div class="rl-mock">Mock data is on screen. Part of the decision engine is not connected yet, so some numbers below are placeholders and carry the yellow Placeholder badge.</div>', unsafe_allow_html=True)

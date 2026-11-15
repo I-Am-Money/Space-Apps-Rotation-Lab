@@ -2,8 +2,7 @@
 
 Model yield for year Y = first-year yield of plan [crop]*4 under a scenario that repeats year Y four times
 (no prior-crop effect in year 1). Observed and modeled are linearly detrended before Pearson r.
-Held-out: the most recent 10 overlap years are never used to fit trends (detrend fit on earlier years only,
-extrapolated to the held-out years); nothing is tuned on them.
+Held-out: the most recent eight overlap years are excluded from potential-yield and trend estimation.
 Rice note: district rice yields mix irrigated and rainfed fields, so weak r is expected.
 """
 from __future__ import annotations
@@ -17,7 +16,7 @@ from engine import optimize as opt
 from engine import scenarios as sc
 
 ROOT = Path(__file__).resolve().parent.parent
-HELD_OUT_YEARS = 10
+HELD_OUT_YEARS = 8
 CROP_MAP = {"rice": "rice", "paddy": "rice", "sorghum": "jowar", "jowar": "jowar", "pearl millet": "bajra",
             "pearl_millet": "bajra", "bajra": "bajra", "pigeonpea": "pigeonpea", "pigeon pea": "pigeonpea",
             "pigeon_pea": "pigeonpea", "tur": "pigeonpea"}
@@ -46,10 +45,8 @@ def load_farm_records() -> pd.DataFrame | None:
     p = ROOT / "data" / "raw" / "farm_records.csv"
     if not p.exists():
         return None
-    df = pd.read_csv(p)
-    df["crop"] = df["crop"].astype(str).str.lower().map(lambda c: CROP_MAP.get(c, c))
-    df["yield_kg_ha"] = df["yield_quintals"] * 100.0 / (df["area_acres"] * 0.404686)
-    return df
+    from engine.records import validate_records
+    return validate_records(pd.read_csv(p))
 
 
 def detrend(years, y, fit_mask=None):
@@ -65,12 +62,16 @@ def pearson(a, b):
     return float(np.corrcoef(a, b)[0, 1])
 
 
-def model_single_season(annual, crop, awc, irr) -> np.ndarray:
+def model_single_season(annual, crop, awc, irr, ym_override=None) -> np.ndarray:
     n = len(annual["years"])
     idx = np.repeat(np.arange(n)[:, None], 4, axis=1)
     scen = sc.make_scen(annual, idx, [str(y) for y in annual["years"]])
     ss = sc.ScenSet(("single", n, int(annual["years"][0])), scen)
-    sim = opt.sim_plan([crop] * 4, ss, awc, irr)
+    if ym_override is None:
+        sim = opt.sim_plan([crop] * 4, ss, awc, irr)
+    else:
+        with opt.simulation_overrides(**{f"ym_kg_ha.{crop}": float(ym_override)}):
+            sim = opt.sim_plan([crop] * 4, ss, awc, irr)
     return np.asarray(sim["yield_kg_ha"])[:, 0]
 
 
@@ -79,6 +80,8 @@ def hindcast(annual, awc, irr, observed=None, farm=None) -> dict:
     farm = load_farm_records() if farm is None else farm
     out = {"per_crop": {}, "farm_records": None, "badge_observed": "observed", "badge_modeled": "modeled",
            "available": observed is not None and len(observed) > 0}
+    if farm is not None:
+        out["farm_records"] = {"badge": "local", "rows": farm.to_dict("records")}
     if not out["available"]:
         out["note"] = "No district yield data found; hindcast skipped (nothing fabricated)."
         return out
@@ -92,15 +95,17 @@ def hindcast(annual, awc, irr, observed=None, farm=None) -> dict:
         if len(years) < 8:
             out["per_crop"][crop] = {"years": years.tolist(), "no_data": False, "status": "no validation data", "note": "no validation data: fewer than 8 overlapping years"}
             continue
-        mod_all = model_single_season(annual, crop, awc, irr)
-        mod = mod_all[np.searchsorted(yrs_all, years)]
         obs = d.loc[years].to_numpy(float)
+        h = min(HELD_OUT_YEARS, len(years) // 2)
+        fit = np.arange(len(years)) < len(years) - h
+        from engine.fetch_icrisat import detrend as detrend_levels
+        ym_train = float(np.percentile(detrend_levels(years[fit], obs[fit]), 90))
+        mod_all = model_single_season(annual, crop, awc, irr, ym_override=ym_train)
+        mod = mod_all[np.searchsorted(yrs_all, years)]
         a_obs, a_mod = detrend(years, obs), detrend(years, mod)
         r = pearson(a_obs, a_mod)
         mae = float(np.mean(np.abs(obs - mod)))
         mae_anom = float(np.mean(np.abs(a_obs - a_mod)))
-        h = min(HELD_OUT_YEARS, len(years) // 2)
-        fit = np.arange(len(years)) < len(years) - h
         ho_obs, ho_mod = detrend(years, obs, fit)[~fit], detrend(years, mod, fit)[~fit]
         r_ho = pearson(ho_obs, ho_mod)
         reasons = []
@@ -115,7 +120,9 @@ def hindcast(annual, awc, irr, observed=None, farm=None) -> dict:
             "pearson_r": r, "mae_kg_ha": mae, "mae_anomaly_kg_ha": mae_anom,
             "heldout_years": years[~fit].tolist(), "heldout_r": r_ho, "n_years": int(len(years)),
             "bias_kg_ha": float(np.mean(mod - obs)),
-            "level_note": "Potential yield Ym in config/prices_india.yaml is the P90 of the same district series, so MAE and bias are not independent of the data; r on detrended anomalies is the real test.",
+            "ym_training_kg_ha": ym_train, "training_years": years[fit].tolist(),
+            "heldout_mae_kg_ha": float(np.mean(np.abs(obs[~fit] - mod[~fit]))),
+            "level_note": "Validation potential yield and trend lines are estimated from training years only; the latest eight overlap years are held out. Operational recommendations use the full published yield series.",
             "weak": bool(r is None or r < WEAK_R), "weak_reason": "; ".join(reasons) or None,
             "text": (f"{crop}: r = {r:.2f} on {len(years)} years" if r is not None else f"{crop}: r not computable")
                     + (f"; held-out last {h} years r = {r_ho:.2f}" if r_ho is not None else "; held-out r not computable")

@@ -1,43 +1,33 @@
-# India data sources (india-data agent)
+# India data and cost basis
 
-All access dates 2026-11-14. Code: `engine/fetch_icrisat.py`, `engine/fetch_msp.py`, `engine/fetch_soil.py`. Config: `config/prices_india.yaml`.
-District: **Nalgonda, Telangana** (iteration 2). Matched to the pre-2016 (undivided) Nalgonda district in ICRISAT. To switch, set `district` / `icrisat_district` in `config/region.yaml`; nothing else changes. Sections 1 and 3 below were written for the earlier DEV point; the Iteration 2 section at the end supersedes their numbers.
+## District crop observations
 
-## 1. ICRISAT District Level Database (yields, area)
-- Primary: ICRISAT/TCI DLD, http://data.icrisat.org/dld/src/crops.html (apportioned, 1966-2017, CC BY 4.0; resource document http://data.icrisat.org/dldAPI/documentDownload/?fileName=unapportioned). Landing pages: https://tci.cornell.edu/data , https://vdsa.icrisat.org/vdsa-database.aspx.
-- **Blocked:** `data.icrisat.org` timed out on TCP from this environment (curl, 15-60 s, and Playwright). No file from the primary portal was obtained. `engine.fetch_icrisat.try_download()` re-probes and writes `data/raw/icrisat_dld/FETCH_STATUS.json`.
-- **Fallback actually used:** Mohapatra, "ICRISAT District-Level Data: Heterogeneous Climate Effect on Crop Yield...", Mendeley Data, doi:10.17632/ywp3y5j9vv.1 (CC BY 4.0, v1, 11 Jul 2023). File `main merge (droped _merge==2) (560 dist 1990-2015).xls`, cached at `data/raw/icrisat_mendeley/`. Third-party, derived from ICRISAT DLD, **unapportioned**, 1990-2015 only, and holds **rice and pearl millet only** (no sorghum, no pigeonpea). Telangana districts appear under the 10 undivided names.
-- Result for Rangareddy: rice 26 years, bajra 24 years (1990-2015). Jowar and pigeonpea: no rows, `potential_yield` is a flagged placeholder. Nothing is invented.
-- **Manual steps (to get 1966+ and all four crops):** open http://data.icrisat.org/dld/src/crops.html, choose states Telangana/Andhra Pradesh, crops Rice, Kharif Sorghum (or Sorghum), Pearl Millet, Pigeonpea, download the CSVs, and save them as `data/raw/icrisat_dld/*.csv`. The loader reads any wide DLD CSV with columns `Dist Name, State Name, Year, <CROP> AREA (...), <CROP> YIELD (Kg per ha)` and prefers these files automatically (a "1000 ha" area header is scaled to ha). Verify the column headers on first load.
-- District matching: `match_district()` maps current names to the undivided district (exact, Telangana lineage table, fuzzy) and reports what matched. The lineage table (`TELANGANA_TO_ICRISAT`) is administrative knowledge typed by the agent, **team to verify** against Telangana's 2016 district formation orders; districts made from several parents (e.g. Siddipet, Kamareddy) use the main parent and are flagged.
-- Caveats: district rice yields mix irrigated and rainfed fields. Missing years coded 0 or -1 are dropped. Unapportioned data is based on 2015 boundaries.
-- Potential yield Ym = 90th percentile of linearly detrended yields (trend removed, re-centred on the final year). Computed: rice 2875 kg/ha, bajra 1146 kg/ha for Rangareddy (DEV).
+The current file data/raw/icrisat_dld/nalgonda_apportioned_1966_2017.csv is the Nalgonda-only extraction from ICRISAT/TCI's apportioned Crops_Area Production Yield.csv, distributed in the World Bank reproducibility package RR_IND_2025_488.
 
-## 2. MSP and cost (kharif 2026-27)
-- Source (read and parsed): PIB, "Cabinet approves Minimum Support Prices (MSP) for Kharif Crops for Marketing Season 2026-27", 13 May 2026, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. Cached `data/raw/msp_kharif_2026_27_pib_PRID2260617.html`; `engine.fetch_msp.verify()` re-parses it and checks the YAML offline.
-- Values (Rs/quintal, MSP / 2025-26 MSP / all-India cost A2+FL per quintal): Paddy common 2441 / 2369 / 1627; Jowar hybrid 4023 / 3699 / 2682 (Maldandi 4073); Bajra 2900 / 2775 / 1858; Tur 8450 / 8000 / 5496.
-- Cost column: PIB's footnote describes all paid-out costs plus imputed family labour (A2+FL), all-India weighted average, per quintal, projected for 2026-27. It is not per acre and not state-specific.
-- Not found: state-level (Telangana/AP) CACP cost of cultivation per acre. `operating_cost_rs_per_acre`, soil-test cost and borewell/tank measurement cost are `badge: placeholder` (null) for the team to fill. A news-site copy of the PIB prose quoted 2360 for 2025-26 paddy; the PIB table says 2369 and was used.
+Catalog: https://reproducibility.worldbank.org/catalog/409
+Package download: https://reproducibility.worldbank.org/catalog/409/download/1152
+Original DLD publisher: http://data.icrisat.org/dld/src/crops.html
+License: CC BY 4.0, as stated in the archive catalog.
 
-## 3. Soil (SoilGrids)
-- Source: ISRIC SoilGrids 2.0 REST API, https://rest.isric.org/soilgrids/v2.0/properties/query (layers wv0033, wv1500, sand, silt, clay, depths 0-100 cm, mean and Q0.05/Q0.95). Unit scaling taken from the API response (`d_factor` 10). I did not open ISRIC's documentation pages; unit handling is from the API response itself.
-- AWC = wv0033 - wv1500, thickness-weighted over 0-100 cm. DEV point (17.5, 78.5) is masked (urban Hyderabad); the nearest valid pixel 1.5 km away is used (`pixel_offset_km`) and cached as `data/raw/soil_17.5_78.5.json`.
-- DEV result: AWC 128 mm/m, texture sandy clay (sand 47.7, silt 16.3, clay 35.9 %), group D.
-- Uncertainty: the API 5-95 % band, combined in quadrature, is very wide (0 to 342 mm/m); layers are correlated so this overstates it. `awc_low_pm25/awc_high_pm25` give a flagged +-25 % alternative (96 to 160).
-- Hydrologic group is an assumption mapped from texture class (SoilGrids does not provide it). Fallback if the API is unreachable: FAO-56 Table 19 typical TAW by texture (values typed by the agent, team to verify), badge `assumption`.
-- Limits: 250 m model predictions, not a field measurement; the badge is `local` only in the sense of location-specific data.
+The direct publisher endpoint could not be retrieved. The archive member was recovered from its ZIP local record and verified against the complete member's CRC-32 data descriptor. SOURCE.json records the member SHA-256 and extracted-file SHA-256. Only Nalgonda rows were retained; the original columns and values are unchanged. The source labels the state Telangana and district code 59. The apportioned historical district differs from today's district boundary.
 
-## Iteration 2 (Nalgonda), 2026-11-14
-- **ICRISAT Dataverse DOI 10.21421/D2/XFB1BZ** ("District Level Data (DLD) and Dashboard...", licence: ICRISAT Data Sharing Agreement, http://data.icrisat.org/document/ICRISAT-Data-Sharing-Agreement.html). `doi.org` was too slow (curl 10 s timeout, Playwright 60 s timeout), but `dataverse.icrisat.org` answered by curl and its API (`/api/datasets/:persistentId/?persistentId=doi:10.21421/D2/XFB1BZ`) lists only three public files: DLD Apportioned Data Documentation.pdf, DLD Unapportioned Data Documentation.pdf, Overview of District Level Database.docx. **No data tables are in the Dataverse.** The tables are served from `data.icrisat.org`, which still times out. Dataverse search calls timed out, so other datasets there were not checked. The owner must supply the CSVs by hand (steps in section 1); no login was asked for.
-- **Lineage (Nalgonda).** Verified: the official Nalgonda page https://nalgonda.telangana.gov.in/about-district/ gives the current district 31 mandals, 564 revenue villages (history page https://nalgonda.telangana.gov.in/history/ has no split dates). The 11 Oct 2016 split (Suryapet, Yadadri Bhuvanagiri created from the old Nalgonda) is from secondary sources only (Telangana Today, Wikipedia mirrors, a TS High Court district list citing G.O.Ms.No.246 for Suryapet); the Gazette and High Court PDF could not be fetched (host did not resolve). Data check: Nalgonda rice area in the panel averages 262,055 ha, larger than the 2,449.79 km2 (244,979 ha) the official page gives for today's district, so the rows are for the larger pre-2016 district. In the Mendeley panel the state label is "Telangana"; the DLD CSVs may say Andhra Pradesh. Team to confirm the lineage in the Gazette.
-- **Year counts, Nalgonda (fallback panel, 1990-2015):** rice 26, bajra 26, jowar 0, ragi 0, pigeonpea 0 (0 means the crop is absent from the file, not zero yield). Provisional millet selection: bajra, recorded under `crop_selection:` in `config/region.yaml`. Re-count with `engine.fetch_icrisat.year_counts()` after the DLD CSVs are in place.
-- **Potential yield (P90 detrended, Nalgonda):** rice 3377.6 kg/ha, bajra 872.6 kg/ha; jowar, ragi, pigeonpea placeholders. Bajra 2014 and 2015 are both exactly 500 in the panel, check against the DLD CSV.
-- **Ragi MSP:** not added; ragi is not selected. (The cached PIB table lists Ragi at 5205 Rs/quintal if needed later.)
-- **Soil at the Nalgonda centroid (16.877, 79.193, from region.yaml):** valid pixel at the point; AWC 126 mm/m, texture clay loam (sand 33.5, silt 29.8, clay 36.7 %), group C (assumed from texture). API 5-95 % band 0 to 343 mm/m (wide); +-25 % alternative 95 to 158. Cached `data/raw/soil_16.877_79.193.json`.
+There are 52 positive-yield years each for rice, kharif sorghum, bajra and pigeonpea (1966-2017). Ragi has 17 (1969-2000). Both equally complete millets are selected; bajra remains the reference-plan millet. The loader prefers kharif sorghum and does not also ingest the annual sorghum yield column. Zero/negative sentinel yields are excluded rather than used as observations. The two bajra values of exactly 500 kg/ha in 2014 and 2015 are present in the archived source and are retained with this caveat.
 
-## Iteration 4: black soil (farm input)
-- Farm soil type (black soil, cracking clay, vertisol) is a farmer input. `engine.fetch_soil.farm_soil()` returns it as "Black soil (farm input)" with the AWC range from `config/farm.yaml` and a comparison against SoilGrids. No place or person names are stored.
-- AWC range, 145 to 380 mm per m (upper 1 m, Indian Vertisols): Mandal et al. 2013, Int. J. Plant Production 7(3), https://j.gau.ac.ir/article_1114_f275ecc4f56af699b45a91ab995fb3ef.pdf, text read in full ("AWC of these soils ranges from 145 to 380 mm for the upper one-meter depth", citing Gupta et al. 1991; moisture at 33 and 1500 kPa 25-47 % and 12-30 % gravimetric). Accessed 2026-11-14. The primary Gupta et al. table was not opened.
-- Cross-check: FAO-56 Table 19 (Chapter 7, https://www.fao.org/4/x0490e/x0490e0c.htm, accessed 2026-11-14), Clay theta_FC - theta_WP = 0.12 to 0.20 m3/m3, i.e. 120 to 200 mm/m. The vertisol range extends well above FAO's generic clay range; the mid-point (262 mm/m) is the arithmetic centre, not a measurement. Badge `assumption` (literature range, local soil series unverified, team to verify).
-- FAO-56 fallback table in `fetch_soil.py` now uses mid-points of the Table 19 ranges (earlier values were typed from memory); classes absent from Table 19 use the nearest listed class (assumption).
-- SoilGrids at the district centroid: clay loam, clay 36.7 %, group C, AWC 126 mm/m. Verdict: agrees on texture (clay rich, group C) but its AWC sits below the cited vertisol range (and inside FAO's clay range). Kept as the district estimate.
+Operational potential yield is the P90 of a linearly detrended crop series, recentered on its last observed year. It is a derived statistic, badge Modeled, not a farm observation. Hindcast potential yields and trends are estimated independently from training years only; the latest eight overlap years are held out. Weather overlap is 1984-2017. Ragi is available in the source but is not selected for optimization.
+
+## Prices and budgets
+
+Government source: https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1
+Accessed 2026-11-14; marketing season 2026-27. Cached release: data/raw/msp_kharif_2026_27_pib_PRID2260617.html.
+
+Official MSP / national A2+FL cost, Rs per quintal: paddy common 2441 / 1627; hybrid jowar 4023 / 2682; bajra 2900 / 1858; ragi 5205 / 3470; tur 8450 / 5496. These are not state-specific costs per acre. The cost concept includes paid-out expenses and imputed family labour, including ordinary irrigation and pump energy.
+
+Default per-acre budgets are explicit assumptions computed as national A2+FL Rs/quintal * detrended district potential kg/ha / 100 * 0.404686 ha/acre. This combines two published quantities under a modeling assumption and must not be described as observed Telangana cost of cultivation. Attempts to retrieve current state cost tables from DES and IASRI failed in the environment. Additional irrigation charges default to zero to avoid adding ordinary irrigation twice; user-entered incremental charges can replace that assumption.
+
+Nitrogen-credit savings use an assumed urea-equivalent price: Rs 266.50 per 45 kg bag divided by 46% nitrogen content. The official subsidized bag price is reported at https://www.pib.gov.in/PressReleasePage.aspx?PRID=2272695&lang=2&reg=3 (14 June 2026). This is a price proxy, not a purchase receipt, and does not validate the assumed legume credit.
+
+No verified local soil-test or water-measurement quote was found. Those values remain null. EVPI is shown without a purchase verdict until an explicit quote is entered. Farm records and local cost overrides remain optional; no records are fabricated.
+
+## Farm and soil
+
+Farm input: 40 acres, black soil, rice-only baseline. SoilGrids is a separate district-point prediction. The black-soil capacity range and physical parameters retain their literature references and verification notes in config/farm.yaml and config/assumptions.yaml. Canal/well supply defaults are planning assumptions, not measurements of this farm.

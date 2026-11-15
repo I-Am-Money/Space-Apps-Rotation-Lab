@@ -1,3 +1,5 @@
+> Historical build notes. Current behavior and data are documented in README.md and engine/CONTRACT.md.
+
 # SPEC_CHANGES_INDIA: overrides to RotationLab Build Spec v2
 
 Source: team update pasted 2026-11-14. Where this file and the v2 spec disagree, this file wins. Everything not mentioned here stays as in the v2 spec (milestone order, provenance badges, offline cache, seed 42, tests-before-UI, no invented data).

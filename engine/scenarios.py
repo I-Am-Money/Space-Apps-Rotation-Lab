@@ -54,7 +54,7 @@ class ScenSet:
 
     def subset(self, n: int) -> "ScenSet":
         n = min(n, self.n)
-        s = {k: (v[:n] if isinstance(v, np.ndarray) else v[:n]) for k, v in self.scen.items()}
+        s = {k: (v[:n] if isinstance(v, (np.ndarray, list)) else v) for k, v in self.scen.items()}
         return ScenSet(self.key + (("first", n),), s, self.note)
 
 
@@ -121,14 +121,9 @@ def summer_tmax(annual: dict) -> np.ndarray:
 
 
 def onset_doy(precip_year: np.ndarray, window: int = 7, thresh_mm: float = 50.0) -> int:
-    """First day from 15 May where the trailing 7-day rain >= 50 mm (a documented
-    onset proxy). Returns OCT1 (273) if it never happens."""
-    c = np.concatenate([[0.0], np.cumsum(precip_year)])
-    for d in range(MAY15, OCT1):
-        lo = max(0, d - window + 1)
-        if c[d + 1] - c[lo] >= thresh_mm:
-            return d
-    return OCT1
+    """Compatibility wrapper for the configured wet-window / dry-spell rule."""
+    from engine.monsoon import detect_onset
+    return int(detect_onset(precip_year))
 
 
 def _take(annual, idx) -> dict:
@@ -138,6 +133,8 @@ def _take(annual, idx) -> dict:
 
 def make_scen(annual: dict, idx: np.ndarray, labels: list[str]) -> dict:
     s = _take(annual, idx)
+    from engine.monsoon import detect_onset
+    s["onset_doy"] = detect_onset(annual["precip"])[np.asarray(idx)]
     if annual.get("upstream") is not None:
         s["upstream_season_rain"] = np.asarray(annual["upstream"])[np.asarray(idx)]      # [S,4] mm
     s["labels"] = list(labels)
@@ -170,16 +167,16 @@ def stress_tests(annual: dict) -> dict:
     three plan years are the median-monsoon year of the record (documented filler).
     Returns {name: {scen, source_year, plan_year, description}}."""
     yrs = annual["years"]
-    mr, tm = monsoon_rain(annual), summer_tmax(annual)
+    mr, tm = monsoon_rain(annual), annual["tmax"][:, JUN1:304].mean(1)
     on = np.array([onset_doy(annual["precip"][i]) for i in range(len(yrs))])
     med_year = int(np.argsort(np.abs(mr - np.median(mr)))[0])
     picks = [
         ("driest monsoon in year 2", int(np.argmin(mr)), 2,
          lambda i: f"monsoon (Jun-Sep) rain {mr[i]:.0f} mm in {yrs[i]}, record median {np.median(mr):.0f} mm"),
-        ("hottest summer in year 3", int(np.argmax(tm)), 3,
-         lambda i: f"Mar-May mean Tmax {tm[i]:.1f} degC in {yrs[i]}, record median {np.median(tm):.1f} degC"),
+        ("hottest kharif season in year 3", int(np.argmax(tm)), 3,
+         lambda i: f"Jun-Oct mean Tmax {tm[i]:.1f} degC in {yrs[i]}, record median {np.median(tm):.1f} degC"),
         ("latest monsoon onset in year 1", int(np.argmax(on)), 1,
-         lambda i: f"onset proxy on day {on[i]+1} of {yrs[i]} (first 7-day rain >= 50 mm after 15 May), median day {int(np.median(on))+1}"),
+         lambda i: f"configured rainfall onset on day {on[i]+1} of {yrs[i]}, median day {int(np.median(on))+1}; wet-window / dry-spell planning rule, not an official onset date"),
     ]
     if annual.get("upstream") is not None:
         up = annual["upstream"]
@@ -219,10 +216,14 @@ def apply_whatif(scen: dict, rain_mult: float = 1.0, dT: float = 0.0, shift_days
     out = dict(scen)
     p = shift_june_july(scen["precip"], shift_days) * float(rain_mult)
     out["precip"] = p
-    out["tmax"] = scen["tmax"] + float(dT)
-    out["et0"] = scen["et0"] * (1.0 + et0_per_degc * float(dT))
+    if "onset_doy" in scen:
+        from engine.monsoon import detect_onset
+        # Detect using scaled real rain; delay moves the planting calendar with the rain.
+        out["onset_doy"] = np.minimum(365, detect_onset(scen["precip"] * float(rain_mult)) + int(shift_days))
+    out["tmax"] = scen["tmax"] if dT == 0 else scen["tmax"] + float(dT)
+    out["et0"] = scen["et0"] if dT == 0 else scen["et0"] * (1.0 + et0_per_degc * float(dT))
     if "upstream_season_rain" in scen:      # independent of the local multiplier
-        out["upstream_season_rain"] = np.asarray(scen["upstream_season_rain"]) * float(upstream_mult)
+        out["upstream_season_rain"] = scen["upstream_season_rain"] if upstream_mult == 1 else np.asarray(scen["upstream_season_rain"]) * float(upstream_mult)
     out["whatif"] = {"rain_mult": float(rain_mult), "upstream_mult": float(upstream_mult), "dT": float(dT), "shift_days": int(shift_days),
                      "label": WHATIF_LABEL, "et0_scaling": ET0_PER_DEGC_NOTE}
     return out

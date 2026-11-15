@@ -87,7 +87,7 @@ def _sim(plan: tuple, rm: float, irr: float, price: float, awc: float):
 def _p(params):
     p = params or {}
     awc = p.get("awc_mm_per_m") or 140.0
-    return (float(p.get("irrigation_mm", 500)), float(p.get("price_mult", 1.0)), float(awc))
+    return (float(500 if p.get("irrigation_mm") is None else p["irrigation_mm"]), float(p.get("price_mult", 1.0)), float(awc))
 
 
 def _metrics(plan, params, rm=1.0):
@@ -215,6 +215,8 @@ def tipping_points(params=None):
     days = [0, 7, 14, 21]
     lm = dict(days=days, rotations={n: dict(mean_profit=[_metrics(c, params, rm=1 - 0.006 * d)["mean_profit"] for d in days]) for n, c in zip(names[:3], cands[:3])},
               winner=names[:1] * 4, text="MOCK late-monsoon text.", badge="placeholder")
+    for row in lm["rotations"].values():
+        row["J"] = row["mean_profit"]
     ev = lambda lbl: dict(value=0.0, test_cost=0.0, test_cost_badge="placeholder", worth_measuring=False, label=lbl, badge="placeholder",
                           text="MOCK: value of information is not computed in mock mode.")
     ups = [0.6, 0.8, 1.0, 1.2]
@@ -243,7 +245,7 @@ def hindcast(params=None):
     return out
 
 
-def assumptions_table():
+def assumptions_table(params=None):
     rows = [("rice water need (mock)", 1100, "900-1400", "mm", "placeholder, team to verify", "placeholder"),
             ("irrigation recharge exponent k (mock)", 0.5, "0.2-1.0", "", "placeholder, team to verify", "placeholder")]
     return pd.DataFrame(rows, columns=["name", "value", "range", "unit", "source", "badge"])
