@@ -532,8 +532,10 @@ def normalize_rotation(rotation) -> tuple[list, list]:
         return [_crops.crop_id(e)] if isinstance(e, str) else [_crops.crop_id(x) for x in e]
 
     def cover(e):
-        if e is None or str(e).strip().lower() in ("", "none", "no", "false"):
+        if e is None or e is False or str(e).strip().lower() in ("", "none", "no", "false", "0"):
             return None
+        if e is True or str(e).strip().lower() in ("true", "yes", "1"):
+            return str(_crops.rule("default_cover_crop"))          # a plain yes/no: the default cover crop
         return str(e).strip().lower().replace(" ", "_")
 
     crops4 = [entry(cr[i % len(cr)]) for i in range(PLAN_YEARS_V4)]
@@ -545,7 +547,41 @@ def _clim_of(clim_or_weather) -> dict:
     return clim_or_weather if isinstance(clim_or_weather, dict) else _crops.climatology(clim_or_weather)
 
 
+_TL_CACHE: dict = {}
+
+
 def build_timeline(rotation, clim_or_weather, irrigated: bool = True) -> Timeline:
+    """Cached front door of _build_timeline (same rotation at the same site is laid out once)."""
+    clim = _clim_of(clim_or_weather)
+    crops4, cov4 = normalize_rotation(rotation)
+    key = (id(clim), tuple(tuple(e) for e in crops4), tuple(cov4), bool(irrigated), _crops.SIM_PATH.stat().st_mtime_ns)
+    hit = _TL_CACHE.get(key)
+    if hit is not None and hit[0] is clim:
+        return hit[1]
+    tl = _build_timeline({"crops": crops4, "cover_crops": cov4}, clim, irrigated)
+    if len(_TL_CACHE) > 20000:
+        _TL_CACHE.clear()
+    _TL_CACHE[key] = (clim, tl)
+    return tl
+
+
+_CAL_CACHE: dict = {}
+
+
+def _calendar(c, clim, earliest=None, irrigated=True):
+    """crop_calendar, remembered per site climate (the same crop is asked for thousands of times)."""
+    key = (id(clim), c.id, earliest, bool(irrigated), _crops.SIM_PATH.stat().st_mtime_ns)
+    hit = _CAL_CACHE.get(key)
+    if hit is not None and hit[0] is clim:
+        return hit[1]
+    cal = _crops.crop_calendar(c, clim, earliest=earliest, irrigated=irrigated)
+    if len(_CAL_CACHE) > 50000:
+        _CAL_CACHE.clear()
+    _CAL_CACHE[key] = (clim, cal)
+    return cal
+
+
+def _build_timeline(rotation, clim_or_weather, irrigated: bool = True) -> Timeline:
     """Lay the plan's crops on a repeating 4-year (1460-day) timeline using this location's climate calendar.
 
     The crop of plan year y is the one harvested in year y (winter wheat harvested in year 2 was planted in
@@ -569,13 +605,13 @@ def build_timeline(rotation, clim_or_weather, irrigated: bool = True) -> Timelin
                 return bad(f"unknown crop '{cid}'")
             c = lib[cid]
             if j == 0:
-                cal = _crops.crop_calendar(c, clim, irrigated=irrigated)
+                cal = _calendar(c, clim, None, irrigated)
                 if not cal.feasible:
                     return bad(f"{c.name}: {cal.reason}")
                 start = y * NDOY + cal.harvest_doy - (cal.season_days - 1)
             else:
                 e = prev_end + turn + 1
-                cal = _crops.crop_calendar(c, clim, earliest=e % NDOY, irrigated=irrigated)
+                cal = _calendar(c, clim, e % NDOY, irrigated)
                 if not cal.feasible:
                     return bad(f"{c.name} as a second crop: {cal.reason}")
                 start = e + (cal.plant_doy - e) % NDOY
@@ -590,7 +626,7 @@ def build_timeline(rotation, clim_or_weather, irrigated: bool = True) -> Timelin
         prev_end = prev[3] + prev[1].season_days - 1 - (D4 if i == 0 else 0)
         if cur[3] < prev_end + turn + 1:
             e = prev_end + turn + 1
-            cal = _crops.crop_calendar(cur[0], clim, earliest=e % NDOY, irrigated=irrigated)
+            cal = _calendar(cur[0], clim, e % NDOY, irrigated)
             if not cal.feasible:
                 return bad(f"{cur[0].name} cannot follow {prev[0].name}: {cal.reason}")
             cur[1], cur[3] = cal, e + (cal.plant_doy - e) % NDOY
@@ -682,6 +718,92 @@ def yearly_supply(water, scenarios) -> np.ndarray:
     return dry + (normal - dry) * np.clip((rain - scenarios.rain_dry_mm) / span, 0.0, 1.0)
 
 
+try:                                            # compiled kernel when numba is installed (it is in requirements.txt)
+    from numba import njit as _njit, prange as _prange
+    _HAVE_NUMBA = True
+except Exception:                               # pragma: no cover - plain Python fallback, same numbers, slow
+    _HAVE_NUMBA = False
+    _prange = range
+
+    def _njit(*a, **k):
+        return (lambda f: f)
+
+
+@_njit(parallel=True, cache=True)
+def _balance_kernel(KC, TAW, RAW, IRR, COV, tawcol, et0, precip, ro_crop, ro_fallow, supply, seg_start, seg_end,
+                    f0, eta_s, irr_s, yr_irr, yr_eta, yr_ro, yr_drain, storage_change, keep_daily, dep_d, irr_d):
+    R, D = KC.shape
+    S = et0.shape[0]
+    for i in _prange(R * S):                                # every rotation x scenario pair is independent
+        r = i // S
+        for s in range(i % S, i % S + 1):
+            dr = f0 * TAW[r, D - 1]                         # root-zone depletion (mm)
+            db = f0 * (tawcol[r] - TAW[r, D - 1])           # depletion of the layer below the roots
+            acc_eta = 0.0
+            acc_irr = 0.0
+            rem = 0.0
+            store0 = 0.0
+            for main in range(2):                           # pass 0 = spin-up, pass 1 = reported
+                if main == 1:
+                    store0 = dr + db
+                for d in range(D):
+                    y = d // 365
+                    if d % 365 == 0:
+                        rem = supply[s, y]
+                    taw = TAW[r, d]
+                    prev = TAW[r, d - 1] if d > 0 else TAW[r, D - 1]
+                    if taw != prev:                         # root depth changed: share the water out by depth
+                        tot = dr + db
+                        dr = tot * taw / tawcol[r]
+                        db = tot - dr
+                    if seg_start[r, d] >= 0:
+                        acc_eta = 0.0
+                        acc_irr = 0.0
+                    raw = RAW[r, d]
+                    etc = KC[r, d] * et0[s, d]
+                    ro = ro_crop[s, d] if COV[r, d] else ro_fallow[s, d]
+                    x = dr - (precip[s, d] - ro)
+                    irr = 0.0
+                    if IRR[r, d]:
+                        need = x + etc - raw                # keeps the crop out of stress today
+                        if need > 0.0:
+                            irr = need if need < rem else rem
+                            rem -= irr
+                            x -= irr
+                    perc = 0.0
+                    if x < 0.0:
+                        perc = -x
+                        x = 0.0
+                    a = raw - x                             # taken at the full rate (no stress)
+                    if a < 0.0:
+                        a = 0.0
+                    elif a > etc:
+                        a = etc
+                    eta = a + (taw - x - a) * -np.expm1(-(etc - a) / (taw - raw))   # the rest under stress, exact
+                    dr = x + eta
+                    xb = db - perc
+                    drain = 0.0
+                    if xb < 0.0:
+                        drain = -xb
+                        xb = 0.0
+                    db = xb
+                    acc_eta += eta
+                    acc_irr += irr
+                    if main == 1:
+                        yr_irr[r, s, y] += irr
+                        yr_eta[r, s, y] += eta
+                        yr_ro[r, s, y] += ro
+                        yr_drain[r, s, y] += drain
+                        if keep_daily:
+                            dep_d[r, s, d] = dr
+                            irr_d[r, s, d] = irr
+                        k = seg_end[r, d]
+                        if k >= 0:
+                            eta_s[r, s, k] = acc_eta
+                            irr_s[r, s, k] = acc_irr
+            storage_change[r, s] = store0 - (dr + db)       # + = soil ended wetter than it started
+
+
 def run_balance(timelines, scenarios, supply, awc_mm_per_m: float, hydrologic_group: str | None = None,
                 keep_daily: bool = False) -> dict:
     """Daily water balance of R timelines over S scenarios (all feasible timelines; arrays are [R,S,...]).
@@ -700,10 +822,10 @@ def run_balance(timelines, scenarios, supply, awc_mm_per_m: float, hydrologic_gr
     """
     tls = list(timelines)
     R, S = len(tls), scenarios.n
-    et0 = scenarios.et0.reshape(S, D4)
-    precip = scenarios.precip.reshape(S, D4)
+    et0 = np.ascontiguousarray(scenarios.et0.reshape(S, D4), dtype=np.float64)
+    precip = np.ascontiguousarray(scenarios.precip.reshape(S, D4), dtype=np.float64)
     awc = float(awc_mm_per_m)
-    KC = np.stack([t.kc for t in tls])
+    KC = np.stack([t.kc for t in tls]).astype(np.float64)
     TAW = awc * np.stack([t.zr for t in tls])                     # [R,D] root-zone capacity today
     RAW = np.stack([t.p for t in tls]) * TAW
     IRR = np.stack([t.irrigable for t in tls])
@@ -711,79 +833,36 @@ def run_balance(timelines, scenarios, supply, awc_mm_per_m: float, hydrologic_gr
     tawcol = TAW.max(axis=1)                                       # [R] whole column capacity
     cn_crop, cn_fallow = curve_numbers(hydrologic_group)
     ia = float(_crops.sim_setting("hydrology", "ia_ratio"))
-    ro_crop, ro_fallow = scs_runoff_v4(precip, cn_crop, ia), scs_runoff_v4(precip, cn_fallow, ia)
-    supply = np.broadcast_to(np.asarray(supply, float), (S, PLAN_YEARS_V4))
+    memo = scenarios.__dict__.setdefault("_runoff_memo", {})        # runoff depends only on the rain and the soil group
+    rkey = (cn_crop, cn_fallow, ia)
+    if rkey not in memo:
+        memo.clear()
+        memo[rkey] = (scs_runoff_v4(precip, cn_crop, ia), scs_runoff_v4(precip, cn_fallow, ia))
+    ro_crop, ro_fallow = memo[rkey]
+    supply = np.ascontiguousarray(np.broadcast_to(np.asarray(supply, float), (S, PLAN_YEARS_V4)))
 
     K = max(len(t.cash) for t in tls)
     eta_s = np.full((R, S, K), np.nan)
     irr_s = np.full((R, S, K), np.nan)
     etm_s = np.full((R, S, K), np.nan)
-    starts, ends = {}, {}
+    seg_start = np.full((R, D4), -1, np.int64)
+    seg_end = np.full((R, D4), -1, np.int64)
     for r, t in enumerate(tls):
         for k, s in enumerate(t.cash):
-            starts.setdefault(s.start % D4, []).append(r)
-            ends.setdefault(s.end % D4, []).append((r, k))
+            seg_start[r, s.start % D4] = k
+            seg_end[r, s.end % D4] = k
             etm_s[r, :, k] = et0[:, s.idx()] @ s.kc
-    change = np.roll(TAW, 1, axis=1) != TAW                        # [R,D] root depth differs from yesterday
-    change_rows = {d: np.nonzero(change[:, d])[0] for d in np.nonzero(change.any(axis=0))[0]}
-
-    f0 = float(_crops.rule("init_depletion_frac"))
-    dr = np.repeat((f0 * TAW[:, -1])[:, None], S, axis=1)          # root-zone depletion (mm)
-    db = np.repeat((f0 * (tawcol - TAW[:, -1]))[:, None], S, axis=1)   # depletion of the layer below
-    acc_eta, acc_irr = np.zeros((R, S)), np.zeros((R, S))
     yr = {k: np.zeros((R, S, PLAN_YEARS_V4)) for k in ("irrigation", "eta_year", "runoff", "drainage")}
-    daily = {k: np.zeros((R, S, D4)) for k in ("depletion", "irrigation_daily")} if keep_daily else None
-    rem = np.zeros((R, S))
-    store0 = None
-    for main in (False, True):
-        if main:
-            store0 = dr + db
-        for d in range(D4):
-            y = d // NDOY
-            if d % NDOY == 0:
-                rem = np.repeat(supply[None, :, y], R, axis=0)
-            rows = change_rows.get(d)
-            if rows is not None:                                   # root depth changed: share the water out by depth
-                tot = dr[rows] + db[rows]
-                dr[rows] = tot * (TAW[rows, d] / tawcol[rows])[:, None]
-                db[rows] = tot - dr[rows]
-            if d in starts:
-                acc_eta[starts[d]] = 0.0
-                acc_irr[starts[d]] = 0.0
-            taw, raw = TAW[:, d, None], RAW[:, d, None]
-            etc = KC[:, d, None] * et0[None, :, d]
-            ro = np.where(COV[:, d, None], ro_crop[None, :, d], ro_fallow[None, :, d])
-            x = dr - (precip[None, :, d] - ro)
-            irr = np.minimum(rem, np.maximum(x + etc - raw, 0.0) * IRR[:, d, None])
-            rem = rem - irr
-            x = x - irr
-            perc = np.maximum(-x, 0.0)
-            x = np.maximum(x, 0.0)
-            a = np.clip(raw - x, 0.0, etc)                         # taken at the full rate (no stress)
-            eta = a + (taw - x - a) * -np.expm1(-(etc - a) / (taw - raw))   # the rest under stress (Ks < 1), exact
-            dr = x + eta
-            xb = db - perc
-            drain = np.maximum(-xb, 0.0)
-            db = np.maximum(xb, 0.0)
-            acc_eta += eta
-            acc_irr += irr
-            if main:
-                yr["irrigation"][:, :, y] += irr
-                yr["eta_year"][:, :, y] += eta
-                yr["runoff"][:, :, y] += ro
-                yr["drainage"][:, :, y] += drain
-                if keep_daily:
-                    daily["depletion"][:, :, d] = dr
-                    daily["irrigation_daily"][:, :, d] = irr
-                for r, k in ends.get(d, ()):
-                    eta_s[r, :, k] = acc_eta[r]
-                    irr_s[r, :, k] = acc_irr[r]
+    storage_change = np.zeros((R, S))
+    shape_d = (R, S, D4) if keep_daily else (1, 1, 1)
+    dep_d, irr_d = np.zeros(shape_d), np.zeros(shape_d)
+    _balance_kernel(KC, TAW, RAW, IRR, COV, tawcol, et0, precip, ro_crop, ro_fallow, supply, seg_start, seg_end,
+                    float(_crops.rule("init_depletion_frac")), eta_s, irr_s, yr["irrigation"], yr["eta_year"],
+                    yr["runoff"], yr["drainage"], storage_change, bool(keep_daily), dep_d, irr_d)
     rain = np.broadcast_to(scenarios.annual_rain()[None], (R, S, PLAN_YEARS_V4))
-    storage_change = store0 - (dr + db)                            # + = soil ended wetter than it started
     out = {"eta": eta_s, "etm": etm_s, "irr_season": irr_s, "rain": rain, "storage_change": storage_change, **yr}
     out["closure_error"] = (rain.sum(2) + yr["irrigation"].sum(2) - yr["eta_year"].sum(2) - yr["runoff"].sum(2)
                             - yr["drainage"].sum(2) - storage_change)
     if keep_daily:
-        out.update(daily)
-        out["root_zone_capacity"] = TAW
+        out.update({"depletion": dep_d, "irrigation_daily": irr_d, "root_zone_capacity": TAW})
     return out

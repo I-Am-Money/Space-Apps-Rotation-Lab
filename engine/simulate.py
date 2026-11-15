@@ -62,6 +62,35 @@ class SimResult:
     def n_scenarios(self) -> int:
         return 0 if self.rel_yield is None else int(self.rel_yield.shape[0])
 
+    @property
+    def yields_kg_ha(self) -> np.ndarray:
+        """[S,4] yield of the (first) cash crop of each plan year, the shape Feature 3's optimizer reads.
+        0 in a fallow year and for a rotation that cannot be grown here; NaN where the crop has no yield number
+        (see missing_yield)."""
+        out = np.zeros((len(self.labels), 4))
+        if self.feasible:
+            for y in range(4):
+                ks = self.season_index(y + 1)
+                if ks:
+                    out[:, y] = self.yield_kg_ha[:, ks[0]]
+        return out
+
+    @property
+    def rel_yields(self) -> np.ndarray:
+        """[S,4] share of potential yield of the (first) cash crop of each plan year (0 in a fallow year)."""
+        out = np.zeros((len(self.labels), 4))
+        if self.feasible:
+            for y in range(4):
+                ks = self.season_index(y + 1)
+                if ks:
+                    out[:, y] = self.rel_yield[:, ks[0]]
+        return out
+
+    @property
+    def missing_yield(self) -> list:
+        """Crops of this rotation with no yield number (farmer's or county): their yields are NaN."""
+        return sorted({s["crop"] for s in self.seasons if s.get("ym_kg_ha") is None})
+
     def season_index(self, plan_year: int) -> list:
         """Indexes (into the K axis) of the seasons of a plan year (1 to 4)."""
         return [k for k, s in enumerate(self.seasons) if s["plan_year"] == plan_year]
@@ -123,9 +152,21 @@ def site_climate(site) -> dict:
     return clim
 
 
+_SCEN_CACHE: dict = {}
+
+
 def default_scenarios(site, kind: str = "bootstrap") -> SC.Scenarios:
+    """The site's scenario set (remembered per weather frame): 500 bootstrap plans with seed 42 by default."""
     p = _site_parts(site)
-    return SC.build(p["weather"], kind, lat=p["lat"], elevation_m=p["elevation_m"])
+    key = (id(p["weather"]), kind, C.SIM_PATH.stat().st_mtime_ns)
+    hit = _SCEN_CACHE.get(key)
+    if hit is not None and hit[0] is p["weather"]:
+        return hit[1]
+    scen = SC.build(p["weather"], kind, lat=p["lat"], elevation_m=p["elevation_m"])
+    if len(_SCEN_CACHE) > 12:
+        _SCEN_CACHE.clear()
+    _SCEN_CACHE[key] = (p["weather"], scen)
+    return scen
 
 
 def _is_irrigated(inputs) -> bool:
@@ -184,12 +225,19 @@ def _rel_and_heat(tl, scen, bal, r):
 def simulate_many(site, inputs, rotations, scenarios=None) -> list:
     """simulate() for many rotations in one batch (same site, inputs and scenarios). Same order as given."""
     p = _site_parts(site)
-    scen = default_scenarios(site) if scenarios is None else scenarios
+    # anything that is not a Scenarios set (None, a count, a placeholder list) means "the default set"
+    scen = scenarios if isinstance(scenarios, SC.Scenarios) else default_scenarios(site)
     clim = site_climate(site)
     irrigated = _is_irrigated(inputs)
     water = _get(inputs, "water")
     tls = [WB.build_timeline(rot, clim, irrigated=irrigated) for rot in rotations]
-    results = [SimResult(False, t.reason, t.crops, t.cover_crops) if not t.feasible else None for t in tls]
+    zero = np.zeros((scen.n, WB.PLAN_YEARS_V4))
+    results = [None if t.feasible else
+               SimResult(False, t.reason, t.crops, t.cover_crops, labels=list(scen.labels),
+                         weights=np.asarray(scen.weights, float), irrigation_mm=zero, total_water_mm=zero,
+                         rain_mm=scen.annual_rain(), notes=["This rotation cannot be grown at this site: " + t.reason
+                                                            + ". Its yields are reported as zero."])
+               for t in tls]
     ok = [i for i, t in enumerate(tls) if t.feasible]
     if not ok:
         return results

@@ -37,6 +37,7 @@ rules:
   ym_nass_quantile: {value: 0.90, range: [0.8, 0.95], unit: "quantile", source: "Final prompts v5, Person 2 task 4: potential yield = 90th percentile of detrended county yields.", badge: assumption}
   recent_years: {value: 20, range: [10, 30], unit: years, source: "Final prompts v5 task 7 (R8): 'Recent' climate mode counts the last 20 years twice.", badge: assumption}
   recent_weight: {value: 2.0, range: [1.0, 4.0], unit: "x", source: "Final prompts v5 task 7 (R8): the last 20 years count 2x in 'Recent' mode.", badge: assumption}
+  default_cover_crop: {value: cereal_rye, range: [cereal_rye, oats_cover], unit: "cover crop id", source: "Cover crop used when a plan only says yes or no to a cover crop. Team choice (matches Feature 3).", badge: assumption}
   default_hydrologic_group: {value: B, range: [A, D], unit: group, source: "Used only when the soil source gives no hydrologic group. Team choice, team to verify.", badge: assumption}
 
 # Daily runoff: SCS curve number. Values read in NRCS NEH Part 630 ch.9 Table 9-1 on 2026-11-14 (carried over from v3).

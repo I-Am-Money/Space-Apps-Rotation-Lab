@@ -181,3 +181,17 @@ def test_potential_yield_from_county_series():
     assert YM.ym_from_yield_series(years[:5], y[:5]) is None
     assert YM.potential_yield("corn", {"us_defaults": {"ym": {"maize": 13000.0}}}, None)[0] == 13000.0
     assert YM.potential_yield("maize", None, None)[0] is None
+
+
+def test_result_fits_feature_3_optimizer(site):
+    """Person 1's optimizer reads yields_kg_ha, irrigation_mm, total_water_mm as [S,4], passes cover crops as
+    True/False and may pass a placeholder instead of a scenario set."""
+    inp = inputs("rain", maize={"yield": 9000.0}, soybean={"yield": 3000.0})
+    rot = {"crops": [["maize"], ["soybean"], ["maize"], ["soybean"]], "cover_crops": [False, True, True, True]}
+    r = SIM.simulate(site, inp, rot, list(range(41)))
+    for key in ("yields_kg_ha", "irrigation_mm", "total_water_mm"):
+        assert np.asarray(r[key]).shape == (500, 4) and np.isfinite(r[key]).all()
+    assert r.missing_yield == [] and {c["crop"] for c in r.cover_seasons} == {"cereal_rye"}
+    bad = SIM.simulate(site, inp, {"crops": [["rice"]] * 4, "cover_crops": [False] * 4}, 41)
+    assert not bad.feasible and bad.yields_kg_ha.shape == (500, 4) and (bad.yields_kg_ha == 0).all()
+    assert C.calories_per_kg("rice") == pytest.approx(3650 * 0.66) and C.calories_per_kg("maize") is None

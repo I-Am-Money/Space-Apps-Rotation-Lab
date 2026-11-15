@@ -308,6 +308,15 @@ def calories_kcal_per_ha(crop: str, yield_kg_ha):
     return np.asarray(yield_kg_ha, float) * c.kcal_per_kg * c.edible_fraction
 
 
+def calories_per_kg(crop: str):
+    """Food calories per kg of harvested crop (edible share already applied), or None when not verified yet."""
+    try:
+        c = get_crop(crop)
+    except KeyError:
+        return None
+    return None if c.kcal_per_kg is None else float(c.kcal_per_kg) * float(c.edible_fraction)
+
+
 def residue_kg_ha(crop: str, yield_kg_ha):
     """Above-ground residue (kg/ha, same moisture basis as the yield) from the harvest index: Y * (1 - HI) / HI."""
     hi = get_crop(crop).harvest_index
