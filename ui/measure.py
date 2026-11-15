@@ -45,7 +45,7 @@ def show_row(rank: int, r: dict, currency: str, area_unit: str, example: bool) -
             show_badge(r["badge"])
         if r.get("worth_it") is not None and r.get("test_cost_per_ha") is not None:
             st.write("Your test quote: " + ("worth getting." if r["worth_it"] else "costs more than the most it could save."))
-        if r["note"] and r["note"] != r["plain"]:
+        if r.get("note") and r["note"] != r["plain"]:     # do not print the same sentence twice
             st.caption(r["note"])
 
 
@@ -73,6 +73,16 @@ def render(site, inputs, sliders=None, currency: str = "USD", area_unit: str = "
     if rows and rows[0].get("input") == "prices":
         st.warning(f"Input needed. {rows[0]['note']}.")
         return rows
-    for i, r in enumerate(rows, 1):
+    # Questions the tool could put a value on come first; the ones it cannot judge for this farm are listed after, folded away.
+    judged = [r for r in rows if r.get("computed")]
+    other = [r for r in rows if not r.get("computed")]
+    if judged and not any(r.get("could_change_answer") or (r.get("evpi_per_ha") or 0) > 0 for r in judged):
+        st.success("None of the unknowns this tool could put a value on would change your best plan: the same rotation "
+                   "wins across the whole plausible range of each one.")
+    for i, r in enumerate(judged, 1):
         show_row(i, r, currency, area_unit, is_example)
+    if other:
+        with st.expander(f"Not judged for this farm ({len(other)})", expanded=not judged):
+            for i, r in enumerate(other, len(judged) + 1):
+                show_row(i, r, currency, area_unit, is_example)
     return rows

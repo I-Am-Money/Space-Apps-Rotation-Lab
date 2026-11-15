@@ -1,8 +1,7 @@
 # Limitations
 
 RotationLab gives modeled estimates for planning. It does not guarantee yield or profit and it is not a
-forecast. These limits are shown in the app and listed here (Build Spec v4, R22). Teammates: add anything you
-log to the "Logged by the team" section, or tell Person 3.
+forecast. These limits are shown in the app and listed here.
 
 ## Out of scope in this version (A10)
 
@@ -13,7 +12,7 @@ log to the "Logged by the team" section, or tell Person 3.
 5. Groundwater depletion over many years.
 6. Market price risk. Prices are fixed across weather scenarios.
 7. SMS or offline access.
-8. Full 3D field zones if the 2D zones are not finished.
+8. Field zones (splitting one farm into slope and low-spot zones). They are not in this version, so there is no Field zones page.
 
 ## Model and data limits (v4)
 
@@ -107,11 +106,26 @@ log to the "Logged by the team" section, or tell Person 3.
 
 ## Logged by the team
 
-(Teammates add items here.)
+- **Example farms.** The three example farms on the start screen (Story County, Iowa; Lancaster County, Nebraska;
+  Lubbock County, Texas) use real NASA weather, USDA soil and USDA county yields, prices and costs for the place.
+  Their farm answers (the current crops, the size, rain only) are examples chosen by the team, not a real farm's
+  records, and the page says so. They are listed with their sources in `config/assumptions/setup.yaml`.
+- **Sentence under each recommendation card.** It is a fixed sentence filled in from that card's own numbers, in
+  the units the farmer chose. The optional Claude explanation is a separate button and is only shown when an API
+  key is configured.
+- **Tipping points map.** Each square re-runs the search for the best plan. Where two plans are nearly tied,
+  neighbouring squares can show different winners, so a single odd square is not a finding on its own.
+- **Tipping points on a slow machine.** For a new farm the search uses all 500 weather plans only when that is
+  quick; otherwise it uses the first 100 for the what-if points and says so on the page, and a tipping point can
+  then land one step away (for example 0.85x rainfall instead of 0.75x). The three example farms are worked out
+  ahead of time with all 500 plans (`data/precache/tipping/`), and that saved result is shown only while the
+  engine code, the assumptions and the farm's data are exactly the ones it was made with.
+- **NASA map layers.** SMAP soil moisture and MODIS vegetation index tiles are shown for context and need an
+  internet connection. They are never model inputs.
 
 ## Earlier India version (v3, Telangana)
 
-These apply to the India build that is still on main until the v4 merge.
+These apply to the earlier India build, which is still reachable from the start screen.
 
 1. **Planning estimates.** The app supports farmer and local-expert judgment and does not guarantee yield or profit. It is not a forecast.
 2. **Scope.** Nalgonda, kharif, one crop per year over four years. No rabi, intercropping, pest model, varietal model or market-risk model.

@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import os
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -65,8 +66,16 @@ def money(per_ha: float, currency: str, area_unit: str) -> str:
     return f"{'-' if v < 0 else ''}{currency} {abs(v):,.0f}"
 
 
-def same_plan(a: dict, b: dict) -> bool:
-    return a["crops"] == b["crops"] and a["cover_crops"] == b["cover_crops"]
+def same_plan(a: dict | None, b: dict | None) -> bool:
+    return a is not None and b is not None and a["crops"] == b["crops"] and a["cover_crops"] == b["cover_crops"]
+
+
+def plan_words(rot: dict) -> str:
+    """'Corn every year', or 'Corn, then soybeans, then corn, then soybeans'."""
+    names = [" + ".join(crop_label(c) for c in yr) + (" with a cover crop" if cov else "") for yr, cov in zip(rot["crops"], rot["cover_crops"])]
+    if len(set(names)) == 1:
+        return f"{names[0]} every year"
+    return ", then ".join([names[0]] + [n.lower() for n in names[1:]])
 
 
 def years_html(rot: dict) -> str:
@@ -132,7 +141,8 @@ def _small_delta(v: float) -> str:
     return f'<span class="rl-delta {"up" if v > 0 else "dn"}">{"+" if v > 0 else "-"}{abs(v):,.1f}</span>'
 
 
-def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_unit: str, big: bool, example: bool) -> None:
+def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_unit: str, big: bool, example: bool,
+              same_as: str | None = None) -> None:
     title, ex = PICK_TITLES[name], (" " + badge("example") if example else "")
     cls = "rl-panel lead" if big else "rl-panel"
     if rot is None:
@@ -140,6 +150,10 @@ def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_un
            f'what you grow today. Allow a small drop in profit under "Change what matters to you", or look at the two plans below.</p></div>')
         return
     u = _unit(area_unit)
+    if same_as is not None:                          # one plan won two categories: say so once instead of repeating the card
+        md(f'<div class="{cls}"><h4>{title}{ex}</h4><p class="rl-bigsub" style="margin-top:-.3rem">{PICK_WHY[name]}</p>{years_html(rot)}'
+           f'<p class="rl-say">This is the same plan as "{PICK_TITLES[same_as]}". It wins this category too.</p></div>')
+        return
     md(f'<div class="{cls}"><h4>{title}{ex}</h4><p class="rl-bigsub" style="margin-top:-.3rem">{PICK_WHY[name]}</p>{years_html(rot)}'
        f'<div class="rl-big">{money(rot["mean_profit"], currency, area_unit)}</div>'
        f'<p class="rl-bigsub">average profit per {u} each year {badge("estimated")}</p>'
@@ -237,16 +251,25 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
             st.warning("EXAMPLE DATA. The crop simulation is not connected yet, so these results come from a stand-in. Do not use them for decisions.")
         if head is not None and same_plan(head, cur):
             st.info("What you grow today is already the best match for your priorities. No other plan keeps your average profit and scores higher.")
+        st.write(f"**What you grow today:** {plan_words(cur)}. It earns {money(cur['mean_profit'], currency, area_unit)} per {_unit(area_unit)} a year "
+                 f"on average and {money(cur['worst10_profit'], currency, area_unit)} in a bad year, with a Soil Health Score of {cur['soil_score']:.0f} out of 100. "
+                 "Each plan below is compared with this.")
         pick_card("headline", head, cur, currency, area_unit, True, ex)
         a, b = st.columns(2)
-        with a:
-            pick_card("highest_profit", result["highest_profit"], cur, currency, area_unit, False, ex)
-        with b:
-            pick_card("best_soil", result["best_soil"], cur, currency, area_unit, False, ex)
+        shown = [("headline", head)]
+        for col, name in ((a, "highest_profit"), (b, "best_soil")):
+            pick = result[name]
+            twin = next((other for other, r in shown if same_plan(pick, r)), None)
+            with col:
+                pick_card(name, pick, cur, currency, area_unit, False, ex, same_as=twin)
+            shown.append((name, pick))
         if result.get("excluded_crops"):
             st.caption("Left out until you enter them: " + ", ".join(f"{crop_label(x['crop'])} (needs your {x['field']})" for x in result["excluded_crops"]) + ".")
         if result.get("cover_crop_note"):
             st.caption("Cover crops are not offered until you enter what the seed and planting cost you.")
+    if os.environ.get("ANTHROPIC_API_KEY") and result.get("headline") is not None and st.button("Explain the best plan in my own words", key=f"{key}_ai"):
+        from engine import explain as ex_mod
+        st.info(ex_mod.explain_pick(result["headline"], result["current_plan_result"], pick="headline", use_api=True))
     st.subheader("Every plan we tested")
     st.caption("Each dot is one four-year plan. Further right earns more. Higher up is better for your soil. "
                "The marked dots are the three plans above and what you grow today.")

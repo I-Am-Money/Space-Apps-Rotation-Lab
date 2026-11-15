@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Rotation optimisation: configured four-year sequences, J score, Pareto frontier, reports.
 
 J = (1-lam)*mean_profit + lam*worst10_profit - w*scale*irrigation_mm.

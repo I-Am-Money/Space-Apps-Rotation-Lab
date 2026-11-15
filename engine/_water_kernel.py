@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Daily accounting kernel. Numba compiles the same equations without Python day loops."""
 import numpy as np
 import os

@@ -85,6 +85,15 @@ def _s(v) -> str:
     return "" if v is None or (isinstance(v, float) and v != v) else str(v)
 
 
+def _crop_word(cid) -> str:
+    """The crop's plain name ('corn', 'winter wheat') for a crop id; the id with spaces when the library has no entry."""
+    try:
+        from engine.crops import get_crop
+        return get_crop(str(cid)).name.split(" (")[0].lower()
+    except Exception:
+        return _s(cid).replace("_", " ")
+
+
 def validation_rows(summary) -> list[dict]:
     """Display rows: county, crop, held-out r and MAE (t/ha) with and without the correction, status."""
     df = _table_df(summary)
@@ -98,7 +107,7 @@ def validation_rows(summary) -> list[dict]:
             "Country": "US" if _s(r.get("fips")) else "India" if "India" in _s(r.get("region")) else "",
             "ERS region": _s(r.get("ers_region")) or _s(r.get("region")),
             "Yield records": "USDA NASS county" if _s(r.get("fips")) else "ICRISAT district" if "India" in _s(r.get("region")) else "",
-            "Crop": _s(r.get("crop")), "Water": _s(r.get("water")),
+            "Crop": _crop_word(r.get("crop")), "Water": _s(r.get("water")),
             "r (held out)": _fmt(r.get("r")) if ok else "n/a", "MAE t/ha": mae("mae"),
             "r corrected": _fmt(r.get("r_corrected")) if ok else "n/a", "MAE corrected t/ha": mae("mae_corrected"),
             "Years train/test": f"{int(r['n_train'])}/{int(r['n_test'])}" if ok else "",
@@ -145,10 +154,12 @@ def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
     what = "NASS county" if fips else "district"
     if not pd.notna(r.get("r")) or float(r["r"]) <= 0:
         # checked, but the model did not follow the real ups and downs on held-out years: still a warning
-        return {"show": True, "text": f"Not validated here: checked against {what} yields ({r['crop']}), but the model did "
-                                      f"not track them on held-out years (r = {_fmt(r.get('r'))}). See the page Can I trust this?"}
-    return {"show": False, "text": f"Checked against {what} yields here ({r['crop']}): held-out r = "
-                                   f"{_fmt(r.get('r'))}. See the page Can I trust this?"}
+        return {"show": True, "text": f"Not validated here: checked against real {what} {_crop_word(r['crop'])} yields, but the "
+                                      f"model did not track them in the years it never saw (r = {_fmt(r.get('r'))}). "
+                                      f"See the page Can I trust this?"}
+    return {"show": False, "text": f"Accuracy check for this place: against real {what} {_crop_word(r['crop'])} yields in years "
+                                   f"the model never saw, correlation r = {_fmt(r.get('r'))} (1.00 is perfect). "
+                                   f"See the page Can I trust this?"}
 
 
 # ------------------------------------------------------------------------------------------- assumptions
@@ -304,7 +315,16 @@ def render() -> None:
                       if not _NOT_US.search(" ".join(str(v) for v in r.values())) and "assumptions.yaml" not in str(r.get("File", ""))])
     if not a.empty:
         n_ph = int((a["Badge"] == "placeholder").sum())
-        st.caption(f"{len(a)} parameters. {n_ph} are marked Placeholder (team to verify or no source yet).")
+        n_obs = int((a["Badge"] == "observed").sum())
+        n_asm = len(a) - n_ph - n_obs
+        st.write(f"The model runs on {len(a)} listed values. {n_obs} are taken from a published source (for example FAO-56, "
+                 f"FAO-33 or USDA). {n_asm} are stated planning assumptions. {n_ph} are team choices or values still to be "
+                 f"checked against a source, such as the Soil Health Score weights: they are marked Placeholder so that nobody "
+                 f"mistakes them for measurements.")
+        counts = (a.assign(Kind=a["Badge"].map({"observed": "Published source", "placeholder": "Placeholder (team to verify)"}).fillna("Assumption"))
+                  .groupby(["File", "Kind"]).size().unstack(fill_value=0).reset_index())
+        st.dataframe(counts, hide_index=True)
+        st.caption("Every value, with its range and source:")
         for col in ("Value", "Range", "Unit"):
             a[col] = a[col].map(lambda v: "" if v is None else str(v))
         a["Badge"] = a["Badge"].map(badge)

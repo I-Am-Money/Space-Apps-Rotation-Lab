@@ -30,23 +30,21 @@ else:
     pending = st.session_state.pop('_v5_go', None)
     if pending:
         st.session_state['v5_page'] = pending
-    if 'v4_rec' not in st.session_state and st.session_state.get('v5_page') not in ('Farm setup', 'How good is this?', 'Field zones'):
+    if 'v4_rec' not in st.session_state and st.session_state.get('v5_page') not in ('Farm setup', 'How good is this?'):
         st.session_state['v5_page'] = 'Farm setup'
     st.session_state.setdefault('v5_page', 'Recommendations' if 'v4_rec' in st.session_state else 'Farm setup')
+    # The page list sits at the top of the page, not in a closed sidebar, so every page is one visible click away.
     PAGE_NAMES = {'Farm setup': '1. Your farm', 'Recommendations': '2. Best crop plans', 'Tipping points': '3. What could change it',
-                  'What to measure next': '4. What to check first', 'How good is this?': 'Can I trust this?', 'Field zones': 'Field zones'}
-    started = st.session_state.get('v4_screen', 'start') != 'start' or 'v4_rec' in st.session_state
-    if started:
-        brand, again = st.columns([5, 1], vertical_alignment='center')
-        brand.markdown('<div class="rl-top"><div class="rl-brand">RotationLab</div></div>', unsafe_allow_html=True)
-        if again.button('Start again', help='Clear this farm and go back to the first page.'):
+                  'What to measure next': '4. What to check first', 'How good is this?': 'Can I trust this?'}
+    nav, again = st.container(key='rl_nav').columns([7, 1], vertical_alignment='center')
+    with nav:
+        page = st.radio('Pages', list(PAGE_NAMES), key='v5_page', horizontal=True, label_visibility='collapsed', format_func=PAGE_NAMES.get)
+    with again:
+        if st.button('Start again', help='Clear this farm and go back to the first page.'):
             for key in list(st.session_state):
                 if key.startswith(('v4_', '_v4_', 'v5_', '_v5_', 'rec_', 'meas_')) or key in ('pin_lat', 'pin_lon', '_tipping_result'):
                     del st.session_state[key]
             st.rerun()
-    with st.container(key='rl_nav' if started else 'rl_nav_start'):     # the steps appear once a farm is started
-        page = st.radio('Pages', list(PAGE_NAMES), key='v5_page', horizontal=True, label_visibility='collapsed',
-                        format_func=PAGE_NAMES.get)
     try:
         if page == 'Farm setup':
             if st.session_state.get('v4_screen') == 'results':
@@ -55,15 +53,15 @@ else:
         elif page == 'How good is this?':
             from ui import trust
             trust.render()
-        elif page == 'Field zones':
-            from ui import zones
-            zones.render(st.session_state.get('v4_site'), st.session_state.get('v4_inputs'))
         elif 'v4_inputs' not in st.session_state:
             st.info('Fill in the "Your farm" page first. The crop plans are worked out from your answers.')
         else:
             site, inputs = st.session_state['v4_site'], st.session_state['v4_inputs']
             st.caption('Modeled estimates for planning. Not a guarantee of yield or profit. This tool supports, and does not replace, '
                        'your own judgment and local advice.')
+            if st.session_state.get('v4_example_farm'):
+                st.caption('Example farm: ' + st.session_state['v4_example_farm'] + '. The weather, soil, yields, prices and costs are real '
+                           'records for this place. The farm answers are an example: change them with "Edit farm details".')
             if st.button('Edit farm details'):
                 st.session_state['v4_screen'] = 'farm'
                 st.session_state['_v5_go'] = 'Farm setup'
@@ -77,6 +75,8 @@ else:
                 banner = banner_for_site(site, summary=st.session_state['v4_validation'])
                 if banner['show']:
                     st.warning(banner['text'])
+                elif banner.get('text'):
+                    st.caption(banner['text'])
             except Exception:
                 logging.exception('Validation records could not be loaded')
                 st.warning('Validation records could not be loaded. Not validated here; local performance is unconfirmed.')

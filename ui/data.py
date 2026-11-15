@@ -1,3 +1,4 @@
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Cached real engine access with anonymous uploads isolated to their session."""
 from __future__ import annotations
 
