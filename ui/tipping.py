@@ -75,22 +75,34 @@ def compute(site, inputs, sliders) -> dict:
     return result
 
 
-def _curve_frame(curve: dict) -> pd.DataFrame:
+ACRES_PER_HECTARE = 2.4710538147
+
+
+def _area() -> tuple[str, float]:
+    """The area unit the farmer picked in the app ('Metric units' switch), and the factor that turns a per-hectare
+    value into it. Outside the app shell the engine's own unit (hectare) is shown. Display conversion only."""
+    if st.session_state.get("v4_metric", True):
+        return "hectare", 1.0
+    return "acre", 1.0 / ACRES_PER_HECTARE
+
+
+def _curve_frame(curve: dict, scale: float = 1.0) -> pd.DataFrame:
+    k = scale if curve["metric"]["name"] == "profit" else 1.0     # only money is per area; yield shares stay as they are
     rows = []
     for name, mean in curve["series"].items():
         for i, x in enumerate(curve["x"]):
-            rows.append({"x": x, "Plan": name, "Average": mean[i], "Low (10th percentile)": curve["band"]["p10"][name][i],
-                         "High (90th percentile)": curve["band"]["p90"][name][i], "Best plan here": curve["winner"][i]})
+            rows.append({"x": x, "Plan": name, "Average": mean[i] * k, "Low (10th percentile)": curve["band"]["p10"][name][i] * k,
+                         "High (90th percentile)": curve["band"]["p90"][name][i] * k, "Best plan here": curve["winner"][i]})
     return pd.DataFrame(rows)
 
 
-def _curve_chart(curve: dict):
-    df = _curve_frame(curve)
+def _curve_chart(curve: dict, unit: str = "hectare", scale: float = 1.0):
+    df = _curve_frame(curve, scale)
     x = alt.X("x:Q", title=curve["x_label"], scale=alt.Scale(zero=False))
     tips = ["Plan", alt.Tooltip("x:Q", title=curve["x_label"]), alt.Tooltip("Average:Q", format=",.0f"),
             alt.Tooltip("Low (10th percentile):Q", format=",.0f"), alt.Tooltip("High (90th percentile):Q", format=",.0f"),
             "Best plan here"]
-    y_title = "Profit per hectare per year" if curve["metric"]["name"] == "profit" else "Share of best possible yield (%)"
+    y_title = f"Profit per {unit} per year" if curve["metric"]["name"] == "profit" else "Share of best possible yield (%)"
     legend = alt.Legend(orient="bottom", direction="vertical", labelLimit=600, title="Plan")
     band = alt.Chart(df).mark_area(opacity=0.2).encode(x=x, y=alt.Y("Low (10th percentile):Q", title=y_title),
                                                       y2="High (90th percentile):Q", color=alt.Color("Plan:N", legend=None))
@@ -104,11 +116,11 @@ def _curve_chart(curve: dict):
     return alt.layer(*layers).resolve_legend(color="independent").properties(height=380 + 24 * len(curve["series"]))
 
 
-def _show_curve(title: str, curve: dict, lead: str, fmt) -> None:
+def _show_curve(title: str, curve: dict, lead: str, fmt, unit: str = "hectare", scale: float = 1.0) -> None:
     st.subheader(title)
     _cap(f"{lead} Line = average over 500 weather plans; shaded band = 10th to 90th percentile. "
                f"Dashed line = your farm now. {_badge('estimated')}")
-    st.altair_chart(_curve_chart(curve), width="stretch")
+    st.altair_chart(_curve_chart(curve, unit, scale), width="stretch")
     if curve["crossover_details"]:
         for d in curve["crossover_details"]:
             how = (f"10th to 90th percentile {fmt(d['p10'])} to {fmt(d['p90'])}" if d["by"] == "average"
@@ -119,7 +131,7 @@ def _show_curve(title: str, curve: dict, lead: str, fmt) -> None:
     if curve.get("note"):
         st.caption(curve["note"])
     with st.expander("Numbers behind this chart"):
-        st.dataframe(_curve_frame(curve).rename(columns={"x": curve["x_label"]}), hide_index=True)
+        st.dataframe(_curve_frame(curve, scale).rename(columns={"x": curve["x_label"]}), hide_index=True)
 
 
 def _show_map(m: dict) -> None:
@@ -180,13 +192,14 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
 
     _show_map(result["map_2d"])
     money = result["metric"]["name"] == "profit"
-    what = "average profit per hectare per year, in the currency of your prices" if money else "share of the best possible yield"
+    unit, scale = _area()
+    what = f"average profit per {unit} per year, in the currency of your prices" if money else "share of the best possible yield"
     _show_curve("If rainfall changes", result["rainfall_curve"],
-                f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain")
+                f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale)
     _show_curve("If your water supply changes", result["water_curve"],
-                f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm")
+                f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale)
     _show_curve("If it gets hotter", result["heat_curve"],
-                f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC")
+                f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale)
 
     with st.expander("How this was worked out"):
         method = result.get("method") or {}

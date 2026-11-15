@@ -184,13 +184,19 @@ def _money(x) -> str:
     return f"{abs(float(x)):,.0f}"
 
 
+# Card titles, so the sentence never shows an internal name such as highest_profit.
+PICK_NAMES = {"headline": "Best for soil and climate", "highest_profit": "Highest profit", "best_soil": "Best for your soil"}
+
+
 def template_from_payload(p: dict) -> str:
     """Fixed template. Uses only numbers and crop names from the payload, so it always passes the guard."""
     plan, cur, d = p.get("plan") or {}, p.get("current_plan") or {}, p.get("change_vs_current") or {}
     s = []
     crops = ", ".join(plan.get("crops_by_year") or []) or "this plan"
     cov = plan.get("cover_crops") or []
-    s.append(f"The {p.get('pick', 'recommended plan')} plan grows {crops}" + (f" with {', '.join(cov)} as a cover crop" if cov else "") + ".")
+    name = PICK_NAMES.get(str(p.get("pick")))
+    lead = f'The "{name}" plan' if name else "The recommended plan"
+    s.append(f"{lead} grows {crops}" + (f" with {', '.join(cov)} as a cover crop" if cov else "") + ".")
     if plan.get("mean_profit_per_ha") is not None and plan.get("bad_year_profit_per_ha") is not None:
         def money(x):
             return f"a loss of {_money(x)}" if x < 0 else f"a profit of {_money(x)}"

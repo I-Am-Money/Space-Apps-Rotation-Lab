@@ -39,7 +39,41 @@ def show_badge(kind: str) -> None:
 
 
 def crop_label(c: str) -> str:
-    return str(c).replace("_", " ").capitalize()
+    """Display name from the crop library (the same names the Tipping points page uses), for example 'Winter wheat'."""
+    try:
+        from engine import crops as crop_library
+        return crop_library.get_crop(str(c)).name.split(" (")[0]
+    except Exception:
+        return str(c).replace("_", " ").capitalize()
+
+
+def same_plan(a: dict | None, b: dict | None) -> bool:
+    return a is not None and b is not None and a["crops"] == b["crops"] and a["cover_crops"] == b["cover_crops"]
+
+
+def plan_words(rot: dict) -> str:
+    """'Corn every year', or 'corn, then soybeans, then corn, then soybeans'."""
+    names = [" + ".join(crop_label(c) for c in yr) + (" with a cover crop" if cov else "") for yr, cov in zip(rot["crops"], rot["cover_crops"])]
+    if len(set(names)) == 1:
+        return f"{names[0]} every year"
+    return ", then ".join([names[0]] + [n.lower() for n in names[1:]])
+
+
+def pick_text(rot: dict, currency: str, area_unit: str) -> str:
+    """The sentence under a card, built from the same numbers and in the same units as the card above it.
+    Display formatting only: every number is the engine's result converted to the farmer's area unit."""
+    d, u = rot["deltas_vs_current"], _unit(area_unit)
+    def amount(v):
+        return f"{currency} {abs(_conv(v, area_unit)):,.0f} per {u}"
+    def earns(v):
+        return ("loses " if _conv(v, area_unit) <= -0.5 else "earns ") + amount(v)
+    s = [f"Grows {plan_words(rot).lower()}.",
+         f"On average it {earns(rot['mean_profit'])} a year, and in bad years (the worst 10% of weather) it {earns(rot['worst10_profit'])}."]
+    dm, ds = _conv(d["mean_profit"], area_unit), d["soil_score"]
+    money_part = "the same average profit as your current plan" if abs(dm) < 0.5 else f"{amount(d['mean_profit'])} {'more' if dm > 0 else 'less'} than your current plan"
+    soil_part = "the same Soil Health Score" if abs(ds) < 0.5 else f"a Soil Health Score {abs(ds):.0f} points {'higher' if ds > 0 else 'lower'}"
+    s.append(f"That is {money_part}, with {soil_part}.")
+    return " ".join(s)
 
 
 def _unit(area_unit: str) -> str:
@@ -56,7 +90,8 @@ def money(per_ha: float, currency: str, area_unit: str) -> str:
     return f"{'-' if v < 0 else ''}{currency} {abs(v):,.0f}"
 
 
-def pick_card(name: str, rot: dict | None, text: str, currency: str, area_unit: str, big: bool, example: bool) -> None:
+def pick_card(name: str, rot: dict | None, text: str, currency: str, area_unit: str, big: bool, example: bool,
+              same_as: str | None = None, is_current: bool = False) -> None:
     with st.container(border=True):
         (st.header if big else st.subheader)(PICK_TITLES[name])
         if example:
@@ -68,15 +103,26 @@ def pick_card(name: str, rot: dict | None, text: str, currency: str, area_unit: 
         cols = st.columns(len(rot["crops"]))
         for i, (col, yr) in enumerate(zip(cols, rot["crops"])):
             col.write(f"Year {i + 1}: {crop_label(yr[0])}" + (" + cover crop" if rot["cover_crops"][i] else ""))
+        if same_as is not None:
+            # The same rotation won two categories: say so once instead of repeating the whole card.
+            st.info(f"Same plan as \"{PICK_TITLES[same_as]}\" above. It wins this category too.")
+            return
+        if is_current:
+            st.info("This is your current plan. Nothing scores higher in this category.")
         d, u = rot["deltas_vs_current"], _unit(area_unit)
-        m = st.columns(5)
-        m[0].metric(f"Average profit ({currency}/{u}/yr)", money(rot["mean_profit"], currency, area_unit),
-                    f"{_conv(d['mean_profit'], area_unit):+,.0f} vs current")
-        m[1].metric(f"Bad-year profit ({currency}/{u}/yr)", money(rot["worst10_profit"], currency, area_unit),
-                    f"{_conv(d['worst10_profit'], area_unit):+,.0f} vs current")
-        m[2].metric("Water used (mm/yr)", f"{rot['total_water_mm']:,.0f}", f"{d['total_water_mm']:+,.0f} vs current", delta_color="inverse")
-        m[3].metric("Soil Health Score", f"{rot['soil_score']:.0f}", f"{d['soil_score']:+,.0f} vs current")
-        m[4].metric(f"Food (Mcal/{u}/yr)", f"{_conv(rot['calories'], area_unit) / 1000:,.0f}", f"{_conv(d['calories'], area_unit) / 1000:+,.0f} vs current")
+        vs = "" if is_current else " vs current"
+        # Five numbers in one row for the wide headline card; three and two for the half-width cards so nothing is cut off.
+        m = st.columns(5) if big else st.columns(3) + st.columns(3)[:2]
+        m[0].metric("Average profit", money(rot["mean_profit"], currency, area_unit),
+                    None if is_current else f"{_conv(d['mean_profit'], area_unit):+,.0f}{vs}")
+        m[1].metric("Bad-year profit", money(rot["worst10_profit"], currency, area_unit),
+                    None if is_current else f"{_conv(d['worst10_profit'], area_unit):+,.0f}{vs}")
+        m[2].metric("Soil Health Score", f"{rot['soil_score']:.0f} / 100", None if is_current else f"{d['soil_score']:+,.0f}{vs}")
+        m[3].metric("Water used", f"{rot['total_water_mm']:,.0f} mm", None if is_current else f"{d['total_water_mm']:+,.0f}{vs}", delta_color="inverse")
+        m[4].metric("Food energy", f"{_conv(rot['calories'], area_unit) / 1000:,.0f} Mcal",
+                    None if is_current else f"{_conv(d['calories'], area_unit) / 1000:+,.0f}{vs}")
+        st.caption(f"Profit in {currency} per {u} per year. Water in mm per year (rain plus irrigation the crops used). "
+                   f"Food energy in Mcal (thousand kilocalories) per {u} per year.")
         show_badge("estimated")
         st.write(text)
 
@@ -163,18 +209,29 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
         show_badge("example")
         st.warning("EXAMPLE DATA. The crop simulation is not connected yet, so these results come from a stand-in. "
                    "Do not use them for decisions.")
-    texts = result["explanations"]
     cur = result["current_plan_result"]
     head = result["headline"]
-    if head is not None and head["crops"] == cur["crops"] and head["cover_crops"] == cur["cover_crops"]:
+    st.write(f"**Your current plan:** {plan_words(cur)}. It earns {money(cur['mean_profit'], currency, area_unit)} per {_unit(area_unit)} a year "
+             f"on average and {money(cur['worst10_profit'], currency, area_unit)} in bad years, with a Soil Health Score of "
+             f"{cur['soil_score']:.0f} out of 100. Each card below shows the change from this.")
+    if same_plan(head, cur):
         st.info("Your current plan is already the best match for your priorities under your profit guardrail. "
                 "No other rotation keeps your average profit at or above it and scores higher.")
-    pick_card("headline", result["headline"], texts.get("headline", ""), currency, area_unit, True, ex)
+
+    def text_for(name):
+        # The stand-in explanation is kept when the result is flagged EXAMPLE; real results get the sentence in display units.
+        pick = result[name]
+        return result["explanations"].get(name, "") if (ex or pick is None) else pick_text(pick, currency, area_unit)
+
+    pick_card("headline", head, text_for("headline"), currency, area_unit, True, ex, is_current=same_plan(head, cur))
     a, b = st.columns(2)
-    with a:
-        pick_card("highest_profit", result["highest_profit"], texts.get("highest_profit", ""), currency, area_unit, False, ex)
-    with b:
-        pick_card("best_soil", result["best_soil"], texts.get("best_soil", ""), currency, area_unit, False, ex)
+    shown = [("headline", head)]
+    for col, name in ((a, "highest_profit"), (b, "best_soil")):
+        pick = result[name]
+        twin = next((other for other, r in shown if same_plan(pick, r)), None)
+        with col:
+            pick_card(name, pick, text_for(name), currency, area_unit, False, ex, same_as=twin, is_current=same_plan(pick, cur))
+        shown.append((name, pick))
     if result.get("excluded_crops"):
         st.caption("Left out until you enter them: " + ", ".join(f"{crop_label(x['crop'])} (needs {x['field']})" for x in result["excluded_crops"]) + ".")
     if result.get("cover_crop_note"):

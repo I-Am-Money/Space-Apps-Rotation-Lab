@@ -41,11 +41,23 @@ demo_presets:
     label: {value: 'Corn Belt · Iowa', range: null, source: 'Team selection of Story County validation location.'}
     lat: {value: 42.037538, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Story County IA.'}
     lon: {value: -93.466093, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Story County IA.'}
-  kansas:
-    label: {value: 'Great Plains · Kansas', range: null, source: 'Team selection of Sumner County validation location.'}
-    lat: {value: 37.236662, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Sumner County KS.'}
-    lon: {value: -97.493352, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Sumner County KS.'}
-  georgia:
-    label: {value: 'Southeast · Georgia', range: null, source: 'Team selection of Mitchell County validation location.'}
-    lat: {value: 31.228997, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Mitchell County GA.'}
-    lon: {value: -84.192038, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Mitchell County GA.'}
+    place: {value: 'Story County', range: null, source: 'Same validation site.'}
+    current_plan: {value: [maize, maize, maize, maize], range: null, source: 'Example farm chosen by the team for the demo, not a real farm record.'}
+    farm_acres: {value: 300, range: [1, 100000], unit: acres, source: 'Example farm chosen by the team for the demo, not a real farm record.'}
+    water_mode: {value: rain, range: null, source: 'Example farm chosen by the team. Story County cropland is almost entirely rain-fed (USDA NASS irrigated share).'}
+  nebraska:
+    label: {value: 'Great Plains · Nebraska', range: null, source: 'Team selection of Lancaster County validation location (strongest held-out hindcast for maize and soybean, config/validation/results.csv).'}
+    lat: {value: 40.783547, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Lancaster County NE.'}
+    lon: {value: -96.688658, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Lancaster County NE.'}
+    place: {value: 'Lancaster County', range: null, source: 'Same validation site.'}
+    current_plan: {value: [maize, maize, maize, maize], range: null, source: 'Example farm chosen by the team for the demo, not a real farm record.'}
+    farm_acres: {value: 300, range: [1, 100000], unit: acres, source: 'Example farm chosen by the team for the demo, not a real farm record.'}
+    water_mode: {value: rain, range: null, source: 'Example farm chosen by the team. About 7 percent of Lancaster County cropland is irrigated (USDA NASS).'}
+  texas:
+    label: {value: 'Southern Plains · Texas', range: null, source: 'Team selection of Lubbock County validation location.'}
+    lat: {value: 33.611469, range: [-90, 90], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Lubbock County TX.'}
+    lon: {value: -101.819944, range: [-180, 180], source: 'Person 3 validation list: Census 2023 county Gazetteer internal point, Lubbock County TX.'}
+    place: {value: 'Lubbock County', range: null, source: 'Same validation site.'}
+    current_plan: {value: [wheat_winter, wheat_winter, wheat_winter, wheat_winter], range: null, source: 'Example dryland farm chosen by the team for the demo, not a real farm record.'}
+    farm_acres: {value: 600, range: [1, 100000], unit: acres, source: 'Example farm chosen by the team for the demo, not a real farm record.'}
+    water_mode: {value: rain, range: null, source: 'Example dryland farm chosen by the team. About 17 percent of Lubbock County cropland is irrigated (USDA NASS).'}

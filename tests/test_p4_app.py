@@ -67,7 +67,7 @@ def test_start_and_missing_contract(monkeypatch):
 
 def test_setup_blocks_missing_inputs_and_preserves_answers_when_editing(providers):
     app=AppTest.from_file(APP,default_timeout=30).run()
-    next(b for b in app.button if b.label=='Explore Iowa').click().run()
+    next(b for b in app.button if b.label=='Plan my farm').click().run()
     next(b for b in app.button if b.label=='Load this location').click().run()
     next(b for b in app.button if b.label=='Compare my rotations').click().run()
     assert any('greater than zero' in w.value for w in app.warning)
@@ -79,9 +79,42 @@ def test_setup_blocks_missing_inputs_and_preserves_answers_when_editing(provider
     assert app.number_input(key='v4_farm_acres').value==123.
 
 
-def test_all_six_pages_render_without_hidden_exceptions(providers):
+def test_example_farm_goes_straight_to_recommendations_and_stays_editable(providers):
+    """One click on an example farm must reach a result: no empty form, no 'farm size' error."""
+    app=AppTest.from_file(APP,default_timeout=30).run()
+    next(b for b in app.button if b.label=='Explore Iowa').click().run()
+    assert not app.exception
+    assert not any('greater than zero' in w.value for w in app.warning)
+    assert app.session_state['v5_page']=='Recommendations'
+    assert any('Highest profit' in s.value for s in app.subheader)
+    assert app.session_state['v4_inputs'].current_plan==['maize']*4
+    next(b for b in app.button if b.label=='Edit farm details').click().run()
+    assert not app.exception
+    assert app.number_input(key='v4_farm_acres').value==300.
+
+
+def test_example_farms_have_complete_answers():
+    from ui import setup
+    presets=setup.demo_presets()
+    assert len(presets)==3
+    for preset in presets:
+        assert len(preset['plan'])==4 and preset['acres']>0 and preset['water']=='rain' and preset['place']
+
+
+def test_climate_card_rows_are_plain_and_rounded():
+    from ui import setup
+    rows=setup.climate_rows({'season_rain_mm':(557.086,524.601),'rain_variability_cv':(.274,.3117),'heat_days':(4.4,5.2),
+                             'rainy_season_start_doy':(131.9,127.65),'heat_threshold_c':35.0})
+    by={r['name']:r for r in rows}
+    assert by['season_rain_mm']['Baseline']=='557 mm' and by['season_rain_mm']['Change'].startswith('-32 mm')
+    assert by['heat_days']['Change']=='+0.8 days'
+    assert by['rainy_season_start_doy']['Change']=='4 days earlier'
+    assert not any('_' in r['Measure'] or 'Doy' in r['Measure'] for r in rows)
+
+
+def test_all_pages_render_without_hidden_exceptions(providers):
     app=results_app(providers)
-    for page in ('Recommendations','Tipping points','What to measure next','How good is this?','Field zones','Farm setup'):
+    for page in ('Recommendations','Tipping points','What to measure next','How good is this?','Farm setup'):
         app.radio(key='v5_page').set_value(page).run()
         assert not app.exception, [e.message for e in app.exception]
         assert not any('page could not' in e.value.lower() for e in app.error)

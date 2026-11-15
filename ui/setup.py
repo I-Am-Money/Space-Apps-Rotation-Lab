@@ -21,10 +21,82 @@ REQUIRED_API = ('Site', 'WaterInput', 'UserInputs', 'Sliders', 'get_site', 'get_
                 'recommend', 'tipping_points', 'question_value', 'validation_summary')
 
 
+def crop_name(crop):
+    """Plain crop name from the crop library, lower case: 'winter wheat' for wheat_winter."""
+    try:
+        from ui.recommendations import crop_label
+        return crop_label(crop).lower()
+    except Exception:
+        return str(crop).replace('_', ' ')
+
+
 def demo_presets():
+    """Example farms from config/assumptions/setup.yaml: a place plus example answers, so one click reaches a result."""
     import yaml
     data = yaml.safe_load((ROOT / 'config/assumptions/setup.yaml').read_text())['demo_presets']
-    return [(row['label']['value'], row['lat']['value'], row['lon']['value']) for row in data.values()]
+    value = lambda row, name, default=None: (row.get(name) or {}).get('value', default)
+    return [dict(label=value(row, 'label'), lat=value(row, 'lat'), lon=value(row, 'lon'), place=value(row, 'place', ''),
+                 plan=list(value(row, 'current_plan', []) or []), acres=float(value(row, 'farm_acres', 0) or 0),
+                 water=value(row, 'water_mode', 'rain')) for row in data.values()]
+
+
+def preset_summary(preset):
+    plan = preset['plan']
+    crops = (crop_name(plan[0]) + ' every year') if plan and len(set(plan)) == 1 else ', '.join(crop_name(c) for c in plan)
+    water = 'rain only' if preset['water'] == 'rain' else 'irrigated'
+    return f"{preset['place']} · {crops} · {water} · {preset['acres']:,.0f} acres"
+
+
+DEFAULT_SLIDERS = dict(bad_year=.3, water=0., soil=.5, profit_tolerance_pct=0., climate_shift='historical')
+
+
+def score_rotations(site, inputs):
+    """Candidates then recommendations through the API. Returns False when no crop is available here."""
+    candidates = api.get_candidates(site, inputs)
+    st.write(f'Climate and crop availability checked: {len(candidates)} candidate crops.')
+    if not candidates:
+        st.warning('No supported crops are available here with these inputs.')
+        return False
+    st.write('Running weather scenarios and scoring rotations through the recommendation API…')
+    rec = api.recommend(site, inputs, api.Sliders(**DEFAULT_SLIDERS))
+    st.session_state.update(v4_inputs=inputs, v4_rec=rec, v4_screen='results', v4_controls=tuple(DEFAULT_SLIDERS.values()))
+    st.session_state['_v5_go'] = 'Recommendations'
+    st.session_state.pop('v4_tipping_result', None)
+    st.session_state.pop('v4_questions', None)
+    return True
+
+
+def open_preset(preset):
+    """One click on an example farm: load the place, fill in the example answers and go straight to the result.
+    The answers stay editable under 'Edit farm details'. If anything is missing the farmer lands on the form instead."""
+    lat, lon = float(preset['lat']), float(preset['lon'])
+    for name in ('pin_lat', 'pin_lon', '_v4_farm_widgets', 'v4_inputs', 'v4_rec', 'v4_site', 'v4_location', 'v4_cdl_plan', '_v4_autoload'):
+        st.session_state.pop(name, None)
+    st.session_state.update(v4_lat=lat, v4_lon=lon, v4_screen='farm')
+    if missing_api() or len(preset['plan']) != 4 or preset['acres'] <= 0:
+        return
+    try:
+        with st.status('Loading this example farm', expanded=True) as status:
+            st.write('Fetching NASA weather and loading soil through the site API…')
+            site = load_site(lat, lon)
+            st.session_state.update(v4_site=site, v4_location=(lat, lon), v4_asof=record(site).get('data_as_of'))
+            offered = list(record(record(site).get('us_defaults')).get('crops') or [])
+            widgets = {'v4_farm_acres': preset['acres'], 'v4_water_mode': preset['water']}
+            if getattr(site, 'currency', None):
+                widgets['v4_currency'] = site.currency
+            widgets.update({(f'v4_crop{i}' if offered else f'v4_crop_text{i}'): crop for i, crop in enumerate(preset['plan'])})
+            st.session_state['_v4_farm_widgets'] = widgets
+            if preset['water'] != 'rain' or (offered and any(c not in offered for c in preset['plan'])) or \
+                    input_errors(site, preset['plan'], preset['acres'], 'rain', '', 0., 0., {}):
+                return  # the form opens with the example answers filled in, and asks for what is missing
+            inputs = api.UserInputs(current_plan=list(preset['plan']), water=api.WaterInput(mode='rain', source='', normal_mm=0., dry_mm=0.),
+                                    farm_acres=preset['acres'], soil_test=None, history=None, crop_overrides={})
+            if score_rotations(site, inputs):
+                st.session_state['v4_example_farm'] = f"{preset['label']} ({preset_summary(preset)})"
+                status.update(label='Rotations scored', state='complete')
+    except Exception:
+        logging.exception('Example farm could not be opened')
+        st.session_state['v4_screen'] = 'farm'
 
 
 def provenance(value):
@@ -52,9 +124,9 @@ def stamp(value=None, badges=None):
     from ui.components import badge
     st.markdown(' '.join(badge(label) for label in labels), unsafe_allow_html=True)
     st.caption('Data as of ' + str(asof or 'not supplied by engine'))
-    for note in record(value).get('notes') or []:
-        if isinstance(note, str):
-            st.warning(note)
+    # Source notes (for example which USDA cost table was used) are information, shown once each, not warnings.
+    for note in dict.fromkeys(n for n in (record(value).get('notes') or []) if isinstance(n, str)):
+        st.caption(note)
 
 
 def style():
@@ -65,6 +137,14 @@ def style():
     [data-testid="stMetricValue"]{font-size:clamp(1.5rem,3vw,2.4rem)}
     [data-testid="stVerticalBlockBorderWrapper"]{background:#fff;border-radius:18px}
     .stButton>button[kind="primary"]{background:#24734d;border-color:#24734d;color:white}
+    .rl-badge{display:inline-block;font-size:.72rem;font-weight:700;padding:.12rem .55rem;border-radius:999px;margin-right:.35rem;
+      white-space:nowrap;line-height:1.5;border:1px solid transparent}
+    .rl-badge.obs{background:#dcefe3;color:#17553a}.rl-badge.mod{background:#e1ecf7;color:#1f4e79}
+    .rl-badge.loc{background:#efe7f7;color:#553285}.rl-badge.asm{background:#f1efe6;color:#5c5540;border-color:#d9d4bf}
+    .rl-badge.ph{background:#fdf0c8;color:#7a5600;border-color:#ecd188}
+    [data-testid="stMetricLabel"],[data-testid="stMetricLabel"] *{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+    [data-testid="stMetricValue"],[data-testid="stMetricValue"] *{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;line-height:1.15}
+    [data-testid="stMetricDelta"],[data-testid="stMetricDelta"] *{white-space:normal!important;overflow:visible!important}
     @media(max-width:640px){.block-container{padding:1rem} h1{font-size:2.5rem}}
     </style>''', unsafe_allow_html=True)
 
@@ -74,20 +154,26 @@ def start():
     st.title('Healthier soil. A more resilient farm.')
     st.write('RotationLab uses NASA data to show how your climate is changing and which crop rotations could strengthen your soil while protecting profit.')
     st.caption('Four-year crop plans · Real weather years · Explainable tradeoffs')
-    st.subheader('Explore a region')
-    for col, (label, lat, lon) in zip(st.columns(3), demo_presets()):
+    st.subheader('See it on an example farm')
+    st.caption('One click: real NASA weather and USDA records for the place, with example answers you can change afterwards.')
+    chosen = None
+    for col, preset in zip(st.columns(3), demo_presets()):
         with col:
             with st.container(border=True):
-                st.write(label)
-                st.caption('Location preset · Your input')
-                if st.button('Explore ' + label.split(' · ')[-1], use_container_width=True):
-                    st.session_state.update(v4_lat=lat, v4_lon=lon, v4_screen='farm')
-                    st.rerun()
+                st.write(f"**{preset['label']}**")
+                st.caption('Example farm: ' + preset_summary(preset))
+                if st.button('Explore ' + preset['label'].split(' · ')[-1], use_container_width=True):
+                    chosen = preset
+    if chosen:
+        open_preset(chosen)
+        st.rerun()
+    st.subheader('Or plan your own')
     if st.button('Plan my farm', type='primary'):
         st.session_state['v4_screen'] = 'farm'
         st.rerun()
     if missing_api():
         st.info('Global planning is waiting for the v4 engine interface. The existing Nalgonda farm explorer remains available below.')
+    st.caption('Earlier single-farm version: a rice farm in Nalgonda district, Telangana, India.')
     if st.button('Open existing Nalgonda farm explorer'):
         st.session_state['legacy_app'] = True
         st.rerun()
@@ -132,12 +218,14 @@ def location_map():
             # This does not guess dates between composites or fill service gaps.
             default_date = layer.get('date') or dates[0]
             url = url.replace('{date}', when).replace('/' + default_date + '/', '/' + when + '/')
-            folium.TileLayer(tiles=url, name=name, attr='NASA GIBS', overlay=True, show=False,
+            # The first NASA layer is on when the map opens, so the satellite data is visible without hunting for the layer menu.
+            folium.TileLayer(tiles=url, name=name, attr='NASA GIBS', overlay=True, show=(index == 0), opacity=.6,
                              max_native_zoom=layer.get('max_native_zoom', 8), max_zoom=18).add_to(m)
             st.caption(f"Observed · {name} · Image dated {when} · Catalog as of {layer.get('data_as_of') or 'not supplied'}")
             if layer.get('stale'):
                 st.warning('Satellite catalog is an older offline snapshot; imagery may be unavailable.')
-        folium.LayerControl().add_to(m)
+        folium.LayerControl(collapsed=False).add_to(m)
+        st.caption('NASA satellite layers are shown on the map for context (switch them in the box on the map). They are not model inputs.')
     else:
         st.caption('NASA SMAP / MODIS NDVI overlays await the shared satellite-catalog API.')
     result = st_folium(m, height=360, use_container_width=True, key='v4_map', returned_objects=['last_clicked'])
@@ -194,7 +282,8 @@ def farm():
         for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):
             if c in crops:
                 st.session_state.setdefault(f'v4_crop{i}', c)
-        plan = [col.selectbox(f'Year {i+1} current crop', crops, key=f'v4_crop{i}') for i, col in enumerate(st.columns(4))]
+        plan = [col.selectbox(f'Year {i+1} current crop', crops, key=f'v4_crop{i}', format_func=lambda c: crop_name(c).capitalize())
+                for i, col in enumerate(st.columns(4))]
     else:
         plan = [col.text_input(f'Year {i+1} current crop', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
     acres = st.number_input('Farm size (acres) · required', min_value=0., value=0., key='v4_farm_acres')
@@ -210,7 +299,7 @@ def farm():
     with st.expander('Crop economics · required outside the US or when defaults are missing', expanded=True):
         st.caption('Your input · Yield kg/ha; price currency/tonne; cost currency/ha. Blank fields use engine defaults where available.')
         for crop in sorted(set(plan) - {''}):
-            st.write(crop)
+            st.write(crop_name(crop).capitalize())
             cols = st.columns(3)
             vals = [cols[i].number_input(f'{field} · {crop}', min_value=0., value=None, key=f'v4_{crop}_{field}')
                     for i, field in enumerate(('yield', 'price', 'cost'))]
@@ -245,24 +334,47 @@ def farm():
             inputs = api.UserInputs(current_plan=plan, water=api.WaterInput(mode=mode, source=source, normal_mm=normal, dry_mm=dry),
                                     farm_acres=acres, soil_test=soil, history=history, crop_overrides=overrides)
             with st.status('Checking feasible rotations…', expanded=True) as status:
-                candidates = api.get_candidates(site, inputs)
-                st.write(f'Climate and crop availability checked: {len(candidates)} candidate crops.')
-                if not candidates:
-                    st.warning('No supported crops are available here with these inputs.')
+                if not score_rotations(site, inputs):
                     return
-                st.write('Running weather scenarios and scoring rotations through the recommendation API…')
-                sliders = api.Sliders(bad_year=.3, water=.1, soil=.5, profit_tolerance_pct=0., climate_shift='historical')
-                rec = api.recommend(site, inputs, sliders)
-                st.session_state.update(v4_inputs=inputs, v4_rec=rec, v4_screen='results',
-                                        v4_controls=(.3, .1, .5, 0., 'historical'))
-                st.session_state['_v5_go'] = 'Recommendations'
-                st.session_state.pop('v4_tipping_result', None)
-                st.session_state.pop('v4_questions', None)
+                st.session_state.pop('v4_example_farm', None)
                 status.update(label='Rotations scored', state='complete')
             st.rerun()
         except Exception:
             logging.exception('Recommendation calculation failed')
             st.error('Could not calculate recommendations. Your farm details are preserved; try again.')
+
+
+def _years(value, default):
+    return f'{value[0]} to {value[1]}' if isinstance(value, (list, tuple)) and len(value) == 2 else str(value or default)
+
+
+def _day_of_year(doy):
+    """Day of year as a calendar date in a non-leap year, for example 132 -> 12 May."""
+    import datetime
+    d = datetime.date(2023, 1, 1) + datetime.timedelta(days=int(round(float(doy))) - 1)
+    return f'{d.day} {d.strftime("%b")}'
+
+
+def climate_rows(trend):
+    """Display rows for the climate card: plain names, rounded values and the change. Display formatting only."""
+    trend = record(trend)
+    threshold = trend.get('heat_threshold_c')
+    hot = f'Days above {threshold:g}°C ({threshold * 9 / 5 + 32:.0f}°F) per season' if finite_number(threshold) else 'Very hot days per season'
+    spec = {'season_rain_mm': ('Growing-season rain', lambda v: f'{v:,.0f} mm', lambda a, b: f'{b - a:+,.0f} mm ({(b - a) / a * 100:+.0f}%)' if a else f'{b - a:+,.0f} mm'),
+            'rain_variability_cv': ('Year-to-year swing in rain', lambda v: f'{v * 100:.0f}% of average', lambda a, b: f'{(b - a) * 100:+.0f} points'),
+            'heat_days': (hot, lambda v: f'{v:.1f} days', lambda a, b: f'{b - a:+.1f} days'),
+            'rainy_season_start_doy': ('Rains start (team rule of thumb)', _day_of_year,
+                                       lambda a, b: 'no change' if round(b - a) == 0 else f'{abs(b - a):.0f} days ' + ('later' if b > a else 'earlier'))}
+    rows = []
+    for name, (label, fmt, change) in spec.items():
+        pair = trend.get(name)
+        if isinstance(pair, dict):
+            pair = (pair.get('baseline'), pair.get('recent'))
+        if not (isinstance(pair, (list, tuple)) and len(pair) == 2 and all(finite_number(v) for v in pair)):
+            continue
+        rows.append({'name': name, 'Measure': label, 'Baseline': fmt(pair[0]), 'Recent': fmt(pair[1]), 'Change': change(pair[0], pair[1]),
+                     'Data label': provenance(record(trend.get('badges')).get(name, 'estimated'))})
+    return rows
 
 
 def climate_card(site):
@@ -271,19 +383,18 @@ def climate_card(site):
     if not trend:
         st.info('Climate comparison is unavailable for this location.')
         return
-    rows = []
-    for name in ('season_rain_mm', 'rain_variability_cv', 'heat_days', 'rainy_season_start_doy'):
-        pair = trend.get(name)
-        if isinstance(pair, (list, tuple)) and len(pair) == 2:
-            rows.append({'Measure': name.replace('_', ' ').title(), 'Baseline': pair[0], 'Recent': pair[1],
-                         'Source': provenance(record(trend.get('badges')).get(name, 'estimated'))})
-        elif isinstance(pair, dict):
-            rows.append({'Measure': name.replace('_', ' ').title(), 'Baseline': pair.get('baseline'), 'Recent': pair.get('recent')})
-    st.caption(f"Baseline {trend.get('early_years', '1981–2000')} · Recent {trend.get('late_years', 'latest 20 full years')} · NASA POWER")
+    early, late = _years(trend.get('early_years'), '1981 to 2000'), _years(trend.get('late_years'), 'the latest 20 full years')
+    st.caption(f'NASA POWER daily weather at your pin: {late} compared with {early}. What already changed here, not a forecast.')
+    rows = climate_rows(trend)
     if rows:
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-    if trend.get('note'):
-        st.caption(trend['note'])
+        for col, row in zip(st.columns(len(rows)), rows):
+            col.metric(row['Measure'], row['Recent'], row['Change'] + ' vs ' + early.replace(' to ', '–'), delta_color='off',
+                       delta_arrow='off' if row['name'] == 'rainy_season_start_doy' else 'auto')
+        table = pd.DataFrame(rows).drop(columns='name').rename(columns={'Baseline': early, 'Recent': late})
+        with st.expander('The numbers behind this'):
+            st.dataframe(table, hide_index=True, use_container_width=True)
+            if trend.get('note'):
+                st.caption(trend['note'])
     stamp(trend, trend.get('badges'))
 
 
