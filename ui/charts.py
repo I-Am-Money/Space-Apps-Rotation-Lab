@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Plotly figures in the RotationLab style. Every function draws engine output; no numbers are made up here."""
 from __future__ import annotations
 
@@ -5,7 +6,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
-from ui.data import CROP_LABEL, ROT_NAME, plan_label
+from ui.data import CROP_LABEL, plan_label
 from ui.theme import CROP_COLOR, T, oklch
 
 FONT = '"Source Sans 3", system-ui, sans-serif'
@@ -80,11 +81,15 @@ def profit_dist(rots):
 
 
 def yearly_yield(rots):
+    """Average yield per plan year in quintals per acre as sold (rice as paddy). Falls back to kg per hectare."""
     fig = go.Figure()
+    q = all(r.get("yield_quintal_acre_mean") is not None for r in rots.values())
     for rid, r in rots.items():
-        fig.add_bar(x=[f"Year {i+1}" for i in range(4)], y=list(r["yield_mean"]), name=NAMES.get(rid, rid), marker=dict(color=ROT_COLOR.get(rid, T["mixed"]), cornerradius=4),
-                    customdata=[CROP_LABEL[c] for c in r["plan"]], hovertemplate="%{customdata}: %{y:,.0f} kg per ha<extra>" + NAMES.get(rid, rid) + "</extra>")
-    _layout(fig, 360, yt="Average yield (kg per hectare)", legend=False)
+        y = list(r["yield_quintal_acre_mean"]) if q else list(r["yield_mean"])
+        fig.add_bar(x=[f"Year {i+1}" for i in range(4)], y=y, name=NAMES.get(rid, rid), marker=dict(color=ROT_COLOR.get(rid, T["mixed"]), cornerradius=4),
+                    customdata=[CROP_LABEL[c] for c in r["plan"]],
+                    hovertemplate="%{customdata}: %{y:,.1f} " + ("quintals per acre" if q else "kg per ha") + "<extra>" + NAMES.get(rid, rid) + "</extra>")
+    _layout(fig, 360, yt="Average yield (quintals per acre)" if q else "Average yield (kg per hectare)", legend=False)
     fig.update_layout(barmode="group", bargap=0.25, bargroupgap=0.08)
     return fig
 
@@ -137,11 +142,14 @@ def residue_lines(rots):
         fig.add_scatter(x=[f"Year {i+1}" for i in range(4)], y=list(r["residue_index"]), mode="lines+markers", name=NAMES.get(rid, rid),
                         line=dict(color=ROT_COLOR.get(rid, T["mixed"]), width=2.5), marker=dict(size=8, line=dict(color=T["surface"], width=2)),
                         hovertemplate="%{y:.2f}<extra>" + NAMES.get(rid, rid) + "</extra>")
-    _layout(fig, 320, yt="Soil cover proxy (1 = best modeled yield for that crop)", legend=False)
+    _layout(fig, 320, yt="Soil-cover index (0 = bare, 1 = fully covered)", legend=False)
+    fig.update_yaxes(range=[0, 1])
     return fig
 
 
 def pareto(df, top_id, base_id="rice-rice-rice-rice"):
+    if "offered" in df:
+        df = df[df.offered.astype(bool)]
     fig = go.Figure()
     fig.add_scatter(x=df.mean_profit, y=df.worst10_profit, mode="markers", showlegend=False,
                     marker=dict(size=8, color=df.irrigation_mm, colorscale=[[0, "#dfe8de"], [1, T["rice"]]], opacity=0.9, line=dict(color=T["surface"], width=1),
@@ -151,14 +159,14 @@ def pareto(df, top_id, base_id="rice-rice-rice-rice"):
     fr = df[df.on_frontier].sort_values("mean_profit")
     fig.add_scatter(x=fr.mean_profit, y=fr.worst10_profit, mode="lines", name="Best trade-offs", line=dict(color=T["ink"], width=2, dash="dot"), hoverinfo="skip")
     t = df[df.id == top_id].iloc[0]
-    fig.add_scatter(x=[t.mean_profit], y=[t.worst10_profit], mode="markers+text", name="Recommended", text=["Recommended"], textposition="top left",
-                    textfont=dict(size=14, color=T["ink"]), marker=dict(size=17, color=T["jowar"], line=dict(color=T["ink"], width=2.5), symbol="diamond"),
+    fig.add_scatter(x=[t.mean_profit], y=[t.worst10_profit], mode="markers", name="Recommended",
+                    marker=dict(size=17, color=T["jowar"], line=dict(color=T["ink"], width=2.5), symbol="diamond"),
                     hovertemplate=plan_label(t.plan) + "<extra>Recommended</extra>")
     b = df[df.id == base_id]
     if len(b):
         b = b.iloc[0]
-        fig.add_scatter(x=[b.mean_profit], y=[b.worst10_profit], mode="markers+text", name="Our farm today", text=["Our farm today"], textposition="bottom right",
-                        textfont=dict(size=14, color=T["ink"]), marker=dict(size=15, color="#ffffff", line=dict(color=T["ink"], width=3)),
+        fig.add_scatter(x=[b.mean_profit], y=[b.worst10_profit], mode="markers", name="Our farm today",
+                        marker=dict(size=15, color="#ffffff", line=dict(color=T["ink"], width=3)),
                         hovertemplate="Our farm today (rice every year)<extra></extra>")
     _layout(fig, 460, xt="Average plan profit over 4 years (Rs per acre)", yt="Profit in the worst 10% of weather sequences (Rs per acre)", legend=False)
     return fig
@@ -193,33 +201,35 @@ def plan_colors(tp):
     ids |= {w for row in (tp.get("grid_upstream_local") or {}).get("winner", []) for w in row}
     for c in tp["rainfall_crossover"].get("crossovers", []):
         ids |= {c["from"], c["to"]}
-    ids |= set(tp["rainfall_crossover"].get("winner", [])[:1]) | set(tp["late_monsoon"]["rotations"])
+    ids |= set(tp["rainfall_crossover"].get("winner", [])) | set(tp["late_monsoon"]["rotations"])
+    ids |= set((tp.get("heat") or {}).get("rotations", {})) | {"rice-rice-rice-rice"}
     return winner_colors(ids)
 
 
-def tipping_grid(g, irr_now, colors, xkey="rain_mult", ykey="irrigation_mm", xt="Monsoon rainfall compared with usual (1.0 = usual)", yt="Irrigation water available (mm per season)", farm=None, hov=None):
-    ids = sorted({w for row in g["winner"] for w in row}, key=lambda s: (-s.split("-").count("rice"), s))
-    idx = {k: i for i, k in enumerate(ids)}
-    n = max(1, len(ids))
-    z = [[idx[w] for w in row] for row in g["winner"]]
+RICE_YEAR_COLORS = [oklch(0.95, 0.035, 120), oklch(0.87, 0.06, 165), oklch(0.75, 0.075, 205), oklch(0.60, 0.095, 228), T["rice"]]
+RICE_YEAR_LABELS = ["No rice", "Rice in 1 year of 4", "Rice in 2 years", "Rice in 3 years", "Rice every year"]
+
+
+def tipping_grid(g, irr_now, colors=None, xkey="rain_mult", ykey="irrigation_mm", xt="Monsoon rainfall compared with usual (1.0 = usual)", yt="Irrigation water available (mm per season)", farm=None, hov=None):
+    """Tipping-point map: each square is coloured by the number of rice years in the best rotation there (the plan
+    itself is in the hover). Dashed line = where rotations with two or more rice years start to win; dotted lines =
+    10th and 90th percentile of that line when the weather record is resampled. White circle = our farm today."""
+    ry = g.get("rice_years") or [[w.split("-").count("rice") for w in row] for row in g["winner"]]
     cs = []
-    for i, k in enumerate(ids):
-        cs += [[i / n, colors[k]], [(i + 1) / n, colors[k]]]
+    for i, c in enumerate(RICE_YEAR_COLORS):
+        cs += [[i / 5, c], [(i + 1) / 5, c]]
     text = [[plan_label(w) for w in row] for row in g["winner"]]
-    fig = go.Figure(go.Heatmap(x=g[xkey], y=g[ykey], z=z, colorscale=cs, zmin=-0.5, zmax=n - 0.5, showscale=False, xgap=2, ygap=2, text=text,
-                               hovertemplate=(hov or "Rain %{x:.2f} times usual<br>%{y:,.0f} mm irrigation water<br>Best: %{text}<extra></extra>")))
-    thr_l = g.get("rice_shift_threshold_mm") or []
-    xs = [m for m, t in zip(g[xkey], thr_l) if t is not None]
-    ys = [t for t in thr_l if t is not None]
-    if xs:
-        fig.add_scatter(x=xs, y=ys, mode="lines+markers", name="Shift to rice", line=dict(color=T["ink"], width=2.5, dash="dash", shape="hv"),
-                        marker=dict(size=6, color=T["ink"]), hovertemplate="Rice-majority wins above %{y:,.0f} mm<extra></extra>", showlegend=False)
-    band = g.get("boundary_band")
-    if band:
-        fig.add_scatter(x=g[xkey], y=band["p90"], mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False)
-        fig.add_scatter(x=g[xkey], y=band["p10"], mode="lines", line=dict(width=0), fill="tonexty",
-                        fillcolor="rgba(22,38,43,0.15)", name="Boundary, 10th-90th percentile", showlegend=False,
-                        hovertemplate="Bootstrap lower boundary: %{y:,.0f} mm<extra></extra>")
+    fig = go.Figure(go.Heatmap(x=g[xkey], y=g[ykey], z=ry, colorscale=cs, zmin=-0.5, zmax=4.5, showscale=False, xgap=2, ygap=2, text=text, customdata=ry,
+                               hovertemplate=(hov or "Rain %{x:.2f} times usual<br>%{y:,.0f} mm irrigation water<br>Best: %{text}<br>Rice years: %{customdata}<extra></extra>")))
+    def line(vals, name, dash, width, hover):
+        xs = [m for m, t in zip(g[xkey], vals or []) if t is not None]
+        ys = [t for t in (vals or []) if t is not None]
+        if xs:
+            fig.add_scatter(x=xs, y=ys, mode="lines", name=name, line=dict(color=T["ink"], width=width, dash=dash), hovertemplate=hover, showlegend=False)
+    band = g.get("boundary_band") or {}
+    line(band.get("p10"), "10th percentile", "dot", 1.5, "10th percentile of the line: %{y:,.0f} mm<extra></extra>")
+    line(band.get("p90"), "90th percentile", "dot", 1.5, "90th percentile of the line: %{y:,.0f} mm<extra></extra>")
+    line(g.get("rice_shift_threshold_mm"), "Shift to rice", "dash", 2.8, "Two or more rice years win above %{y:,.0f} mm<extra></extra>")
     fx, fy = farm if farm else (1.0, irr_now)
     fig.add_scatter(x=[fx], y=[fy], mode="markers",
                     marker=dict(size=18, color="#ffffff", line=dict(color=T["ink"], width=3.5)), hovertemplate="Our farm today<extra></extra>", showlegend=False)
@@ -227,14 +237,26 @@ def tipping_grid(g, irr_now, colors, xkey="rain_mult", ykey="irrigation_mm", xt=
                        bgcolor="#ffffff", bordercolor=T["ink"], borderwidth=1, borderpad=4, font=dict(size=14, color=T["ink"]))
     _layout(fig, 520 if ykey == "irrigation_mm" else 440, xt=xt, yt=yt, legend=False)
     fig.update_xaxes(gridcolor="rgba(0,0,0,0)", tickmode="array", tickvals=g[xkey], tickformat=".2f" if xkey != "rain_mult" else None); fig.update_yaxes(gridcolor="rgba(0,0,0,0)")
-    return fig, [(plan_label(k), colors[k]) for k in ids]
+    present = sorted({v for row in ry for v in row})
+    return fig, [(RICE_YEAR_LABELS[v], RICE_YEAR_COLORS[v]) for v in present]
+
+
+def curve_lines(curve, keep=("rice-rice-rice-rice",), extra=(), limit=5):
+    """Rotations worth drawing on a 1D what-if chart: our farm today, every rotation that is best somewhere, then extras."""
+    ids = []
+    for k in list(keep) + list(curve.get("winner", [])) + list(extra):
+        if k in curve["rotations"] and k not in ids:
+            ids.append(k)
+    return ids[:limit]
 
 
 def crossover(xo, colors):
+    """Score J of each rotation against the rainfall multiplier (v3 section 8.2): our farm today plus every rotation
+    that is best somewhere. Dashed lines mark where the number of rice years in the best rotation changes."""
     fig = go.Figure()
     band = xo.get("band") or {}
     if band.get("p10") is not None and band.get("p90") is not None:
-        fig.add_vrect(x0=band["p10"], x1=band["p90"], fillcolor=T["accent"], opacity=0.14, line_width=0, annotation_text="10th to 90th percentile", annotation_position="top left", annotation_font=dict(size=12, color=T["ink2"]))
+        fig.add_vrect(x0=band["p10"], x1=band["p90"], fillcolor=T["accent"], opacity=0.14, line_width=0, annotation_text="10th to 90th percentile of the first change", annotation_position="top left", annotation_font=dict(size=12, color=T["ink2"]))
     names = xo["candidates"]
     P = np.array(xo["J"])
     show = ["rice-rice-rice-rice"] if "rice-rice-rice-rice" in names else []
@@ -256,15 +278,55 @@ def crossover(xo, colors):
     return fig, [(plan_label(k), cols[k]) for k in show]
 
 
-def late_monsoon(lm, colors):
+def whatif_curve(curve, colors, xkey, xt, hover_unit, ids=None, ykey="J", yt="Score J for your priorities (Rs per acre)"):
+    """One line per rotation against a what-if (onset delay in days, or warming in degC)."""
     fig = go.Figure()
     items = []
-    for i, (k, r) in enumerate(lm["rotations"].items()):
-        items.append((plan_label(k), colors[k]))
-        fig.add_scatter(x=lm["days"], y=r["J"], mode="lines+markers", name=plan_label(k), line=dict(width=2.5, color=colors[k]),
-                        marker=dict(size=8, line=dict(color=T["surface"], width=2)), hovertemplate="%{x} days late: Rs %{y:,.0f}<extra>" + plan_label(k) + "</extra>")
-    _layout(fig, 320, xt="Days onset and sowing are delayed", yt="Priority score, J (Rs per acre)", legend=False)
+    for k in (ids or list(curve["rotations"])):
+        r = curve["rotations"][k]
+        col = colors.get(k, T["mixed"])
+        items.append((plan_label(k), col))
+        fig.add_scatter(x=curve[xkey], y=r.get(ykey) or r["mean_profit"], mode="lines+markers", name=plan_label(k), line=dict(width=2.5, color=col),
+                        marker=dict(size=8, line=dict(color=T["surface"], width=2)),
+                        hovertemplate="%{x:g} " + hover_unit + ": Rs %{y:,.0f}<extra>" + plan_label(k) + "</extra>")
+    _layout(fig, 320, xt=xt, yt=yt, legend=False)
     return fig, items
+
+
+def late_monsoon(lm, colors, ids=None):
+    return whatif_curve(lm, colors, "days", "Days the monsoon starts later than it really did", "days late", ids)
+
+
+def heat(hc, colors, ids=None):
+    return whatif_curve(hc, colors, "dT", "Warming added to every day (degrees C)", "degrees C warmer", ids)
+
+
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_MSTART = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
+
+
+def doy_label(doy) -> str:
+    """Day-of-year (1-based, 365-day year) as '11 Jun'."""
+    d = int(round(float(doy)))
+    d = min(max(d, 1), 365)
+    m = max(i for i in range(12) if _MSTART[i] < d)
+    return f"{d - _MSTART[m]} {MONTHS[m]}"
+
+
+def onset_history(mon):
+    """Monsoon onset day of each year of the record (observed rain, modeled rule), with the median."""
+    yrs, on = mon["years"], mon["onset_doy"]
+    fig = go.Figure()
+    fig.add_bar(x=yrs, y=[o - 151 for o in on], base=151, marker=dict(color=T["accent"], cornerradius=3), customdata=[doy_label(o) for o in on],
+                hovertemplate="%{x}: onset %{customdata}<extra></extra>")
+    med = mon["median_doy"]
+    fig.add_hline(y=med, line=dict(color=T["ink"], width=1.5, dash="dot"))
+    fig.add_annotation(x=0.01, xref="paper", xanchor="left", y=med, yanchor="bottom", yshift=4, text=f"Median {doy_label(med)}", showarrow=False,
+                       bgcolor=T["surface"], borderpad=2, font=dict(size=12, color=T["ink"]))
+    _layout(fig, 300, yt="Monsoon onset date", legend=False)
+    ticks = [152, 166, 182, 196, 213, 227, 244]
+    fig.update_yaxes(tickmode="array", tickvals=ticks, ticktext=[doy_label(t) for t in ticks], range=[150, max(max(on) + 6, 215)])
+    return fig
 
 
 def hindcast_scatter(d, crop, farm=None):

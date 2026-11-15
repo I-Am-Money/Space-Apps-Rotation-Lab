@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import numpy as np
 from engine import scenarios as sc
 from tests.decision_fakes import synthetic_annual
@@ -40,13 +41,20 @@ def test_whatif_rain_and_temperature():
     assert "not forecasts" in w["whatif"]["label"]
 
 
-def test_late_monsoon_conserves_total_and_delays():
+def test_late_onset_loses_early_monsoon_rain_and_moves_onset():
     a = synthetic_annual(10)
     s = sc.historical_blocks(a).scen
     w = sc.apply_whatif(s, shift_days=20)
-    assert np.allclose(w["precip"].sum(-1), s["precip"].sum(-1))
-    cum0 = s["precip"][..., 151:273].cumsum(-1); cum1 = w["precip"][..., 151:273].cumsum(-1)
-    assert np.all(cum1 <= cum0 + 1e-9)
+    assert np.all(w["precip"] <= s["precip"])                         # rain is lost, never added or moved
+    assert np.all(w["onset_doy"] == s["onset_doy"] + 20)              # onset (and so sowing) is 20 days later
+    on = s["onset_doy"]
+    for i in range(on.shape[0]):
+        for y in range(4):
+            o = int(on[i, y]) - 1
+            assert np.allclose(w["precip"][i, y, :o], s["precip"][i, y, :o])            # before the real onset: unchanged
+            assert np.all(w["precip"][i, y, o:o + 20] == 0)                              # the first 20 monsoon days: lost
+            assert np.allclose(w["precip"][i, y, o + 20:], s["precip"][i, y, o + 20:])  # after the delayed onset: unchanged
+    assert np.array_equal(sc.apply_whatif(s, shift_days=0)["precip"], s["precip"])
 
 
 def test_upstream_aligned_and_independent_multipliers():

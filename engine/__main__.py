@@ -48,7 +48,7 @@ def main():
                  ("priority_change", lambda: api.recommend({"lam": .9, "w": .9})),
                  ("supply_change", lambda: api.recommend({"canal_supply_mm": 300., "well_supply_mm": 100.}))]
         if args.include_tipping:
-            tasks += [("cold_tipping", lambda: api.tipping_points()), ("warm_tipping", lambda: api.tipping_points())]
+            tasks += [("cold_tipping", lambda: api.tipping_points({"boundary_scenarios": args.scenarios})), ("warm_tipping", lambda: api.tipping_points({"boundary_scenarios": args.scenarios}))]
         for label, fn in tasks:
             start = time.perf_counter(); fn()
             result[label + "_seconds"] = round(time.perf_counter() - start, 4)

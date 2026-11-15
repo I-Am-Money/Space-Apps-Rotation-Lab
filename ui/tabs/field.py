@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import html
 import io
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from ui import charts, data
-from ui.components import REGIONAL, badge, md, section, srcline, stat, stats, tab_head
+from ui.components import REGIONAL, badge, fmt_rs, md, section, srcline, stat, stats, tab_head
 from ui.data import CROP_LABEL
 
 GIBS_FILE = Path(__file__).resolve().parents[2] / "data" / "gibs_layers.json"
@@ -40,14 +41,14 @@ def _gibs_layers():
 
 
 def render():
-    tab_head("My Field", "Our farm grows rice every year today. Set the water you can count on, then see what else could work.")
+    tab_head("Our Farm", "A rice farm in Nalgonda, Telangana. It grows rice every year today. Set the water you can count on, then see what else could work.")
     with st.spinner(data.MSG["get_field_summary"]):
         fs = data.field_summary()
     reg, cl, soil = fs["region"], fs["climate"], fs["soil"]
     V = data.V()
     with st.expander("Import anonymous farm records"):
         st.caption("CSV columns: year, crop, area_acres, yield_quintals; optional costs_rupees. Use no names, contact details or village locations. Imports stay in this session.")
-        uploaded = st.file_uploader("Farm harvest records (CSV, up to 2 MB)", type=["csv"], key="farm_csv")
+        uploaded = st.file_uploader("Farm harvest records (CSV, up to 2 MB)", type=["csv"], key=f"farm_csv_{st.session_state.get('farm_upload_version', 0)}")
         if uploaded is not None:
             try:
                 if uploaded.size > 2 * 1024 * 1024:
@@ -60,6 +61,7 @@ def render():
                 st.error(str(error))
         if st.session_state.get("farm_records") and st.button("Clear imported records"):
             del st.session_state["farm_records"]
+            st.session_state["farm_upload_version"] = st.session_state.get("farm_upload_version", 0) + 1
             st.rerun()
     with st.expander("Crop costs and heat sensitivity"):
         st.checkbox("Include flowering heat sensitivity", value=V["heat_enabled"], **data.bind("heat_enabled"))
@@ -74,11 +76,27 @@ def render():
                     min_value=0., value=float(costs.get(crop, prices["operating_cost_rs_per_acre"].get(crop, 0))),
                     step=500., key=f"local_cost_{crop}", on_change=_save_crop_cost, args=(crop,))
             V["cost_values"] = costs
-            for key, label, source in (("irrigation_cost", "Additional irrigation cost (Rs per m3)", "irrigation_cost_rs_per_m3"),
-                                       ("soil_test_cost", "Soil test quote for the farm (Rs)", "soil_test_cost_rs"),
+            for key, label, source in (("soil_test_cost", "Soil test quote for the farm (Rs)", "soil_test_cost_rs"),
                                        ("water_test_cost", "Water-supply measurement quote for the farm (Rs)", "water_measure_cost_rs")):
-                V[key] = st.number_input(label, min_value=0., value=float((prices[source] or 0) if V[key] is None else V[key]), step=1., **data.bind(key))
-            st.caption("Local inputs apply only to this session. Include only extra irrigation charges here if operating costs already include irrigation, to avoid double counting.")
+                V[key] = st.number_input(label, min_value=0., value=prices[source] if V[key] is None else float(V[key]), placeholder="Enter a verified quote", step=1., **data.bind(key))
+            st.caption("Local inputs apply only to this session. Operating costs include irrigation; the water-priority slider is a planning preference, not a bill.")
+
+    # --- baseline card: rotation A, rice every year (v3 section 9, tab 1)
+    p = data.params()
+    with st.spinner(data.MSG["recommend"]):
+        rec = data.recommend(p)
+    mb = "placeholder" if data.is_mock() else "modeled"
+    mdf = rec["metrics"]
+    a = mdf[mdf.id == "rice-rice-rice-rice"]
+    if len(a):
+        a = a.iloc[0]
+        section("Our farm today: rice every year (Rotation A)", mb, "This is the baseline. Every other plan in the tool is shown as a difference from it.")
+        stats([
+            stat("Average profit over 4 years", fmt_rs(a.mean_profit), "per acre", mb, f"{fmt_rs(data.farm_total(a.mean_profit))} for {data.ACRES:,.0f} acres" if data.ACRES else ""),
+            stat("In the worst 10% of weather sequences", fmt_rs(a.worst10_profit), "per acre", mb, f"{fmt_rs(data.farm_total(a.worst10_profit))} for {data.ACRES:,.0f} acres" if data.ACRES else ""),
+            stat("Irrigation water over 4 years", f"{a.irrigation_mm:,.0f}", "mm", mb, f"{data.m3(a.irrigation_mm):,.0f} m3 on the farm" if data.m3(1) else ""),
+        ])
+        md('<p class="rl-note">District-scale estimate from regional weather, district yields and state cost surveys. It is not a measurement of this farm. Prices are this season\'s minimum support prices and do not change between years.</p>')
 
     # --- rice irrigation supply: canal plus well
     section("Rice irrigation water", "assumption", "Rice gets canal water first. Wells cover what the canal does not, up to their limit. By default the model works both out from rainfall. Override either one with your own figure.")
@@ -102,15 +120,10 @@ def render():
     rng = fs_["awc_range"]
     if isinstance(rng, (list, tuple)) and len(rng) == 2:
         awc_txt = f'{rng[0]:g} to {rng[1]:g}'
-        awc_note = f'Source: {html.escape(str(fs_["awc_source"] or "not stated"))}. {badge("assumption")}'
+        awc_note = f'{badge("assumption")} <details style="margin-top:.4rem"><summary style="cursor:pointer;font-weight:600">Source for this range</summary><p style="margin:.3rem 0 0;font-size:.9rem">{html.escape(str(fs_["awc_source"] or "not stated"))}</p></details>'
     else:
         awc_txt = "Not set"
         awc_note = f'The black-soil water holding range has no cited source yet. {badge("assumption")} team to verify'
-    try:
-        from engine import fetch_soil
-        fsoil = fetch_soil.farm_soil()
-    except Exception:
-        fsoil = None
     s1, s2 = st.columns(2, gap="large")
     with s1:
         stats([stat(html.escape(fs_["soil_name"]), awc_txt, "mm per metre" if isinstance(rng, (list, tuple)) else "", "assumption", "Literature range; soil type supplied by the farm")])
@@ -126,7 +139,7 @@ def render():
     st.segmented_control("Soil used by the model", ["farm", "district"], format_func=lambda k: {"farm": "Farm soil (black soil)", "district": "District estimate (SoilGrids)"}[k],
                          default=V["soil_mode"], key="w_soil_mode", on_change=lambda: V.update(soil_mode=st.session_state.get("w_soil_mode") or "farm"))
 
-    c1, c2, c3 = st.columns([1, 1, 1.2], gap="large")
+    c2, c3 = st.columns([1, 1.2], gap="large")
     with c2:
         st.checkbox("I have a soil test for water holding capacity", value=V["use_soil_test"], **data.bind("use_soil_test"))
         if V["use_soil_test"]:
@@ -205,22 +218,40 @@ def _climate_cards(cl, soil):
 
 
 def _baseline_and_yields(fs):
+    mon = fs.get("monsoon_onset")
+    if mon:
+        section("When the monsoon arrives", mon.get("badge", "modeled"),
+                "Every crop is sown when the monsoon arrives, so a late monsoon means late sowing. The onset date of each year is worked out from the daily rain record with one fixed rule.")
+        stats([
+            stat("Usual onset (median)", charts.doy_label(mon["median_doy"]), "", mon.get("badge", "modeled"), f'{len(mon["years"])} years of daily rain'),
+            stat("Earliest", charts.doy_label(mon["earliest_doy"]), "", mon.get("badge", "modeled"), f'in {mon["earliest_year"]}'),
+            stat("Latest", charts.doy_label(mon["latest_doy"]), "", mon.get("badge", "modeled"), f'in {mon["latest_year"]}'),
+        ])
+        charts.show(charts.onset_history(mon), "onset_hist")
+        nc = mon.get("no_clean_onset_years") or []
+        srcline(f'Daily rain from NASA POWER (regional estimate). Onset rule: {mon["rule"]}.'
+                + (f' No clean onset was found in {", ".join(str(y) for y in nc)}; 1 September is used for those years.' if nc else "")
+                + " The numbers in the rule are assumptions, team to verify.", "Source")
+
     yh = fs.get("yield_history")
-    section("Our farm today: rice every year", "modeled", "Baseline results for the current soil, water, cost and priority inputs. Profit totals cover four years.")
-    base = data.recommend(data.params())["metrics"]
-    base = base[base.id == "rice-rice-rice-rice"].iloc[0]
-    stats([stat("Average profit", f'Rs {base.mean_profit:,.0f}', "per acre", "modeled"),
-           stat("Bad-year profit, worst 10%", f'Rs {base.worst10_profit:,.0f}', "per acre", "modeled"),
-           stat("Irrigation over four years", f'{base.irrigation_mm:,.0f}', "mm", "modeled")])
     if yh:
         yh = pd.DataFrame(yh)
         section("District yield history", "placeholder" if data.is_mock() else "observed",
-                "Average yields for the district, all farms together. Rice here mixes irrigated and rainfed fields.")
+                "Average yields for the district, all farms together. Rice is reported as milled rice (paddy times 0.66) and mixes irrigated and rainfed fields.")
         charts.show(charts.yield_history(yh), "yh")
-        srcline("ICRISAT district-level yields as loaded by the app. Crops with no district record are not drawn.", "Data source")
+        srcline("ICRISAT/TCI apportioned district yields, 1966-2017, archived by the World Bank (RR_IND_2025_488). Four selected crops each have 52 positive-yield years. Historical district boundaries differ from today.", "Data source")
         with st.expander("Show these numbers as a table"):
             t = yh.pivot_table(index="year", columns="crop", values="yield_kg_ha").rename(columns=CROP_LABEL).round(0).reset_index().rename(columns={"year": "Year"})
             st.dataframe(t, hide_index=True, width="stretch")
     else:
         section("District yield history")
         md(f'<div class="rl-nodata">{badge("placeholder")} No district yield data is loaded yet, so nothing is drawn. Nothing has been made up.</div>')
+
+    uploaded_records = st.session_state.get("farm_records")
+    fr = {"rows": uploaded_records} if uploaded_records else fs.get("farm_records")
+    section("Farm records", "local")
+    if fr and fr.get("rows"):
+        md('<p class="rl-note">Your anonymous harvest records, provided as local inputs.</p>')
+        st.dataframe(pd.DataFrame(fr["rows"]), hide_index=True, use_container_width=True)
+    else:
+        md('<p class="rl-note">No farm records have been added yet. Import an anonymous harvest CSV above to compare your records with the district model.</p>')

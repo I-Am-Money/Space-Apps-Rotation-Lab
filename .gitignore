@@ -11,3 +11,5 @@ output/
 data/cache/
 *.nbc
 *.nbi
+
+data/raw/farm_records.csv

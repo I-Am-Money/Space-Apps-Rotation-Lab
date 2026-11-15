@@ -9,3 +9,5 @@ data/cache
 assets/screens
 data/raw/icrisat_mendeley
 data/raw/sources
+
+data/raw/farm_records.csv

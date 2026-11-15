@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Crop parameters and assumption lookup. Reads config/assumptions.yaml (nothing hard-coded here)."""
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ def A(params: dict | None, name: str):
         if name in params:
             return params[name]
         leaf = name.rsplit(".", 1)[-1]
-        if leaf in params and not name.startswith("crops."):
+        if leaf in params and not name.startswith(("crops.", "heat.tmax_c.", "heat.flowering_days.", "soil_cover.score.")):
             return params[leaf]
     return load_assumptions()[name]["value"]
 
@@ -77,17 +78,24 @@ class CropParams:
         return kc
 
 
+@lru_cache(maxsize=1)
+def _prices_yaml() -> dict:
+    return (yaml.safe_load(PRICES_PATH.read_text()) or {}) if PRICES_PATH.exists() else {}
+
+
 def _ym_from_prices(crop: str):
     if not PRICES_PATH.exists():
-        return None
+        return None, None
     d = _prices_data(PRICES_PATH.stat().st_mtime_ns)
     y = d.get("potential_yield_kg_ha")
     if not isinstance(y, dict) or crop not in y:
-        return None
+        return None, None
     v = y[crop]
+    badge = "observed"
     if isinstance(v, dict):
+        badge = v.get("badge", "observed")
         v = v.get("value")
-    return None if v is None else float(v)
+    return (None, None) if v is None else (float(v), badge)
 
 
 @lru_cache(maxsize=2)
@@ -99,7 +107,7 @@ def load_crops(params: dict | None = None) -> dict[str, CropParams]:
     out = {}
     for c in CROP_IDS:
         g = lambda k: A(params, f"crops.{c}.{k}")
-        ym = _ym_from_prices(c)
+        ym, ym_badge = _ym_from_prices(c)
         meta = (_prices_data(PRICES_PATH.stat().st_mtime_ns).get("potential_yield_kg_ha") or {}).get(c, {})
         ym_badge = meta.get("badge", "modeled") if isinstance(meta, dict) else "modeled"
         if ym is None:

@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Decision API (engine-decision) exactly as in engine/CONTRACT.md.
 
 Scenario set for optimisation: 500 bootstrap plans of 4 random real years (seed 42).
@@ -6,7 +7,6 @@ BOUNDARY_N_SCEN trims it (stated in outputs).
 """
 from __future__ import annotations
 
-import time
 import copy
 import json
 from pathlib import Path
@@ -25,7 +25,7 @@ from engine.configuration import version as configuration_version
 IS_MOCK = False
 ROOT = Path(__file__).resolve().parent.parent
 N_SCEN = sc.N_BOOT
-BOUNDARY_N_SCEN = 500
+BOUNDARY_N_SCEN = 150
 _ANNUAL = None          # tests may inject via set_annual()
 _ANNUAL_REV = 0
 _TIPPING_CACHE = ArrayCache(16 * 1024 * 1024)
@@ -50,16 +50,17 @@ def annual() -> dict:
 
 def boot_set(n=None) -> sc.ScenSet:
     n = n or N_SCEN
-    k = ("boot", n)
+    k = ("boot", n, configuration_version(include_data=True), _ANNUAL_REV)
     if k not in _scensets:
         _scensets[k] = sc.bootstrap_plans(annual(), n)
     return _scensets[k]
 
 
 def hist_set() -> sc.ScenSet:
-    if "hist" not in _scensets:
-        _scensets["hist"] = sc.historical_blocks(annual())
-    return _scensets["hist"]
+    key = ("hist", configuration_version(include_data=True), _ANNUAL_REV)
+    if key not in _scensets:
+        _scensets[key] = sc.historical_blocks(annual())
+    return _scensets[key]
 
 
 # ---------------------------------------------------------------- params
@@ -136,7 +137,7 @@ def norm_params(params=None) -> dict:
         return value
     for key, limits in {"lam": (0, 1), "w": (0, 1), "irrigation_mm": (0, 10000),
                         "awc_mm_per_m": (1, 1000), "canal_supply_mm": (0, 10000), "well_supply_mm": (0, 10000),
-                        "price_mult": (0, 10), "water_value_rs_m3": (0, 5), "recharge_exponent_k": (0, 3), "canal_release_factor": (0, 3)}.items():
+                        "price_mult": (0, 10), "water_value_rs_m3": (0, 10), "recharge_exponent_k": (0, 3), "canal_release_factor": (0, 3)}.items():
         if p.get(key) is not None:
             number(key, 0, *limits)
     if p.get("water_source") not in (None, *WATER_SOURCE_LABEL):
@@ -149,7 +150,7 @@ def norm_params(params=None) -> dict:
         if crop not in opt.CROPS or not np.isfinite(float(value)) or float(value) < 0:
             raise ValueError("Cultivation costs must be nonnegative and use selected crops")
         overrides[f"cost.{crop}"] = float(value)
-    for key in ("irrigation_cost_rs_per_m3", "soil_test_cost_rs", "water_measure_cost_rs"):
+    for key in ("soil_test_cost_rs", "water_measure_cost_rs"):
         if p.get(key) is not None:
             overrides[key] = number(key, 0, 0, 1e7)
     soil_mode = p.get("soil_mode") or "farm_black_soil"
@@ -171,7 +172,7 @@ def norm_params(params=None) -> dict:
     if ws == "canal_and_well":
         irr_default = (_assump("base_canal") if cs is None else float(cs)) + (_assump("base_well") if wsup is None else min(float(wsup), _assump("max_well")))
     return {"water_source": ws, "water_source_requested": requested, "soil_mode": soil["mode"], "soil_mode_requested": soil_mode, "canal_supply_mm": None if cs is None else float(cs),
-            "well_supply_mm": None if wsup is None else float(wsup), "lam": float(p.get("lam", 0.5)), "w": float(p.get("w", 0.2)),
+            "well_supply_mm": None if wsup is None else float(wsup), "lam": float(p.get("lam", 0.3)), "w": float(p.get("w", 0.1)),
             "irrigation_mm": float(p["irrigation_mm"]) if p.get("irrigation_mm") is not None else irr_default,
             "awc_mm_per_m": p.get("awc_mm_per_m"), "soil": soil, "awc": float(p["awc_mm_per_m"]) if p.get("awc_mm_per_m") is not None else awc_d,
             "current_rotation": list(p.get("current_rotation") or opt.REF["A"]),
@@ -180,7 +181,7 @@ def norm_params(params=None) -> dict:
             "recharge_exponent_k": p.get("recharge_exponent_k"),
             "canal_release_factor": p.get("canal_release_factor"),
             "heat_enabled": bool(p.get("heat_enabled", True)), "economic_overrides": overrides,
-            "water_value_rs_m3": number("water_value_rs_m3", _dfs(_yaml("assumptions.yaml"), ("water_value_rs_m3",)), 0, 5),
+            "water_value_rs_m3": number("water_value_rs_m3", opt.water_price_proxy_rs_per_mm_acre() / economics.M3_PER_MM_ACRE, 0, 10),
             "boundary_scenarios": int(number("boundary_scenarios", BOUNDARY_N_SCEN, 10, 1000))}
 
 
@@ -189,10 +190,31 @@ def _assump(name: str) -> float:
     return float(crops.A(None, f"rice_irrigation.{name}"))
 
 
+def _assump_any(name: str):
+    from engine import crops
+    return crops.A(None, name)
+
+
+def soil_cover_trend(plan) -> dict:
+    """v3 section 5.6: residue / soil-cover index (0 to 1) from a simple per-crop rule in assumptions.yaml.
+    index[y] = carry * index[y-1] + (1 - carry) * score(crop in year y); year 0 = rice (our farm today).
+    Soil organic carbon is reported as a direction only."""
+    carry = float(_assump_any("soil_cover.carry"))
+    start = float(_assump_any("soil_cover.score.rice"))
+    idx, out = start, []
+    for c in plan:
+        idx = carry * idx + (1.0 - carry) * float(_assump_any(f"soil_cover.score.{c}"))
+        out.append(float(idx))
+    d = out[-1] - start
+    arrow = "up" if d > 1e-9 else ("down" if d < -1e-9 else "flat")
+    return {"index": out, "start": start, "change_vs_rice_only": d, "soc_direction": arrow,
+            "soc_note": "direction only; too slow to quantify over 4 years", "badge": "assumption",
+            "rule": "cover index = carry x last year's index + (1 - carry) x the crop's cover score (assumptions.yaml soil_cover)"}
+
+
 def _median_rain() -> float:
     """Median rice-season rain of the BASE (un-adjusted) bootstrap set; fixed so rainfall what-ifs
     reduce irrigation availability instead of rescaling the median with them."""
-    from engine import crops
     return float(np.median(annual()["precip"][:, 151:304].sum(1)))
 
 
@@ -252,11 +274,13 @@ def _badges(p):
             "rotation_effects": "assumption", "econ_detail": economics.economics_badges(prices)}
 
 
-def _table(p, n=None):
+def _table(p, n=None, extra=()):
+    """Metrics table over the offered rotations, plus (not offered, never recommended) the user's current rotation
+    and any `extra` rotation that the team rule blocks, so they can still be compared."""
     opt.configure()
     _apply_sim_params(p)
     ss = boot_set(n)
-    df = opt.evaluate_table(ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"])
+    df = opt.evaluate_table(ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"], extra=[p["current_rotation"], *extra])
     return ss, opt.rescore(df, p["lam"], p["w"], p["water_value_rs_m3"] * economics.M3_PER_MM_ACRE)
 
 
@@ -292,9 +316,12 @@ def farm_soil_info():
     return None
 
 
+SOIL_MODE_ALIASES = {"farm": "farm_black_soil", "district": "district_soilgrids"}      # names the UI uses
+
+
 def active_soil(p) -> dict:
     """Soil used for AWC: farm black soil (default) if available, else the district SoilGrids estimate."""
-    mode = p.get("soil_mode", "farm_black_soil")
+    mode = SOIL_MODE_ALIASES.get(p.get("soil_mode") or "farm_black_soil", p.get("soil_mode") or "farm_black_soil")
     if mode == "farm_black_soil":
         fs = farm_soil_info()
         if fs:
@@ -346,9 +373,9 @@ def get_field_summary() -> dict:
     a = annual()
     yrs = a["years"]
     mr = sc.monsoon_rain(a)
-    from engine.monsoon import detect_onset
-    onset = detect_onset(a["precip"])
-    valid_onset = onset[onset < 365]
+    from engine import monsoon
+    monsoon_data = monsoon.summary(a)
+    onset = np.asarray(monsoon_data["onset_doy"])
     out = {"region": reg, "dev_placeholder": bool(reg.get("dev_placeholder", False)),
            "climate": {"first_year": int(yrs[0]), "last_year": int(yrs[-1]), "annual_rain_mm": float(a["precip"].sum(1).mean()),
                        "monsoon_rain_mm": float(mr.mean()), "monsoon_rain_p10_mm": float(np.percentile(mr, 10)),
@@ -359,10 +386,11 @@ def get_field_summary() -> dict:
     out["climate"]["monthly_tmax_c"] = [float(a["tmax"][:, mon[i]:mon[i + 1]].mean()) for i in range(12)]
     out["climate"]["monthly_et0_mm"] = [float(a["et0"][:, mon[i]:mon[i + 1]].sum(1).mean()) for i in range(12)]
     out["soil"] = dict(soil_info())
-    out["climate"]["onset"] = {"years": yrs.tolist(), "doy": (onset + 1).tolist(),
-        "median_doy": None if not len(valid_onset) else int(np.median(valid_onset)) + 1,
-        "no_onset_years": yrs[onset == 365].tolist(), "badge": "modeled",
+    out["climate"]["onset"] = {"years": yrs.tolist(), "doy": onset.tolist(),
+        "median_doy": monsoon_data["median_doy"],
+        "no_onset_years": monsoon_data["no_clean_onset_years"], "badge": "modeled",
         "note": "Wet-window / dry-spell planning rule applied to NASA POWER rainfall; sowing follows onset. Not an official IMD onset date."}
+    out["monsoon_onset"] = monsoon_data
     obs = hc.load_observed()
     out["yield_history"] = None if obs is None else obs.to_dict("records")
     fr = hc.load_farm_records()
@@ -386,7 +414,9 @@ def _stress_rows(plan, p, stress, base_rows=None):
         rows.append({"test": name, "label": t["label"], "source_year": t["source_year"], "description": t["description"],
                      "profit": float(at["profit"][0]), "yield_kg_ha": at["yield"][0].tolist(),
                      "water_stress_mm": float(at["stress"][0]), "irrigation_mm": float(at["irrig"][0]),
-                     "total_water_mm": float(at["total"][0])})
+                     "hot_days": None if at.get("hot_days") is None else at["hot_days"][0].tolist(),
+                     "sowing_doy": None if at.get("sowing_doy") is None else at["sowing_doy"][0].tolist(),
+                     "plan_year": t.get("plan_year"), "total_water_mm": float(at["total"][0])})
     if p["water_source"] == "canal":      # x0.5 what-if only for the older canal mode; canal_and_well uses the real low-upstream year
         ms = sc.median_year_scenario(annual())
         f = sc.CANAL_LOW_RELEASE_FACTOR
@@ -409,34 +439,27 @@ def _stress_rows(plan, p, stress, base_rows=None):
 
 def compare(rotation_ids: list, params=None) -> dict:
     p = norm_params(params)
-    ss, df = _table(p)
+    ss, df = _table(p, extra=[_resolve(r, p) for r in rotation_ids])
     hist = hist_set()
     prices = opt.current_prices()
     stress = {k: v for k, v in sc.stress_tests(annual()).items()
               if k != "low canal release year" or p["water_source"] == "canal_and_well"}
     base_plan = list(opt.REF["A"])
     base_st = _stress_rows(base_plan, p, stress)
-    brow = df[df.id == opt.plan_id(base_plan)].iloc[0]
     out = {"params": p, "badges": _badges(p), "n_scenarios": ss.n, "scenario_note": ss.note,
            "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today", "water_source": _water_flag(p),
            "farm": {"acres": farm_info()["acres"], "badge": farm_info()["acres_badge"], "m3_per_acre_per_mm": farm_info()["m3_per_acre_per_mm"]},
            "crop_selection": {"millets": list(opt.MILLETS), "source": opt.SELECTION_SOURCE},
            "fixed_prices_note": prices["fixed_prices_note"], "rotations": {}}
-    ym = {}
     for rid in rotation_ids:
         plan = _resolve(rid, p)
         a = opt.rotation_arrays(plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])
         m = opt.metrics(a)
         ah = opt.rotation_arrays(plan, hist, p["awc"], p["irrigation_mm"], p["price_mult"])
-        # residue_index: PROXY = modeled yield / best modeled yield for that crop across the set (not measured residue)
-        resid = []
-        for y, c in enumerate(plan):
-            if c not in ym:
-                ym[c] = max(1e-9, float(opt.rotation_arrays([c] * 4, ss, p["awc"], p["irrigation_mm"], p["price_mult"])["yield"].max()))
-            resid.append(float(np.clip(a["yield"][:, y].mean() / ym[c], 0, 1)))
+        cover = soil_cover_trend(plan)
         row = df[df.id == opt.plan_id(plan)].iloc[0]
         out["rotations"][rid] = {"plan": plan, "profit": a["profit"], "yield_kg_ha": a["yield"], "yield_mean": a["yield"].mean(0),
-            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(row.J),
+            "profit_year_mean": a["profit_year"].mean(0), **m, "J": float(row.J), "offered": bool(row.offered),
             "delta_vs_baseline": opt.delta_vs_baseline(row),
             "farm_totals": farm_totals({**m, "irrigation_canal_mm": None if a["irrig_canal"] is None else float(a["irrig_canal"].mean()),
                                         "irrigation_well_mm": None if a["irrig_well"] is None else float(a["irrig_well"].mean())}),
@@ -445,7 +468,11 @@ def compare(rotation_ids: list, params=None) -> dict:
             "irrigation_well_mm": None if a["irrig_well"] is None else float(a["irrig_well"].mean()),
             "irrigation_source_note": "canal = proxy for canal releases from upstream monsoon rain; wells = simplified recharge proxy",
             "profit_delta_distribution": a["profit"] - opt.rotation_arrays(base_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])["profit"],
-            "residue_index": resid, "residue_index_note": "proxy: modeled yield relative to best modeled yield of that crop, not measured residue",
+            "residue_index": cover["index"], "residue_index_note": cover["rule"], "soil_cover": cover,
+            "yield_quintal_acre_mean": (economics.kg_ha_to_quintal_acre(a["yield"].mean(0))
+                                        * np.array([prices["sold_kg_per_yield_kg"].get(c, 1.0) for c in plan])).tolist(),
+            "yield_unit_note": "quintals per acre as sold: rice as paddy (milled rice / 0.66), other crops as grain",
+            "hot_days_mean": None if a.get("hot_days") is None else a["hot_days"].mean(0).tolist(),
             "historical_blocks": {"labels": hist.scen["labels"], "profit": ah["profit"]},
             "stress_tests": _stress_rows(plan, p, stress, base_st), "badges": {"profit": "modeled", "water": "modeled", "yield": "modeled"}}
     return out
@@ -464,9 +491,7 @@ def land_split(alt_id, params=None) -> dict:
     aB = opt.rotation_arrays(alt_plan, ss, p["awc"], p["irrigation_mm"], p["price_mult"])
     k = np.arange(N + 1, dtype=float)[:, None]               # acres in rice
     w_rice, w_alt = k, (N - k)
-    def mix(x, y):
-        return w_rice * x[None, :] + w_alt * y[None, :]       # [N+1, S]
-    profit = mix(aA["profit"], aB["profit"])                  # farm total over the plan, Rs
+    profit = opt.combine_profit(aA["profit"], aB["profit"], N)   # farm total over the plan, Rs [N+1, S]
     S = profit.shape[1]
     nw = max(1, int(np.ceil(0.1 * S)))
     mean = profit.mean(1)
@@ -515,12 +540,18 @@ def recommend(params=None) -> dict:
     for v in rep.values():
         row = df[df.id == v["id"]].iloc[0]
         v["evidence"]["farm_totals"] = farm_totals(row.to_dict(), farm)
-    cols = ["id", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"] + list(opt.DELTA_FIELDS.values()) + [
+    cols = ["id", "offered", "mean_profit", "worst10_profit", "water_stress_mm", "irrigation_mm", "total_water_mm", "J", "rank", "on_frontier"] + list(opt.DELTA_FIELDS.values()) + [
         "irrigation_canal_mm", "irrigation_well_mm", "total_profit_mean", "total_profit_worst10", "total_irrigation_m3",
         "irrigation_canal_m3", "irrigation_well_m3", "total_water_m3", "d_total_profit_mean", "d_total_profit_worst10",
         "d_total_irrigation_m3", "d_total_water_m3"]
     pts = df[cols]
-    return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts,
+    be = opt.breakeven_shortfall(r["top"]["plan"], ss, p["awc"], p["irrigation_mm"], p["lam"], p["w"], p["price_mult"], df.attrs["scale"])
+    nofx = opt.without_rotation_effects(r["top"]["plan"], ss, p["awc"], p["irrigation_mm"], p["price_mult"])
+    if nofx is not None:
+        nofx["effects"] = {k: _assump_any(f"rotation.{k}") for k in ("rice_after_rice", "rice_after_pigeonpea", "millet_after_pigeonpea",
+                                                                      "millet_after_millet", "n_credit_after_pigeonpea")}
+    return {"params": p, "top": r["top"], "runner_up": r["runner_up"], "metrics": df, "pareto": pts, "breakeven": be,
+            "no_rotation_effects": nofx,
             "baseline_id": opt.BASELINE_ID, "baseline_label": "A: rice x4, our farm today",
             "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "label": farm["label"],
                      "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"], "soil": p["soil"]},
@@ -528,6 +559,7 @@ def recommend(params=None) -> dict:
             "water_source": _water_flag(p), "crop_selection": {"millets": list(opt.MILLETS), "source": opt.SELECTION_SOURCE},
             "three_strategy_report": rep, "badges": _badges(p), "n_scenarios": ss.n,
             "scale_rs_per_mm": df.attrs["scale"],
+            "water_price_proxy": {"value_rs_per_mm_ha": p["water_value_rs_m3"] * 10, "badge": "assumption", "note": "Planning preference, never a charge deducted from profit"},
             "objective": "J = (1-lam)*mean + lam*worst10 - w*scale*irrigation_mm",
             "fixed_prices_note": economics.load_prices()["fixed_prices_note"]}
 
@@ -539,12 +571,12 @@ def tipping_points(params=None) -> dict:
     if cached is not None:
         return copy.deepcopy(cached)
     ss, df = _table(p)
-    count = min(p["boundary_scenarios"], BOUNDARY_N_SCEN, ss.n)
+    count = min(p["boundary_scenarios"], ss.n)
     bs = boot_set(count) if count < ss.n else ss
     scale = df.attrs["scale"]
     cands = bd.candidate_plans(df)
     prices = opt.current_prices()
-    awc, irr, pm = p["awc"], p["irrigation_mm"], p["price_mult"]
+    awc, irr = p["awc"], p["irrigation_mm"]
     farm = farm_info()
     out = {"params": p, "farm": {"acres": farm["acres"], "badge": farm["acres_badge"], "m3_per_acre_per_mm": farm["m3_per_acre_per_mm"]},
            "badges": _badges(p), "n_scenarios": bs.n, "frame": bd.FRAME, "baseline_id": opt.BASELINE_ID,
@@ -553,10 +585,11 @@ def tipping_points(params=None) -> dict:
     irr_levels = np.round(np.linspace(0, max(2 * irr, 1500.0), 9), 1)
     g = bd.decision_grid(bs, awc, p, scale, cands, irr_levels)
     out["grid"] = {"rain_mult": g["rain_mult"], "irrigation_mm": g["irrigation_mm"], "winner": g["winner"],
-                   "boundary_band": g["boundary_band"],
+                   "boundary_band": g["boundary_band"], "rice_years": g["rice_years"], "current_irrigation_mm": irr,
                    "rice_shift_threshold_mm": g["rice_shift_threshold_mm"], "baseline_id": opt.BASELINE_ID,
                    "delta_mean_profit_vs_baseline": g["delta_mean_profit_vs_baseline"], "text": g["text"], "badge": "modeled"}
-    out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands[:6] if len(cands) > 6 else cands)
+    out["late_monsoon"] = bd.late_monsoon_curve(bs, awc, irr, p, scale, cands)
+    out["heat"] = bd.heat_curve(bs, awc, irr, p, scale, cands)
     si = soil_info()
     sa = p["soil"]
     lo, hi = si.get("awc_low_pm25"), si.get("awc_high_pm25")
@@ -580,7 +613,7 @@ def tipping_points(params=None) -> dict:
     e2 = bd.evpi(bs, p, scale, cands, "irr", irr_vals, awc, irr,
                  None if prices["water_measure_cost_rs"] is None else prices["water_measure_cost_rs"] / farm["acres"], prices["badges"]["water_measure_cost_rs"], "available irrigation water")
     e2["range_note"] = "irrigation uncertainty range +-50% of the input, assumption, team to verify"
-    e2["text"] = bd.evpi_text_irr(e2)
+    e2["text"] = bd.evpi_text_irr(e2, p["water_source"])
     out["evpi_awc"], out["evpi_irrigation"] = e1, e2
     out["grid_upstream_local"] = bd.upstream_local_grid(bs, awc, irr, p, scale, cands, n_scen=bs.n)
     a_ = farm["acres"]
@@ -601,7 +634,8 @@ def hindcast(params=None) -> dict:
         farm = validate_records(params["farm_records"])
     h = hc.hindcast(annual(), p["awc"], p["irrigation_mm"], farm=farm)
     h["baseline"] = hc.baseline_table(df, ss, p["awc"], p["irrigation_mm"], p)
-    h["note"] = h.get("note") or ("Single-season model vs district yield, linearly detrended. District rice yields mix irrigated and rainfed fields.")
+    h["note"] = h.get("note") or ("Single-season model vs district yield, linearly detrended. District rice yields mix irrigated and rainfed fields, "
+                                  "and are reported as milled rice (paddy x 0.66).")
     return h
 
 
@@ -625,7 +659,7 @@ def assumptions_table(params=None) -> pd.DataFrame:
         rows.append({"name": f"operating_cost.{c}", "value": pr["operating_cost_rs_per_acre"].get(c), "range": None, "unit": "Rs/acre",
                      "source": "config/prices_india.yaml" if cost_badge != "placeholder" else "unverified placeholder, team to verify",
                      "badge": cost_badge})
-    for k in ("n_cost_rs_per_kg", "irrigation_cost_rs_per_m3", "soil_test_cost_rs", "water_measure_cost_rs", "farm_area_acres"):
+    for k in ("n_cost_rs_per_kg", "soil_test_cost_rs", "water_measure_cost_rs", "farm_area_acres"):
         rows.append({"name": k, "value": pr[k], "range": None, "unit": k.split("_rs_")[-1] if "_rs_" in k else "", "source": "config/prices_india.yaml"
                      if pr["badges"][k] != "placeholder" else "unverified placeholder, team to verify", "badge": pr["badges"][k]})
     rows[-1]["source"] = "config/farm.yaml (farm area supplied locally)"
@@ -642,4 +676,23 @@ def assumptions_table(params=None) -> pd.DataFrame:
              {"name": "awc_uncertainty_range", "value": 0.3, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
              {"name": "irrigation_uncertainty_range", "value": 0.5, "range": None, "unit": "fraction", "source": "team to verify", "badge": "assumption"},
              {"name": "scenario_seed", "value": sc.SEED, "range": None, "unit": "", "source": "project rule", "badge": "assumption"}]
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    df["in_use"] = [_in_use(n) for n in df["name"]]
+    return df
+
+
+def _in_use(name: str) -> bool:
+    """False for table rows the current run does not read: parameters of crops that are not in the crop list, and
+    the fallback potential yields that config/prices_india.yaml overrides."""
+    crops_all = ("rice", "jowar", "bajra", "ragi", "pigeonpea")
+    used = set(opt.CROPS)
+    parts = name.split(".")
+    crop = next((x for x in parts if x in crops_all), None)
+    if crop is not None and crop not in used:
+        return False
+    if parts[0] == "monsoon":
+        return False  # legacy standalone absolute-onset compatibility, not the app onset rule
+    if parts[0] == "ym_kg_ha":
+        pot = ((_yaml("prices_india.yaml").get("potential_yield_kg_ha")) or {}).get(parts[-1]) or {}
+        return pot.get("value") is None
+    return True

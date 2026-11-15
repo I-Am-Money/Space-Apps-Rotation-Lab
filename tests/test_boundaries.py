@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import numpy as np
 import pytest
 from engine import api, boundaries as bd
@@ -23,7 +24,9 @@ def test_tipping_points_structure_and_evpi_nonneg():
     assert len(g["winner"]) == len(g["irrigation_mm"]) and len(g["winner"][0]) == len(g["rain_mult"])
     for k in ("evpi_awc", "evpi_irrigation"):
         assert t[k]["value"] >= 0 and t[k]["text"]
-    assert "borewell or tank" in t["evpi_irrigation"]["text"]
+    assert "canal and well supply" in t["evpi_irrigation"]["text"]          # default water source canal_and_well
+    assert "expected value of perfect information" in t["evpi_irrigation"]["text"]
+    assert "borewell supply" in api.tipping_points({"irrigation_mm": 400, "water_source": "borewell"})["evpi_irrigation"]["text"]
     assert "EVSI" not in str(t)
     assert "not forecasts" in rc["text"]
 
@@ -40,10 +43,31 @@ def test_crossover_interpolation():
     assert abs(c[0][0] - 0.55) < 1e-9
 
 
-def test_dry_favours_millet_wet_favours_rice_in_grid():
+def test_crossover_ignores_switch_between_same_number_of_rice_years():
+    ms = np.array([0.5, 0.6]); Jm = np.array([[10., 0.], [0., 10.]])
+    assert bd._first_crossover(np.array([0, 1]), Jm, ms, group=[2, 2]) == []
+    assert len(bd._first_crossover(np.array([0, 1]), Jm, ms, group=[2, 3])) == 1
+
+
+def test_grid_reports_rice_years_boundary_and_band():
     t = api.tipping_points({"irrigation_mm": 400, "lam": 0.0, "w": 0.0})
     g = t["grid"]
     assert g["text"]
+    ry = np.array(g["rice_years"])
+    assert ry.shape == (len(g["irrigation_mm"]), len(g["rain_mult"])) and ry.min() >= 0 and ry.max() <= 4
+    assert len(g["rice_shift_threshold_mm"]) == len(g["rain_mult"])
+    b = g["boundary_band"]
+    assert b["n_boot"] == 200 and len(b["p10"]) == len(g["rain_mult"])
+    for lo, hi in zip(b["p10"], b["p90"]):
+        assert lo is None or hi is None or lo <= hi + 1e-9
+    assert g["current_irrigation_mm"] == 400
+
+
+def test_onset_and_heat_curves_present():
+    t = api.tipping_points({"irrigation_mm": 400})
+    assert t["late_monsoon"]["days"][0] == 0 and t["late_monsoon"]["days"][-1] == 30
+    assert t["heat"]["dT"][0] == 0 and t["heat"]["dT"][-1] == 3
+    assert "not forecasts" in t["late_monsoon"]["text"] and "not forecasts" in t["heat"]["text"]
 
 
 def test_hindcast_machinery_on_synthetic_observed():

@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """NASA POWER daily point data (community AG) -> contract DataFrame.
 
 load_weather(lat, lon) -> DataFrame indexed by daily date 1981-01-01..2025-12-31,

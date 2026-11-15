@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Synthetic stand-ins for the decision tests (NOT model results)."""
 import numpy as np
 from engine import scenarios as sc

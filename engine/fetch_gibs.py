@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """NASA GIBS WMTS (EPSG:3857) layer discovery for map overlays (never used by the model).
 
 Layer IDs are parsed from the real GetCapabilities document (cached in
@@ -9,7 +10,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -76,7 +76,6 @@ def _expand(ranges):
     """Yield (start, end, step_days) tuples from ISO8601 'a/b/P1D' strings."""
     for r in ranges:
         a, b, p = r.split("/")
-        m = re.fullmatch(r"P(\d+)([DM])", p)
         yield dt.date.fromisoformat(a), dt.date.fromisoformat(b), p
 
 

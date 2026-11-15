@@ -130,7 +130,7 @@ def run(plans, prefix_owner, et0, rain, tmax, starts, kc, lengths, roots, deplet
                         out[14, r, s, y] += ic
                         out[15, r, s, y] += iw
                         age = day - start
-                        if heat_on and age >= flower_start[crop] and age < flower_start[crop] + flower_length:
+                        if heat_on and age >= flower_start[crop] and age < flower_start[crop] + flower_length[crop]:
                             if tmax[s, y, day] > thresholds[crop]:
                                 hot += 1
                     if record:

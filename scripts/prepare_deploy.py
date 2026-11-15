@@ -6,7 +6,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output" / "rotationlab-deploy.zip"
-patterns = ["app.py", "requirements.txt", "Dockerfile", ".dockerignore", ".streamlit/config.toml", "README.md", "LIMITATIONS.md", "AI_USE.md", "HANDOFF.md", "PRODUCT.md", "DESIGN.md",
+patterns = ["app.py", "pytest.ini", "requirements.txt", "Dockerfile", ".dockerignore", ".streamlit/config.toml", "README.md", "LIMITATIONS.md", "AI_USE.md", "HANDOFF.md", "PRODUCT.md", "DESIGN.md",
             "engine/*.py", "engine/*.md", "scripts/*.py", "ui/*.py", "ui/tabs/*.py", "config/*.yaml", "assets/favicon.svg", "assets/nalgonda_outline.json",
             "data/gibs_layers.json", "data/raw/power_*.json", "data/raw/soil_*.json", "data/raw/msp_*.html",
             "data/raw/icrisat_dld/*.csv", "data/raw/icrisat_dld/SOURCE.json", "docs/*.md", "tests/*.py", ".github/workflows/ci.yml"]

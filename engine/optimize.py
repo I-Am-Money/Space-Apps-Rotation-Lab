@@ -1,8 +1,8 @@
 """Rotation optimisation: configured four-year sequences, J score, Pareto frontier, reports.
 
 J = (1-lam)*mean_profit + lam*worst10_profit - w*scale*irrigation_mm.
-Scale (rupees/acre/mm) is the profit spread divided by the irrigation spread at the
-base settings. This is a modeled preference scale, not a market price for water.
+Scale (rupees/acre/mm) is a fixed explicit water preference, independent of the
+profit spread. It is never deducted from the displayed profit.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def configure(millets=None, region_path=None):
     from pathlib import Path
     rp = Path(region_path) if region_path else Path(__file__).resolve().parent.parent / "config" / "region.yaml"
     if millets is None:
-        mt = rp.stat().st_mtime if rp.exists() else None
+        mt = (rp.stat().st_mtime_ns if rp.exists() else None, configuration_version())
         if CROPS and mt == _SEL_MTIME:
             return
         _SEL_MTIME = mt
@@ -50,7 +50,22 @@ def configure(millets=None, region_path=None):
     MILLETS = list(millets)
     CROPS = ["rice", "pigeonpea"] + MILLETS
     REF = {"A": ["rice"] * 4, "B": ["rice", m, "rice", m], "C": ["rice", "pigeonpea", m, "rice"]}
-    ALL_PLANS = [list(p) for p in itertools.product(CROPS, repeat=4)]
+    ALL_PLANS = [list(p) for p in itertools.product(CROPS, repeat=4) if plan_allowed(p)]
+
+
+def plan_allowed(plan) -> bool:
+    """Team rule (assumptions.yaml plan_rules): the same non-rice crop in all 4 years is not offered.
+    Rice x4 always stays: it is the baseline, our farm today."""
+    from engine.crops import A
+    if not bool(A(None, "plan_rules.block_same_nonrice_crop_4_years")):
+        return True
+    return not (len(set(plan)) == 1 and plan[0] != "rice")
+
+
+def water_price_proxy_rs_per_mm_acre() -> float:
+    """v3 section 7 water_price_proxy, converted from INR per mm per ha to INR per mm per acre."""
+    from engine.crops import A
+    return float(A(None, "objective.water_price_proxy_rs_per_mm_ha")) * economics.HA_PER_ACRE
 
 
 configure()
@@ -122,6 +137,13 @@ def prefetch_multi(plans, scensets, awc: float, irr: float) -> None:
     from engine.waterbalance import simulate_batch
     keys = ["et0", "precip", "tmax"] + [k for k in ("upstream_season_rain", "onset_doy") if all(k in ss.scen for ss in scensets)]
     cat = {k: np.concatenate([ss.scen[k] for ss in scensets]) for k in keys}
+    if all("onset_median" in ss.scen for ss in scensets):
+        medians = {ss.scen["onset_median"] for ss in scensets}
+        if len(medians) != 1:
+            for ss in scensets:
+                prefetch_multi(plans, [ss], awc, irr)
+            return
+        cat["onset_median"] = medians.pop()
     res = simulate_batch(cat, todo, float(awc), float(irr), params_for(irr))
     off = 0
     for ss in scensets:
@@ -202,7 +224,7 @@ def params_for(irr: float) -> dict | None:
 
 def _sim_key(plan, scenset, awc, irr):
     # irrigation only matters when the plan contains rice: drop it from the key otherwise
-    return (scenset.key, tuple(plan), round(float(awc), 4), round(float(irr), 4) if "rice" in plan else None,
+    return (scenset.key, scenset.scen.get("source_version", ()), tuple(plan), round(float(awc), 4), round(float(irr), 4) if "rice" in plan else None,
             tuple(sorted((params_for(irr) or {}).items())))
 
 
@@ -225,12 +247,15 @@ def rotation_arrays(plan, scenset, awc, irr, price_mult=1.0, prices=None) -> dic
     a = _ARR_CACHE.get(key) if prices is None else None
     if a is None:
         sim = sim_plan(plan, scenset, awc, irr)
-        eco = economics.plan_economics(plan, sim, price_mult, prices or current_prices())
+        from engine.yieldmodel import nitrogen_credit_kg_ha
+        eco = economics.plan_economics(plan, sim, price_mult, prices or current_prices(), n_credit=nitrogen_credit_kg_ha(plan, dict(_SIM_CONTEXT.get())))
         a = {"profit": eco["profit"], "profit_year": eco["profit_year"],
              "stress": (np.asarray(sim["etm_mm"]) - np.asarray(sim["eta_mm"])).sum(1),
              "irrig": np.asarray(sim["irrig_mm"]).sum(1),
              "total": (np.asarray(sim["rain_mm"]) + np.asarray(sim["irrig_mm"])).sum(1),
              "yield": np.asarray(sim["yield_kg_ha"]), "eco": eco,
+             "hot_days": (np.asarray(sim["hot_days"]) if "hot_days" in sim else None),
+             "sowing_doy": (np.asarray(sim["sowing_doy"]) if "sowing_doy" in sim else None),
              "irrig_canal": (np.asarray(sim["irrig_canal_mm"]).sum(1) if "irrig_canal_mm" in sim else None),
              "irrig_well": (np.asarray(sim["irrig_well_mm"]).sum(1) if "irrig_well_mm" in sim else None)}
         if prices is None:
@@ -256,15 +281,75 @@ def compute_scale(mean_profit, irrigation) -> float:
     return dp / ds if ds > 1e-9 else 0.0
 
 
-def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None) -> pd.DataFrame:
-    plans = plans or ALL_PLANS
+def breakeven_shortfall(plan, scenset, awc, irr, lam, w, price_mult=1.0, scale=None) -> dict | None:
+    """How much less money the non-rice crops of `plan` can bring in (a lower price or a lower yield) before rice every
+    year (rotation A) scores at least as high on J. A sensitivity check on the least certain inputs, not a forecast.
+    Returns None for a plan with no non-rice year. `shortfall` is a fraction of the non-rice revenue (0 to 1), or None
+    when the plan still scores higher with no non-rice revenue at all."""
+    plan = list(plan)
+    cols = [i for i, c in enumerate(plan) if c != "rice"]
+    if not cols:
+        return None
+    scale = water_price_proxy_rs_per_mm_acre() if scale is None else scale
+    a = rotation_arrays(plan, scenset, awc, irr, price_mult)
+    b = rotation_arrays(REF[BASELINE_ID], scenset, awc, irr, price_mult)
+    alt_rev = np.asarray(a["eco"]["revenue"])[:, cols].sum(1)
+    jb = float(objective(b["profit"].mean(), worst_fraction_mean(b["profit"]), b["irrig"].mean(), lam, w, scale))
+
+    def j(short):
+        prof = a["profit"] - short * alt_rev
+        return float(objective(prof.mean(), worst_fraction_mean(prof), a["irrig"].mean(), lam, w, scale))
+
+    out = {"crops": sorted({plan[i] for i in cols}), "non_rice_revenue_mean": float(alt_rev.mean()),
+           "lead_over_baseline": j(0.0) - jb, "baseline_id": plan_id(REF[BASELINE_ID])}
+    if j(0.0) <= jb:
+        return {**out, "shortfall": 0.0}
+    if j(1.0) > jb:
+        return {**out, "shortfall": None}
+    lo, hi = 0.0, 1.0
+    for _ in range(50):
+        mid = 0.5 * (lo + hi)
+        lo, hi = (mid, hi) if j(mid) > jb else (lo, mid)
+    return {**out, "shortfall": 0.5 * (lo + hi)}
+
+
+def without_rotation_effects(plan, scenset, awc, irr, price_mult=1.0) -> dict | None:
+    """Profit of `plan` against rice every year if every rotation effect were zero: no yield change from the previous
+    crop and no nitrogen credit. The rotation effects are unsourced assumptions (Build Spec v3 section 5.5), so this
+    shows how much of the result rests on them. The yield multiplier is applied last in the yield model, so dividing
+    revenue by it removes it exactly. Returns None for rice every year."""
+    plan, base = list(plan), list(REF[BASELINE_ID])
+    if plan_id(plan) == plan_id(base):
+        return None
+    from engine.yieldmodel import rotation_factor
+
+    def prof(pl):
+        e = rotation_arrays(pl, scenset, awc, irr, price_mult)["eco"]
+        f = np.asarray(rotation_factor(pl, dict(_SIM_CONTEXT.get()) or None), float)
+        return (np.asarray(e["revenue"]) / f[None, :] - np.asarray(e["op_cost"])).sum(1)
+
+    p, b = prof(plan), prof(base)
+    with_fx = rotation_arrays(plan, scenset, awc, irr, price_mult)["profit"].mean() - rotation_arrays(base, scenset, awc, irr, price_mult)["profit"].mean()
+    return {"d_mean_profit": float(p.mean() - b.mean()), "d_worst10_profit": float(worst_fraction_mean(p) - worst_fraction_mean(b)),
+            "d_mean_profit_with_effects": float(with_fx), "baseline_id": plan_id(base)}
+
+
+def evaluate_table(scenset, awc, irr, lam, w, price_mult=1.0, plans=None, extra=()) -> pd.DataFrame:
+    """One row per rotation. `extra` = rotations the team rule does not offer (plan_allowed is False) but that the
+    user asked to see, e.g. their current rotation: they get offered=False, are never recommended and have rank 0."""
+    plans = [list(p) for p in (plans or ALL_PLANS)]
+    seen = {plan_id(p) for p in plans}
+    n_offered = len(plans)
+    for p in extra:
+        if plan_id(p) not in seen:
+            seen.add(plan_id(p)); plans.append(list(p))
     prefetch(plans, scenset, awc, irr)
     rows = []
-    for p in plans:
+    for i, p in enumerate(plans):
         m = metrics(rotation_arrays(p, scenset, awc, irr, price_mult))
-        rows.append({"id": plan_id(p), "plan": list(p), **m})
+        rows.append({"id": plan_id(p), "plan": list(p), "offered": i < n_offered, **m})
     df = pd.DataFrame(rows)
-    scale = compute_scale(df.mean_profit.values, df.irrigation_mm.values)
+    scale = water_price_proxy_rs_per_mm_acre()
     df.attrs["scale"] = scale
     return rescore(df, lam, w, scale)
 
@@ -274,9 +359,17 @@ def rescore(df: pd.DataFrame, lam, w, scale=None) -> pd.DataFrame:
     df = df.copy()
     df.attrs["scale"] = scale
     df["J"] = objective(df.mean_profit, df.worst10_profit, df.irrigation_mm, lam, w, scale)
-    df["rank"] = df.J.rank(ascending=False, method="first").astype(int)
-    df["on_frontier"] = pareto_mask(df.mean_profit.values, df.worst10_profit.values)
+    off = df["offered"].astype(bool) if "offered" in df else pd.Series(True, index=df.index)
+    df["rank"] = 0
+    df.loc[off, "rank"] = df.J[off].rank(ascending=False, method="first").astype(int)
+    df["on_frontier"] = False
+    df.loc[off, "on_frontier"] = pareto_mask(df.mean_profit[off].values, df.worst10_profit[off].values)
     return add_deltas(df)
+
+
+def offered(df: pd.DataFrame) -> pd.DataFrame:
+    """Rows the tool may recommend (drops rotations shown only for comparison)."""
+    return df[df["offered"].astype(bool)] if "offered" in df else df
 
 
 DELTA_FIELDS = {"mean_profit": "d_mean_profit", "worst10_profit": "d_worst10_profit", "total_water_mm": "d_total_water_mm",
@@ -319,7 +412,7 @@ def pareto_mask(x, y) -> np.ndarray:
 
 
 def recommend_from_table(df: pd.DataFrame) -> dict:
-    d = df.sort_values("J", ascending=False)
+    d = offered(df).sort_values("J", ascending=False)
     return {"top": d.iloc[0].to_dict(), "runner_up": d.iloc[1].to_dict()}
 
 
@@ -331,9 +424,9 @@ def _count_pairs(plan, same):
 def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price_mult=1.0, prices=None) -> dict:
     """strategies: name -> plan. Text is generated from computed numbers and fixed rules only."""
     prices = prices or current_prices()
-    top = df.sort_values("J", ascending=False).iloc[0]
+    n_off = len(offered(df))
+    top = offered(df).sort_values("J", ascending=False).iloc[0]
     top_arr = rotation_arrays(top["plan"], scenset, awc, irr, price_mult, prices)
-    a_arr = rotation_arrays(REF["A"], scenset, awc, irr, price_mult, prices)
     a_row = df[df.id == plan_id(REF["A"])].iloc[0]
     out = {}
     for name, plan in strategies.items():
@@ -342,27 +435,27 @@ def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price
         p_beat = float((arr["profit"] >= top_arr["profit"]).mean())
         p_loss = float((arr["profit"] < 0).mean())
         credit = float(np.sum(economics.n_credit_kg_ha(plan)))
-        ev = {"rank_of_256": int(row["rank"]), "n_rotations": int(len(df)), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
+        ev = {"rank_of_256": int(row["rank"]), "rank": int(row["rank"]), "n_rotations": n_off, "offered": bool(row.get("offered", True)), "J": float(row.J), "mean_profit_rs_acre": float(row.mean_profit),
               "worst10_profit_rs_acre": float(row.worst10_profit), "water_stress_mm": float(row.water_stress_mm),
               "irrigation_mm": float(row.irrigation_mm), "total_water_mm": float(row.total_water_mm),
               "share_of_scenarios_at_least_as_profitable_as_recommended": p_beat,
               "share_of_scenarios_with_loss": p_loss, "n_credit_kg_ha_over_plan": credit,
               "n_scenarios": int(scenset.n), "delta_vs_baseline": delta_vs_baseline(row), "baseline_id": BASELINE_ID}
         if row.id == top.id:
-            why = (f"Ranked 1 of {len(df)} on the objective J (lam={params['lam']:.2f}, w={params['w']:.2f}): "
+            why = (f"Ranked 1 of {n_off} on the objective J (lam={params['lam']:.2f}, w={params['w']:.2f}): "
                    f"mean {row.mean_profit:,.0f} Rs/acre, worst-10% {row.worst10_profit:,.0f} Rs/acre, "
-                   f"water stress {row.water_stress_mm:.0f} mm.")
+                   f"irrigation {row.irrigation_mm:.0f} mm over the plan.")
         else:
-            why = (f"Ranked {int(row['rank'])} of {len(df)}. Versus the recommended rotation: mean profit "
+            lead = (f"Ranked {int(row['rank'])} of {n_off}. " if bool(row.get("offered", True)) else
+                    "Shown for comparison only: the tool does not offer the same non-rice crop in all 4 years (team rule). ")
+            why = (lead + "Versus the recommended rotation: mean profit "
                    f"{row.mean_profit - top.mean_profit:+,.0f} Rs/acre, worst-10% {row.worst10_profit - top.worst10_profit:+,.0f} Rs/acre, "
-                   f"water stress {row.water_stress_mm - top.water_stress_mm:+.0f} mm, irrigation {row.irrigation_mm - top.irrigation_mm:+.0f} mm. "
+                   f"irrigation {row.irrigation_mm - top.irrigation_mm:+.0f} mm. "
                    f"It matches or beats the recommended plan in {p_beat*100:.0f}% of scenarios.")
         benefits = []
         d_irr = a_row.irrigation_mm - row.irrigation_mm
         if d_irr > 1:
             benefits.append(f"Uses {d_irr:.0f} mm less irrigation water over 4 years than rice every year.")
-        if row.water_stress_mm < a_row.water_stress_mm - 1:
-            benefits.append(f"Mean crop water stress {a_row.water_stress_mm - row.water_stress_mm:.0f} mm lower than rice every year.")
         if row.worst10_profit > a_row.worst10_profit:
             benefits.append(f"Worst-10% profit is {row.worst10_profit - a_row.worst10_profit:,.0f} Rs/acre higher than rice every year.")
         if row.mean_profit > a_row.mean_profit:
@@ -378,7 +471,9 @@ def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price
                         + ", ".join(sorted(k for k, v in pb.items() if v == "placeholder")) + ".")
         if params.get("awc_mm_per_m") is None:
             gaps.append("Soil water capacity is the default value, not measured on this field.")
-        gaps.append("Irrigation available (mm) is a user input, not a measured borewell or tank yield.")
+        gaps.append("Irrigation available (mm) is a user input or a proxy, not a measured canal allocation or well yield.")
+        if any(c in ("pigeonpea", "jowar", "ragi") for c in plan):
+            gaps.append("District yields aggregate farms, irrigation regimes and crop seasons; they do not establish field-level performance.")
         gaps.append("Rotation yield effects come from assumptions (ranges in assumptions table), not from this farm's trials.")
         risks = []
         rr = _count_pairs(plan, lambda c: c == "rice")
@@ -392,7 +487,24 @@ def three_strategy_report(df, scenset, awc, irr, params, strategies: dict, price
         gap = row.mean_profit - row.worst10_profit
         risks.append(f"Worst-10% profit sits {gap:,.0f} Rs/acre below the mean.")
         if row.irrigation_mm > 0 and irr > 0:
-            risks.append(f"Needs about {row.irrigation_mm:.0f} mm irrigation over 4 years against {irr:.0f} mm per season available before monsoon scaling; check borewell or tank yield locally.")
+            risks.append(f"Needs about {row.irrigation_mm:.0f} mm irrigation over 4 years against {irr:.0f} mm per season available before monsoon scaling; check the canal allocation and well yield locally.")
+        if "pigeonpea" in plan:
+            risks.append("Pigeon pea is assumed to sell at the minimum support price; local market prices can be lower. Check with the local market yard.")
         out[name] = {"plan": list(plan), "id": plan_id(plan), "why": why, "evidence": ev, "benefits": benefits,
                      "info_gaps": gaps, "risks_for_local_review": risks}
     return out
+
+
+def combine_profit(p_rice, p_alt, n_acres: int) -> np.ndarray:
+    """Per-scenario farm total [n_acres+1, S] for k = 0..n_acres acres on rotation A (rice) and the rest on the alternative."""
+    k = np.arange(n_acres + 1, dtype=float)[:, None]
+    return k * np.asarray(p_rice)[None, :] + (n_acres - k) * np.asarray(p_alt)[None, :]
+
+def cache_mb():
+    return (_SIM_CACHE.bytes + _ARR_CACHE.bytes) / 1024 ** 2
+
+def trim_cache(max_mb=None):
+    if max_mb is not None and cache_mb() > max_mb:
+        clear_cache()
+        return True
+    return False

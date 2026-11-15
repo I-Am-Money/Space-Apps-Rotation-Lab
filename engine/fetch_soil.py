@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Soil available water capacity (AWC), texture, hydrologic group for a lat/lon.
 
 Source: ISRIC SoilGrids 2.0 REST API (https://rest.isric.org/soilgrids/v2.0/properties/query),

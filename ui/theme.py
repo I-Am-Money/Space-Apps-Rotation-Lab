@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Design tokens (OKLCH source of truth) and the CSS injected into Streamlit."""
 from __future__ import annotations
 

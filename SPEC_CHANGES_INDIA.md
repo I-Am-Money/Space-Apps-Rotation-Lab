@@ -2,6 +2,8 @@
 
 # SPEC_CHANGES_INDIA: overrides to RotationLab Build Spec v2
 
+> **Historical working note.** The project now follows "RotationLab Build Spec v3 (Nalgonda)". Where this file disagrees with v3 or with the code, v3 and the code win. See `HANDOFF.md` for the current state.
+
 Source: team update pasted 2026-11-14. Where this file and the v2 spec disagree, this file wins. Everything not mentioned here stays as in the v2 spec (milestone order, provenance badges, offline cache, seed 42, tests-before-UI, no invented data).
 
 ## Open items for the team (marked TEAM in the update)

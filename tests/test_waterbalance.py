@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 import itertools
 
 import numpy as np
@@ -47,7 +48,7 @@ def test_dry_down_monotonic_and_eta_declines_past_raw():
     r = simulate_plan(scen, ["jowar", "jowar", "jowar", "jowar"], AWC, 0.0,
                       {"record_daily": True, "hydrology.init_depletion_frac": 0.0})
     c = load_crops()["jowar"]
-    taw, raw = AWC * c.root_depth_m, c.p * AWC * c.root_depth_m
+    raw = c.p * AWC * c.root_depth_m
     sow, n = c.sowing_doy - 1, c.season_days
     dr = r["daily"]["dr"][0, 0, sow:sow + n]
     ks = r["daily"]["ks"][0, 0, sow:sow + n]

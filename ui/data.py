@@ -1,17 +1,11 @@
-"""Cached engine access. Toy data is available only through explicit design-preview mode."""
+"""Cached real engine access with anonymous uploads isolated to their session."""
 from __future__ import annotations
+
+import re
 
 import streamlit as st
 
-from engine import mock_api
-
-import os
-import re
-
-if os.environ.get("ROTATIONLAB_MOCK") == "1":
-    api = mock_api
-else:
-    from engine import api
+from engine import api
 
 CROPS = ["rice", "jowar", "bajra", "pigeonpea"]
 try:  # the engine decides which crops are candidates (iteration 2: selected millets only)
@@ -75,13 +69,13 @@ SOURCE_LABELS = {"canal_and_well": "Canal and well", "unset": "Not sure yet", "c
 CANAL_LABEL = "Proxy for canal releases based on upstream monsoon rain; actual releases depend on reservoir operations."
 WELL_LABEL = "Simplified recharge proxy."
 DEFAULTS = dict(irrigation_mm=BASE_IRR, use_soil_test=False, soil_awc=140, rot0="rice", rot1="rice", rot2="rice", rot3="rice",
-                lam=30, w=30, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
+                lam=30, w=10, water_source="canal_and_well", recharge_k=BASE_K, canal_factor=1.0,
                 canal_override=False, canal_supply=None, well_override=False, well_supply=None, soil_mode="farm", split_acres=None,
-                heat_enabled=True, use_cost_overrides=False, cost_values={}, irrigation_cost=None, soil_test_cost=None, water_test_cost=None,
-                water_value=float(_assump("water_value_rs_m3", 1)))
+                heat_enabled=True, use_cost_overrides=False, cost_values={}, soil_test_cost=None, water_test_cost=None,
+                water_value=float(_assump("water_price_proxy_rs_per_mm_ha", 50)) / 10)
 DEFAULTS["full_tipping"] = False
 ROT_NAME = {"A": "A: our farm today", "B": "Rotation B", "C": "Rotation C", "current": "Your rotation"}
-ROT_SHORT = {"A": "A: all rice", "B": "B: rice and jowar", "C": "C: rice, pigeon pea, jowar"}
+ROT_SHORT = {"A": "A: all rice", "B": "B: rice and millet", "C": "C: rice, pigeon pea, millet"}
 
 
 def plan_label(plan) -> str:
@@ -124,7 +118,7 @@ def params() -> dict:
                 heat_enabled=bool(s["heat_enabled"]),
                 water_value_rs_m3=float(s["water_value"]),
                 boundary_scenarios=500 if s["full_tipping"] else 150,
-                **({"operating_costs": s["cost_values"], "irrigation_cost_rs_per_m3": s["irrigation_cost"],
+                **({"operating_costs": s["cost_values"],
                     "soil_test_cost_rs": s["soil_test_cost"], "water_measure_cost_rs": s["water_test_cost"]} if s["use_cost_overrides"] else {}),
                 **({"canal_supply_mm": float(s["canal_supply"])} if s["canal_override"] and s["canal_supply"] is not None else {}),
                 **({"well_supply_mm": float(s["well_supply"])} if s["well_override"] and s["well_supply"] is not None else {}),
@@ -133,17 +127,18 @@ def params() -> dict:
 
 
 def is_mock() -> bool:
-    return bool(st.session_state.get("_mock")) or api is mock_api or bool(getattr(api, "IS_MOCK", False))
+    """Always False: the toy stand-in engine was removed so the app can never show invented numbers."""
+    return False
 
 
 def _call(name, *args):
-    return getattr(api, name)(*args), api is mock_api
+    return getattr(api, name)(*args), False
 
 
 MSG = {"get_field_summary": "Loading the field record.",
-       "compare": "Running four rotations through the weather record.",
+       "compare": "Running the rotations through the weather record.",
        "recommend": "Scoring all rotations for your priorities. The first run takes about 10 seconds; later runs are instant.",
-       "tipping_points": "Finding the tipping points. The first run takes up to 30 seconds; later runs are instant.",
+       "tipping_points": "Finding the tipping points. The first run takes about 20 seconds; later runs are instant.",
        "hindcast": "Checking the model against district yields.", "assumptions_table": "Loading assumptions."}
 
 
@@ -216,3 +211,19 @@ def compare_ids(p) -> tuple:
 
 def land_split(alt_id, p):
     return _land_split(alt_id, p)
+
+
+def supply_words(p) -> str:
+    """How to name the farm's irrigation supply in a sentence, from the chosen water source."""
+    return {"canal_and_well": "canal and well supply", "canal": "canal supply", "borewell": "borewell supply",
+            "tank": "tank supply"}.get((p or {}).get("water_source"), "borewell, tank or canal supply")
+
+
+def placeholder_inputs() -> list:
+    """Names of model inputs still badged Placeholder (no verified source). Empty if none."""
+    try:
+        t = assumptions()
+        rows = t.to_dict("records") if hasattr(t, "to_dict") else list(t)
+        return [str(r.get("name")) for r in rows if str(r.get("badge", "")).lower() == "placeholder" and r.get("in_use", True)]
+    except Exception:
+        return []

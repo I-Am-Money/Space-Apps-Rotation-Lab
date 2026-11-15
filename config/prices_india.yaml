@@ -1,82 +1,196 @@
-# Prices and yield potentials for RotationLab (India). Rupees per quintal (100 kg).
-# Accessed 2026-11-14. Every value carries a source; badge placeholder = not verified / not found.
+# District yield ceilings are derived statistics. Costs are assumptions, not farm observations.
 msp:
-  marketing_season: "Kharif Marketing Season 2026-27"
-  announced: "2026-05-13"
-  source: "PIB, Cabinet approves MSP for Kharif Crops for Marketing Season 2026-27, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1 (table read from the cached page data/raw/msp_kharif_2026_27_pib_PRID2260617.html)"
+  marketing_season: Kharif Marketing Season 2026-27
+  announced: '2026-05-13'
+  source: PIB, Cabinet approves MSP for Kharif Crops for Marketing Season 2026-27,
+    https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1 (table
+    read from the cached page data/raw/msp_kharif_2026_27_pib_PRID2260617.html)
   badge: observed
   rice:
-    variety: "Paddy (Common)"
+    variety: Paddy (Common)
     msp_rs_per_quintal: 2441
-    msp_prev_season_rs_per_quintal: 2369   # 2025-26, same table
+    msp_prev_season_rs_per_quintal: 2369
     cost_a2fl_rs_per_quintal_allindia: 1627
     margin_pct: 50
   jowar:
-    variety: "Jowar (Hybrid); Maldandi is listed separately at 4073"
+    variety: Jowar (Hybrid); Maldandi is listed separately at 4073
     msp_rs_per_quintal: 4023
     msp_prev_season_rs_per_quintal: 3699
     cost_a2fl_rs_per_quintal_allindia: 2682
     margin_pct: 50
   bajra:
-    variety: "Bajra"
+    variety: Bajra
     msp_rs_per_quintal: 2900
     msp_prev_season_rs_per_quintal: 2775
     cost_a2fl_rs_per_quintal_allindia: 1858
     margin_pct: 56
   pigeonpea:
-    variety: "Tur (Arhar)"
+    variety: Tur (Arhar)
     msp_rs_per_quintal: 8450
     msp_prev_season_rs_per_quintal: 8000
     cost_a2fl_rs_per_quintal_allindia: 5496
     margin_pct: 54
   ragi:
-    variety: "Ragi"
+    variety: Ragi
     msp_rs_per_quintal: 5205
     msp_prev_season_rs_per_quintal: 4886
     cost_a2fl_rs_per_quintal_allindia: 3470
     margin_pct: 50
-  cost_note: >
-    PIB "Cost" column is the all-India weighted average cost of production per quintal
-    (all paid-out costs plus imputed family labour, i.e. A2+FL), projected for 2026-27.
-    It is per quintal, not per acre, and is not state-specific.
+  cost_note: 'PIB "Cost" column is the all-India weighted average cost of production
+    per quintal (all paid-out costs plus imputed family labour, i.e. A2+FL), projected
+    for 2026-27. It is per quintal, not per acre, and is not state-specific.
 
-# Operating cost per acre: explicit national A2+FL proxy; no farm/state observation claimed.
-# CACP cost-of-cultivation state tables were not reachable. Team to fill from CACP
-# "Cost of Cultivation / Production" reports (cacp.da.gov.in), Cost A2+FL, Telangana or AP.
+    '
 operating_cost_rs_per_acre:
-  rice: {"value": 25170.92, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 1627 Rs/quintal times detrended district potential yield 3822.904 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
-  jowar: {"value": 8018.47, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 2682 Rs/quintal times detrended district potential yield 738.779 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
-  bajra: {"value": 5983.42, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 1858 Rs/quintal times detrended district potential yield 795.766 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
-  ragi: {"value": 34062.71, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 3470 Rs/quintal times detrended district potential yield 2425.669 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
-  pigeonpea: {"value": 13674.95, "badge": "assumption", "source": "Explicit national-cost proxy, NOT a Telangana or farm cost observation: PIB 2026-27 all-India A2+FL cost 5496 Rs/quintal times detrended district potential yield 614.838 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation costs already; extra irrigation charge defaults to zero. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1. State per-acre tables could not be retrieved. Override using actual farm costs."}
-
-# Potential yield Ym = 90th percentile of linearly detrended district yields (kg/ha),
-# computed by engine/fetch_icrisat.py for Nalgonda (pre-2016 undivided district).
-# Values come from the checksum-verified ICRISAT/TCI apportioned district table archived by the World Bank.
-# Ragi has only 17 positive-yield years and is not selected for the optimizer.
+  rice:
+    value: 38265
+    badge: assumption
+    source: Telangana A2+FL 72,353.64 Rs/ha (2020-21, DES via PJTSAU) x 1.3068 (all-India
+      cost per quintal 2026-27 / 2020-21, PIB) x 0.404686. See cost_of_cultivation.
+  jowar:
+    value: 8018.47
+    badge: assumption
+    source: 'Explicit national-cost proxy, NOT a Telangana or farm cost observation:
+      PIB 2026-27 all-India A2+FL cost 2682 Rs/quintal times detrended district potential
+      yield 738.779 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation
+      costs already; no separate water charge is deducted. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1.
+      No verified state budget for this crop is bundled. Override using actual farm
+      costs.'
+  bajra:
+    value: 5983.42
+    badge: assumption
+    source: 'Explicit national-cost proxy, NOT a Telangana or farm cost observation:
+      PIB 2026-27 all-India A2+FL cost 1858 Rs/quintal times detrended district potential
+      yield 795.766 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation
+      costs already; no separate water charge is deducted. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1.
+      No verified state budget for this crop is bundled. Override using actual farm
+      costs.'
+  ragi:
+    value: 34062.71
+    badge: assumption
+    source: 'Explicit national-cost proxy, NOT a Telangana or farm cost observation:
+      PIB 2026-27 all-India A2+FL cost 3470 Rs/quintal times detrended district potential
+      yield 2425.669 kg/ha /100 times 0.404686 ha/acre. Includes ordinary irrigation
+      costs already; no separate water charge is deducted. https://www.pib.gov.in/PressReleasePage.aspx?PRID=2260617&reg=3&lang=1.
+      No verified state budget for this crop is bundled. Override using actual farm
+      costs.'
+  pigeonpea:
+    value: 19535
+    badge: assumption
+    source: Telangana A2+FL 33,341.27 Rs/ha (2020-21, DES via PJTSAU) x 1.4478 (PIB
+      cost ratio) x 0.404686. See cost_of_cultivation.
 potential_yield_kg_ha:
   district: Nalgonda
-  rice: {"value": 3822.904, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
-  jowar: {"value": 738.779, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
-  bajra: {"value": 795.766, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
-  ragi: {"value": 2425.669, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (17 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
-  pigeonpea: {"value": 614.838, "badge": "modeled", "source": "P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda code 59 (52 positive years; 1966-2017 table), recentered on final observed year. Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409; source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not measured farm potential."}
-
-# Costs of information (EVPI cards). No source: team estimates only.
+  rice:
+    value: 3822.904
+    badge: modeled
+    source: P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda
+      code 59 (52 positive years; 1966-2017 table), recentered on final observed year.
+      Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409;
+      source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not
+      measured farm potential.
+  jowar:
+    value: 738.779
+    badge: modeled
+    source: P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda
+      code 59 (52 positive years; 1966-2017 table), recentered on final observed year.
+      Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409;
+      source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not
+      measured farm potential.
+  bajra:
+    value: 795.766
+    badge: modeled
+    source: P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda
+      code 59 (52 positive years; 1966-2017 table), recentered on final observed year.
+      Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409;
+      source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not
+      measured farm potential.
+  ragi:
+    value: 2425.669
+    badge: modeled
+    source: P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda
+      code 59 (17 positive years; 1966-2017 table), recentered on final observed year.
+      Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409;
+      source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not
+      measured farm potential.
+  pigeonpea:
+    value: 614.838
+    badge: modeled
+    source: P90 of linearly detrended ICRISAT/TCI apportioned DLD yields, Nalgonda
+      code 59 (52 positive years; 1966-2017 table), recentered on final observed year.
+      Archived by World Bank RR_IND_2025_488, https://reproducibility.worldbank.org/catalog/409;
+      source checksum in data/raw/icrisat_dld/SOURCE.json. Derived statistic, not
+      measured farm potential.
 soil_test_cost_rs:
   value: null
   badge: placeholder
-  source: "TEAM_TO_FILL (quote from local soil testing lab / Soil Health Card scheme)"
+  source: TEAM_TO_FILL (quote from local soil testing lab / Soil Health Card scheme)
 borewell_or_tank_capacity_measurement_cost_rs:
   value: null
   badge: placeholder
-  source: "TEAM_TO_FILL (quote from a local borewell yield test / tank survey)"
-
+  source: TEAM_TO_FILL (quote from a local borewell yield test / tank survey)
 n_cost_rs_per_kg:
   value: 12.8743961353
   badge: assumption
-  source: "Urea-equivalent nitrogen price: official subsidized 45 kg urea bag MRP Rs 266.50 / (45 * 0.46 nitrogen fraction). Model saving proxy, not a local purchase receipt. PIB, 14 June 2026, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2272695&lang=2&reg=3."
-irrigation_cost_rs_per_m3:
-  value: 0
-  badge: assumption
-  source: "Additional charge only. National A2+FL proxy budgets already include irrigation and pump energy (PIB 2026-27 MSP footnote). Zero prevents double counting; enter an incremental local charge to vary costs with water use. This does not claim irrigation is free."
+  source: 'Urea-equivalent nitrogen price: official subsidized 45 kg urea bag MRP
+    Rs 266.50 / (45 * 0.46 nitrogen fraction). Model saving proxy, not a local purchase
+    receipt. PIB, 14 June 2026, https://www.pib.gov.in/PressReleasePage.aspx?PRID=2272695&lang=2&reg=3.'
+milled_rice_per_paddy:
+  value: 0.66
+  badge: observed
+  source: 'ICRISAT VDSA ''all apportioned web document'' (https://vdsa.icrisat.org/Include/document/all-apportioned-web-document.pdf,
+    read 2026-11-15): ''For paddy crop production figures refer to rice production
+    for all districts ... converted into rice by using 0.66 as the conversion factor.''
+    The Mendeley panel used here is derived from the same database (unapportioned
+    version); team to confirm the unapportioned document says the same.'
+cost_of_cultivation:
+  concept: A2+FL
+  inflation_ratio:
+    rice:
+      cost_2020_21_rs_per_quintal: 1245
+      cost_2026_27_rs_per_quintal: 1627
+      ratio: 1.30683
+    pigeonpea:
+      cost_2020_21_rs_per_quintal: 3796
+      cost_2026_27_rs_per_quintal: 5496
+      ratio: 1.44784
+    bajra:
+      cost_2020_21_rs_per_quintal: 1175
+      cost_2026_27_rs_per_quintal: 1858
+      ratio: 1.58128
+    jowar:
+      cost_2020_21_rs_per_quintal: 1746
+      cost_2026_27_rs_per_quintal: 2682
+      ratio: 1.53608
+  base_rs_per_ha:
+    rice:
+      value: 72353.64
+      year: 2020-21
+      area: Telangana
+      source: Comprehensive Scheme for Studying the Cost of Cultivation of Principal
+        Crops, Telangana (PJTSAU page, source Directorate of Economics and Statistics,
+        GoI), Paddy A2+FL 2020-21. https://www.pjtau.edu.in/Cost_Cultivation_Crops.html,
+        read 2026-11-15
+    pigeonpea:
+      value: 33341.27
+      year: 2020-21
+      area: Telangana
+      source: Same page, Red Gram A2+FL 2020-21. https://www.pjtau.edu.in/Cost_Cultivation_Crops.html,
+        read 2026-11-15
+    bajra:
+      value: 32793
+      year: TE 2021-22
+      area: all-India
+      used: false
+      source: 'NOT USED for the operating cost (see operating_cost_rs_per_acre.bajra).
+        SECONDARY source, team to verify against the CACP report: farmingcosmos.com
+        article quoting CACP Price Policy for Kharif Crops 2023-24, all-India A2+FL
+        for Bajra, average of 2019-20 to 2021-22. https://www.farmingcosmos.com/gross-returns-for-paddy-highest-among-kharif-cereal-crops-during-te-2021-22/,
+        read 2026-11-15. No Telangana bajra survey was found; an all-India figure
+        is probably too high for low-input rainfed bajra here.'
+    jowar:
+      value: 37377
+      year: TE 2021-22
+      area: all-India
+      source: 'SECONDARY source, team to verify: same article, all-India A2+FL for
+        Jowar, average of 2019-20 to 2021-22.'

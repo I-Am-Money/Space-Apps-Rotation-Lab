@@ -31,6 +31,12 @@ def test_five_screens_and_supply_override(monkeypatch):
                 app.checkbox(key="w_canal_override").check().run()
                 assert not app.exception
                 assert app.session_state["_v"]["canal_supply"] == 600
+                app.checkbox(key="w_use_cost_overrides").check().run()
+                assert not app.exception
+                assert app.number_input(key="w_soil_test_cost").value is None
+                assert app.number_input(key="w_water_test_cost").value is None
+                assert app.session_state["_v"]["soil_test_cost"] is None
+                assert app.session_state["_v"]["water_test_cost"] is None
     finally:
         st.cache_data.clear()
         api.set_annual(None)

@@ -1,8 +1,10 @@
 # RotationLab handoff
 
-Current implementation completed locally on 2026-11-14. Read README.md, LIMITATIONS.md and engine/CONTRACT.md for current behavior. The earlier v2/v3 documents describe the build's history; they do not authorize portal submissions or external communications.
+Updated 2026-11-15 after reconciling the upstream v3 rebuild and second audit (through 6be85cb) with the local completion (d39d893). Both remote branches pointed to 6be85cb at audit time; no separate branch changes were outstanding. Read README.md, LIMITATIONS.md, docs/AUDIT_2026-11-15.md and engine/CONTRACT.md for current behavior.
 
 ## Run and verify
+
+Use Python 3.11-3.13. Streamlit >=1.58 and the pinned numerical compiler are in requirements.txt.
 
 ```sh
 .venv/bin/python -m engine check-data
@@ -13,31 +15,24 @@ Current implementation completed locally on 2026-11-14. Read README.md, LIMITATI
 .venv/bin/python scripts/prepare_deploy.py
 ```
 
-No key is needed. Read docs/DEPLOYMENT.md before publishing. The owner has requested that the completed implementation be pushed to GitHub. Public deployment and portal submission remain separate steps.
+No API key is needed. Five screens use real cached data, with an offline district map. Optional Claude explanations require user opt-in; the deterministic explanation always works. There is no toy engine or mock fallback.
 
-## Completed
+## Reconciled behavior
 
-- Recovered and checksum-verified ICRISAT/TCI apportioned crop data from the World Bank archive RR_IND_2025_488. Nalgonda district code 59 has 52 positive-yield years, 1966-2017, for rice, kharif sorghum, bajra and pigeonpea; ragi has 17. Selected bajra and jowar, giving 256 rotations. Avoided double-counting annual and kharif sorghum.
-- Updated potential yields from the real district series. Official 2026-27 ragi MSP is included. Per-acre cost budgets now use a transparent national A2+FL unit-cost proxy instead of arbitrary guesses. It remains an assumption, not a verified farm/state cost. Removed invented measurement quotes and avoided double-counting ordinary irrigation charges.
-- Added onset-driven planting, false-onset rejection and flowering heat sensitivity. Completed continuous daily accounting, capped well supply, canal-first use and no-harvest behavior when planting/maturity falls outside the modeled year.
-- Added compiled parallel numerical loops and exact shared-prefix reuse. The compiled fixed-calendar calculations match the reference equations to rounding precision. Request-specific settings are isolated with context variables; array and tipping-result caches are bounded. Large sweeps are chunked and cached views copied so old batch buffers are not retained.
-- Unified the fixed monetary water preference across recommendations, boundaries, EVPI and farm splits. Added bootstrap bands to the main rainfall/supply map and exact count-weighted tail resampling. Supply overrides vary correctly with total supply in sweeps. Preserved duplicate nondominated Pareto points.
-- Added 150-sequence interactive and 500-sequence full tipping modes, with 200 resamples. Main recommendations always use 500. Warm tipping responses reuse completed results.
-- Added an offline district-outline map, local cost inputs, heat toggle, anonymous farm CSV import, farm-yield history overlay and CSV downloads. All five screens have automated render coverage without an API key or mock fallback.
-- Validation now estimates both potential yield and trends using training data only and holds out the latest eight overlap years. Weak scores remain visible.
-- Added data-check/report/benchmark CLI commands, Docker configuration, GitHub Actions, source-bundle preparation and deployment instructions. The bundle excludes credentials and private farm-record files.
-- Optional Claude explanations require opt-in and use bounded memory caching. Template explanations always work offline.
+- Preserved the upstream plan rule (253 offered rotations, blocked monocultures comparison-only), paddy sale conversion, calibrated-calendar onset shifts, crop-specific heat windows, late-sowing penalty, soil-cover carry-over, year 1 after the farm's rice, income-shortfall and no-rotation-effect sensitivity views, and Indian currency formatting.
+- Retained the recovered ICRISAT/TCI apportioned DLD: 52 positive-yield years for rice, bajra, kharif sorghum and pigeon pea; 17 for ragi. Both bajra and jowar are selected. Source checksums are bundled. Potential-yield estimates and validation training exclude held-out years where appropriate.
+- Verified the upstream Telangana rice and pigeon-pea cultivation costs against the official university table and retained their explicit scaling assumptions. Millet budgets remain national unit-cost proxies. Measurement quotes stay unknown until entered. No separate water charge is deducted from profit.
+- Adapted the compiled daily water kernel to the upstream onset/heat model. Water accounting, fixed-calendar equation parity, heat/onset/supply monotonicity, capped wells and canal-first use are tested.
+- Kept request-local settings, bounded immutable model caches, shared-prefix simulation reuse, copied cache slices, source/config version tokens, exact count-weighted boundary bootstrap, and cached tipping responses.
+- Supply overrides scale in boundary/EVPI sweeps. The full tipping option actually uses 500 sequences; interactive mode uses 150, with 200 boundary resamples. Main recommendations use 500.
+- Preserved anonymous session-only farm uploads, local cultivation costs and measurement quotes, CSV/JSON exports, accessible decision-grid tables, Docker/CI/source bundles. Private local farm-record files are excluded from Git and Docker.
 
-## Performance
+## Verification and performance
 
-On this machine, with 256 rotations and 500 scenarios after native compilation: changed priorities approximately 0.06 s, changed supply approximately 0.79 s. Full tipping analysis approximately 18 s cold and 0.01 s cached. Initial imports and native compilation add startup time. Exact measurements are in output/benchmark-500.json when generated; timings depend on hardware and input settings.
+150 combined tests passed in 51.97 seconds on Python 3.13 / Streamlit 1.67.0; final UI checks are repeated after presentation refinements. Static analysis and source checks pass. The 500-sequence benchmark measured 2.92 s for a cold recommendation, 0.08 s after priority changes, 0.92 s after supply changes, 19.84 s for cold full tipping and 0.03 s cached. Timing depends on hardware and compilation state. Machine-readable reports are generated under ignored output/.
 
-## Remaining real-world work
+## Remaining limitations
 
-All selected crops now have district validation data. Actual farm supply, local costs, agronomic calibration and measurement quotes cannot be established from public records alone. They remain clearly identified assumptions or optional local inputs; do not fabricate them or call regional proxies farm observations. Review LIMITATIONS.md before using rankings.
+Farm supply, actual local budgets, agronomic calibration and measurement quotes cannot be established from public records alone. They remain labeled assumptions or optional local inputs. Weak validation remains visible; the app is decision support, not a guarantee.
 
-Public deployment requires a writable repository or a hosting account that can upload the prepared bundle. Browser automation was unavailable, so public/mobile visual review remains an external verification step. Do not submit anything to the Space Apps portal until the team explicitly authorizes submission. Never include village locations, team names, email addresses or keys in app artifacts.
-
-## Final verification
-
-The completed source passes 106 tests on Streamlit 1.67.0. The older 1.51 navigation path was also exercised before the final export refinements. An independently extracted source bundle passed 105 tests and all five numerical API paths passed with networking disabled. Final screen checks were repeated after the current-input source table and export changes. Source/ZIP manifests are in output/. A visual browser review and Docker build were unavailable; no public deployment is claimed.
+Public hosting, mobile/browser visual review and a Docker image build still require their own verification; this audit does not claim them. Repository publishing does not authorize a Space Apps portal submission or external communications. Never include village locations, personal names, emails or keys in app artifacts.

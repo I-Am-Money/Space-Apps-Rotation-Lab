@@ -1,3 +1,4 @@
+# AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Continuous daily root-zone water balance over a 4-year plan (FAO-56 ch.8 + SCS runoff + FAO-33 yield).
 
 Design
@@ -41,6 +42,11 @@ def scs_runoff(precip, cn, ia_ratio=0.2):
     ia = ia_ratio * s
     ex = np.maximum(precip - ia, 0.0)
     return ex * ex / (ex + s)
+
+
+def _record(rec, name, day, v, val):
+    """Write one day's values into the daily record, only for the scenarios that are in this phase on that day."""
+    rec[name][:, v, day] = val[:, v]
 
 
 def _dry_phase(Dr, kcet0T, peT, taw, inv, dcol, rec=None, off=0):
@@ -321,8 +327,13 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
         raise ValueError("Soil capacity must be positive and irrigation nonnegative")
     ns = rain.shape[0]
     starts = np.empty((ns, 4, len(ids)), dtype=np.int64)
+    from engine import monsoon
     for ci, cid in enumerate(ids):
-        if "onset_doy" in scen:
+        if "onset_doy" in scen and "onset_median" in scen:
+            starts[:, :, ci] = monsoon.sowing_doy(crops[cid].sowing_doy, crops[cid].season_days,
+                                                  scen["onset_doy"], scen["onset_median"]) - 1
+        elif "onset_doy" in scen:
+            # Legacy standalone scenarios use zero-based absolute planting onset.
             lag = A(params, "monsoon.rice_sowing_lag_days" if cid == "rice" else "monsoon.rainfed_sowing_lag_days")
             starts[:, :, ci] = np.minimum(365, np.asarray(scen["onset_doy"], dtype=int) + int(lag))
         else:
@@ -367,7 +378,7 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
     group = A(params, "hydrology.hydrologic_group")
     dcol = awc * max(c.root_depth_m for c in cp)
     heat_on = bool(A(params, "heat.enabled"))
-    thresholds = np.array([A(params, "heat.rice_threshold_c" if c == "rice" else "heat.pigeonpea_threshold_c" if c == "pigeonpea" else "heat.millet_threshold_c") for c in ids])
+    thresholds = np.array([A(params, f"heat.tmax_c.{c}") for c in ids])
     seen, owners = {}, np.zeros((len(plans), 4), dtype=np.int64)
     for r, plan in enumerate(plans):
         for y in range(4):
@@ -382,14 +393,22 @@ def simulate_batch(scen: dict, plans: Sequence[Sequence[str]], awc_mm_per_m: flo
         float(A(params, "fallow.kc")), awc * float(A(params, "fallow.evap_depth_m")), float(A(params, "fallow.depletion_fraction")),
         float(A(params, "hydrology.init_depletion_frac")), float(A(params, "rice_irrigation.percolation_seepage_mm_day")),
         float(A(params, "rice_irrigation.puddling_water_mm")), float(A(params, "rice_irrigation.bund_height_mm")),
-        heat_on, float(A(params, "heat.penalty_per_day")), thresholds,
-        np.array([sum(c.stages_days[:2]) for c in cp]), int(A(params, "heat.flowering_window_days")), bool(params.get("record_daily")))
+        heat_on, float(A(params, "heat.pen_per_day")), thresholds,
+        np.array([sum(c.stages_days[:2]) for c in cp]), np.array([int(A(params, f"heat.flowering_days.{c}")) for c in ids]), bool(params.get("record_daily")))
     keys = ("yield_kg_ha", "eta_mm", "etm_mm", "rain_mm", "irrig_mm", "irrig_needed_mm", "runoff_mm", "drainage_mm", "puddle_mm",
             "rain_total_mm", "eta_total_mm", "runoff_total_mm", "drainage_total_mm", "irrig_total_mm", "irrig_canal_mm", "irrig_well_mm",
             "supply_canal_mm", "supply_well_mm", "heat_days")
     out = dict(zip(keys, raw))
     out.update(storage_change_mm=storage, dcol_mm=dcol, plans=plans,
                sowing_doy=np.stack([starts[:, y, ids.index(p[y])] + 1 for p in plans for y in range(4)]).reshape(len(plans), 4, ns).transpose(0, 2, 1))
+    out["hot_days"] = out["heat_days"]
+    out["heat_factor"] = np.maximum(0., 1. - out["heat_days"] * float(A(params, "heat.pen_per_day")))
+    base_sow = np.array([min(crops[c].sowing_doy, 366 - crops[c].season_days) for c in ids])
+    out["late_days"] = np.stack([np.maximum(starts[:, y, ids.index(p[y])] + 1 - base_sow[ids.index(p[y])], 0)
+                                 for p in plans for y in range(4)]).reshape(len(plans), 4, ns).transpose(0, 2, 1)
+    out["late_factor"] = (np.maximum(0., 1. - out["late_days"] * float(A(params, "late_sowing.pen_per_day")))
+                           if A(params, "late_sowing.enabled") else np.ones_like(out["late_days"]))
+    out["yield_kg_ha"] *= out["late_factor"]
     out["closure_error_mm"] = (out["rain_total_mm"] + out["irrig_total_mm"] - out["eta_total_mm"] - out["runoff_total_mm"] - out["drainage_total_mm"]).sum(-1) - storage
     if params.get("record_daily"):
         out["daily"] = dict(zip(("dr", "ks", "eta", "need"), daily))

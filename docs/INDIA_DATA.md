@@ -22,7 +22,11 @@ Accessed 2026-11-14; marketing season 2026-27. Cached release: data/raw/msp_khar
 
 Official MSP / national A2+FL cost, Rs per quintal: paddy common 2441 / 1627; hybrid jowar 4023 / 2682; bajra 2900 / 1858; ragi 5205 / 3470; tur 8450 / 5496. These are not state-specific costs per acre. The cost concept includes paid-out expenses and imputed family labour, including ordinary irrigation and pump energy.
 
-Default per-acre budgets are explicit assumptions computed as national A2+FL Rs/quintal * detrended district potential kg/ha / 100 * 0.404686 ha/acre. This combines two published quantities under a modeling assumption and must not be described as observed Telangana cost of cultivation. Attempts to retrieve current state cost tables from DES and IASRI failed in the environment. Additional irrigation charges default to zero to avoid adding ordinary irrigation twice; user-entered incremental charges can replace that assumption.
+Rice and pigeon-pea costs use the official Telangana A2+FL cultivation survey: paddy Rs 72,353.64/ha and red gram Rs 33,341.27/ha in 2020-21, verified against https://www.pjtau.edu.in/Cost_Cultivation_Crops.html on 2026-11-15. They are scaled using the national 2026-27/2020-21 A2+FL unit-cost ratios (rice 1627/1245; tur 5496/3796) and 0.404686 ha/acre, giving rounded defaults Rs 38,265 and Rs 19,535 per acre. The historical survey is observed; scaling to current budgets is an assumption. The earlier PIB release is https://pib.gov.in/PressReleasePage.aspx?PRID=1628349.
+
+Millet budgets remain assumptions: national A2+FL Rs/quintal times district potential kg/ha / 100 times 0.404686. No verified Telangana millet budget is bundled. Local cost overrides are preferable. Irrigation is already included in A2+FL; no extra water charge is deducted from profit.
+
+Rice district yields are milled rice, per the ICRISAT apportioned-database documentation (https://vdsa.icrisat.org/Include/document/all-apportioned-web-document.pdf). Sales convert milled yield to paddy by dividing by 0.66. Model yields and validation remain in milled-rice units.
 
 Nitrogen-credit savings use an assumed urea-equivalent price: Rs 266.50 per 45 kg bag divided by 46% nitrogen content. The official subsidized bag price is reported at https://www.pib.gov.in/PressReleasePage.aspx?PRID=2272695&lang=2&reg=3 (14 June 2026). This is a price proxy, not a purchase receipt, and does not validate the assumed legume credit.
 
