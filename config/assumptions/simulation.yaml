@@ -73,7 +73,7 @@ fallow:
 
 crops:
   maize:
-    name: {value: "Maize (corn, grain)", range: null, unit: "text", source: "Display name.", badge: observed}
+    name: {value: "Corn (maize, grain)", range: null, unit: "text", source: "Display name.", badge: observed}
     legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
     season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
     kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}

@@ -145,3 +145,13 @@ runs inside Feature 2 at run time: the simulation, climate modes and tipping poi
   Measured on the build machine with six crops (1,296 rotations): 6.5 seconds without it, 1.9 seconds with it, the
   same rotations picked, sometimes listed from a different starting year. It is off unless asked for, so Feature 3's
   results are unchanged today. It applies only to the 500 bootstrap plans.
+
+## Tipping Points page: names, colors and summary line (after the 5 PM audit)
+
+- A plan is written in the same year order as on the Recommendations page (the farm's current plan keeps its own
+  order). Before this, the same rotation could read "Cotton > Cotton > Cotton > Winter wheat" on this page and
+  "Cotton, Cotton, Winter wheat, Cotton" on Recommendations. The curves now simulate that same year order.
+- One color per plan across the map and the three charts: green is the best plan today, grey is the current plan.
+- When no single change (rainfall, heat or water) moves the best plan but some rainfall-and-water combinations
+  on the map do, the summary line now says so and counts them, instead of saying the plan never changes.
+- Display name of maize is "Corn" (US-first app). The crop id stays `maize`.

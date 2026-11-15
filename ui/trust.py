@@ -84,6 +84,15 @@ def _s(v) -> str:
     return "" if v is None or (isinstance(v, float) and v != v) else str(v)
 
 
+def _crop_word(cid) -> str:
+    """The crop's plain name ('corn', 'winter wheat') for a crop id; the id with spaces when the library has no entry."""
+    try:
+        from engine.crops import get_crop
+        return get_crop(str(cid)).name.split(" (")[0].lower()
+    except Exception:
+        return _s(cid).replace("_", " ")
+
+
 def validation_rows(summary) -> list[dict]:
     """Display rows: county, crop, held-out r and MAE (t/ha) with and without the correction, status."""
     df = _table_df(summary)
@@ -97,7 +106,7 @@ def validation_rows(summary) -> list[dict]:
             "Country": "US" if _s(r.get("fips")) else "India" if "India" in _s(r.get("region")) else "",
             "ERS region": _s(r.get("ers_region")) or _s(r.get("region")),
             "Yield records": "USDA NASS county" if _s(r.get("fips")) else "ICRISAT district" if "India" in _s(r.get("region")) else "",
-            "Crop": _s(r.get("crop")), "Water": _s(r.get("water")),
+            "Crop": _crop_word(r.get("crop")), "Water": _s(r.get("water")),
             "r (held out)": _fmt(r.get("r")) if ok else "n/a", "MAE t/ha": mae("mae"),
             "r corrected": _fmt(r.get("r_corrected")) if ok else "n/a", "MAE corrected t/ha": mae("mae_corrected"),
             "Years train/test": f"{int(r['n_train'])}/{int(r['n_test'])}" if ok else "",
@@ -144,10 +153,12 @@ def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
     what = "NASS county" if fips else "district"
     if not pd.notna(r.get("r")) or float(r["r"]) <= 0:
         # checked, but the model did not follow the real ups and downs on held-out years: still a warning
-        return {"show": True, "text": f"Not validated here: checked against {what} yields ({r['crop']}), but the model did "
-                                      f"not track them on held-out years (r = {_fmt(r.get('r'))}). See How Good Is This?"}
-    return {"show": False, "text": f"Checked against {what} yields here ({r['crop']}): held-out r = "
-                                   f"{_fmt(r.get('r'))}. See How Good Is This?"}
+        return {"show": True, "text": f"Not validated here: checked against real {what} {_crop_word(r['crop'])} yields, but the "
+                                      f"model did not track them in the years it never saw (r = {_fmt(r.get('r'))}). "
+                                      f"See How good is this?"}
+    return {"show": False, "text": f"Accuracy check for this place: against real {what} {_crop_word(r['crop'])} yields in years "
+                                   f"the model never saw, correlation r = {_fmt(r.get('r'))} (1.00 is perfect). "
+                                   f"See How good is this?"}
 
 
 # ------------------------------------------------------------------------------------------- assumptions

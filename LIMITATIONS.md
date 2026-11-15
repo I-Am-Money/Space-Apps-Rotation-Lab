@@ -1,8 +1,7 @@
 # Limitations
 
 RotationLab gives modeled estimates for planning. It does not guarantee yield or profit and it is not a
-forecast. These limits are shown in the app and listed here (Build Spec v4, R22). Teammates: add anything you
-log to the "Logged by the team" section, or tell Person 3.
+forecast. These limits are shown in the app and listed here.
 
 ## Out of scope in this version (A10)
 

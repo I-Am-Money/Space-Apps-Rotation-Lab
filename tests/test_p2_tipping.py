@@ -77,7 +77,7 @@ def test_same_rotation_started_in_another_year_is_one_plan():
     assert a != b and T.same_rotation(a) == T.same_rotation(b)
     assert T.same_rotation(b, prefer=(a,)) == a
     assert T.rot_label(T.rot_key({"crops": [["corn"], ["soybeans"]], "cover_crops": [False, True]})) == \
-        "Maize > Soybeans > Maize > Soybeans (with cover crops)"
+        "Corn > Soybeans > Corn > Soybeans (with cover crops)"
 
 
 def test_winner_comes_from_recommend_inside_the_what_if(weather):
@@ -97,7 +97,7 @@ def test_winner_comes_from_recommend_inside_the_what_if(weather):
     tp = T.tipping_points(make_site(weather), inp, {"climate_shift": "historical"}, recommend=recommend)
     assert "recommend()" in tp["method"]["winner_source"]
     rc, m = tp["rainfall_curve"], tp["map_2d"]
-    wet, dry = f"{T.CURRENT}: Maize > Soybeans > Maize > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
+    wet, dry = f"{T.CURRENT}: Corn > Soybeans > Corn > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
     assert rc["winner"] == [dry] * 3 + [wet] * 6
     assert len(rc["crossovers"]) == 1 and 0.7 <= rc["crossovers"][0] <= 0.8
     band = tp["bands"]["rainfall"][0]
@@ -130,7 +130,7 @@ def test_fewer_weather_plans_alone_never_show_a_tipping_point(weather, monkeypat
         return {"headline": pick, "highest_profit": pick, "best_soil": pick, "all_results": [pick], "example": False}
 
     tp = T.tipping_points(make_site(weather), make_inputs(plan=MS), {"climate_shift": "historical"}, recommend=recommend)
-    wet, dry = f"{T.CURRENT}: Maize > Soybeans > Maize > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
+    wet, dry = f"{T.CURRENT}: Corn > Soybeans > Corn > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
     assert tp["method"]["scenarios_winner"] == 100 and 100 in sizes
     assert any("pick a different plan than they pick at your current setting" in n for n in tp["notes"])
     # the swap on fewer plans is not shown; the real change below 0.75 x rain still is
@@ -192,7 +192,8 @@ def test_with_the_real_feature_3_optimizer(weather):
     assert not any("not by the recommendation engine" in n for n in tp["notes"]), tp["notes"]
     base = optimize.recommend_picks(site, inp, sliders, explain_text=False)
     pick = base["headline"] or base["highest_profit"]
-    assert tp["winner_now"].endswith(T.rot_label(T.same_rotation(T.rot_key(pick), (T.rot_key(inp.current_plan),))))
+    # the pick keeps the year order the Recommendations page shows (unless it is the current plan started another year)
+    assert tp["winner_now"].endswith(T.rot_label(T.same_rotation(T.rot_key(pick), (T.rot_key(inp.current_plan), T.rot_key(pick)))))
     m = tp["map_2d"]
     assert m["winner"][m["current"]["row"]][m["current"]["col"]] == tp["winner_now"]
     assert all(isinstance(v, str) and v != "Not worked out" for row in m["winner"] for v in row)
