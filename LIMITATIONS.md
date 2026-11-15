@@ -1,5 +1,66 @@
 # Limitations
 
+RotationLab gives modeled estimates for planning. It does not guarantee yield or profit and it is not a
+forecast. These limits are shown in the app and listed here (Build Spec v4, R22). Teammates: add anything you
+log to the "Logged by the team" section, or tell Person 3.
+
+## Out of scope in this version (A10)
+
+1. Orchards and tree crops ("not supported yet"). Alaska and Hawaii are not supported in this version.
+2. Intercropping.
+3. Field-level validation. Validation compares against county averages, not single fields.
+4. Measured soil carbon. The Soil Health Score is a rule-based score, not a soil test.
+5. Groundwater depletion over many years.
+6. Market price risk. Prices are fixed across weather scenarios.
+7. SMS or offline access.
+8. Full 3D field zones if the 2D zones are not finished.
+
+## Model and data limits (v4)
+
+9. **Weather is a grid estimate.** NASA POWER is about a 0.5 degree grid, not a field station. Solar
+   radiation starts in 1984, so the usable record is 1984 to 2025 and no values are invented for 1981 to 1983.
+10. **Climate shift settings are what-ifs.** "Recent" and "Continuing trend" reweight or shift real weather
+    years. They are not climate projections.
+11. **Soil Health Score.** The NRCS principles (cover, living roots, diversity, minimal disturbance) are real.
+    The weights, point values, harvest indices, residue carbon fraction and cover crop biomass that turn them
+    into a 0 to 100 number are team choices. Many are marked "team to verify" with a Placeholder badge (see
+    `config/assumptions.yaml`, section `soil_score`). If yields are missing, residue carbon is left out instead
+    of guessed. Field history adjustments (erosion, waterlogging, salinity) shift every plan by the same amount.
+12. **Hindcast model.** Until the team's yield function for hindcasts is in place, validation uses a stand-in
+    single-season model: FAO-56 single crop coefficient water balance, Hargreaves ET0, FAO-33 Ky, a fixed US
+    planting day per crop, and a default 150 mm/m soil water capacity. These settings are in
+    `config/validation/standin_crops.yaml` and its results are badged "stand-in". It has no rotation effects,
+    pests, varieties or management changes. It is rainfed, so agreement in mostly irrigated counties (Georgia,
+    Mississippi Delta, Arkansas rice) is expected to be weaker, and that is reported, not hidden.
+13. **Validation design.** Both series are detrended with lines fitted on training years only. The latest 8
+    years are held out from the trend, the potential yield (Ym) and the correction. Pearson r on 8 held-out
+    years is noisy. County yields average many farms. Agreement with county yields does not prove the model is
+    right for a given field.
+14. **Bias correction.** The linear correction (season rain, heat days, year) is fitted per county and crop on
+    training years only, and only with at least 10 training years. It can soak up trend and bias, but it is a
+    statistical fix, not crop science, and it may not carry over to years unlike the training years.
+15. **Explanations.** Claude writes the explanation text from computed numbers only. The guard checks numbers
+    and crop names, not wording. A reply that passes the guard can still word things loosely. Without an API key
+    the fixed template is used.
+
+## Blocked items and the fallback used
+
+16. **NASS yields not loaded yet (2026-11-15).** No `NASS_API_KEY` is set in this environment and the v4 NASS
+    fetcher is not on main yet, so the validation table shows "validation not run yet" or "no NASS data" for
+    every county. Nothing is filled in. Fallback: rerun `python -m engine.correction` once yields are cached.
+17. **v4 engine API not on main yet (2026-11-15).** Soil score, hindcast, correction and explanation modules are
+    built against the A5 interface in the build spec, with stand-ins inside their own files. They switch to the
+    real `engine/api.py` types when it lands.
+18. **India (ICRISAT) is not in the v4 validation.** The India loader works only for the earlier Telangana build.
+
+## Logged by the team
+
+(Teammates add items here.)
+
+## Earlier India version (v3, Telangana)
+
+These apply to the India build that is still on main until the v4 merge.
+
 1. **Planning estimates.** The app supports farmer and local-expert judgment and does not guarantee yield or profit. It is not a forecast.
 2. **Scope.** Nalgonda, kharif, one crop per year over four years. No rabi, intercropping, pest model, varietal model or market-risk model.
 3. **Spatial resolution.** NASA POWER is a regional grid estimate at a district centroid, not a field measurement. The centroid is calculated from an OpenStreetMap district boundary. Upstream points are approximate sub-basin anchors, not a catchment-weighted rainfall integral.
