@@ -18,8 +18,22 @@ _DARK_TEXT = {"jowar", "pigeonpea"}
 
 
 def badge(kind: str) -> str:
-    label, cls, tip = BADGES.get(kind or "placeholder", BADGES["placeholder"])
-    return f'<span class="rl-badge {cls}" title="{html.escape(tip)}">{label}</span>'
+    """Shared v5 provenance badge; accepts canonical names and legacy engine aliases."""
+    normalized = str(kind or '').strip().lower().replace('-', '_').replace(' ', '_')
+    aliases = {'modeled': 'estimated', 'modelled': 'estimated', 'local': 'your_input',
+               'input': 'your_input', 'placeholder': 'example', 'stub': 'example',
+               'mock': 'example', 'example_data': 'example'}
+    normalized = aliases.get(normalized, normalized)
+    catalog = {
+        'observed': ('Observed', 'obs', 'Measured or officially published source data.'),
+        'estimated': ('Estimated', 'mod', 'Computed or spatially estimated; not a field measurement.'),
+        'your_input': ('Your input', 'loc', 'Supplied by the farmer or their own records.'),
+        'assumption': ('Assumption', 'asm', 'A stated planning assumption; see source and range.'),
+        'example': ('EXAMPLE DATA', 'ph', 'Demonstration data. Not computed from this farm; do not use for decisions.'),
+    }
+    label, cls, tip = catalog.get(normalized, catalog['assumption'])
+    style = ' style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5"' if normalized == 'example' else ''
+    return f'<span class="rl-badge {cls}" title="{html.escape(tip)}"{style}>{label}</span>'
 
 
 def md(s: str) -> None:
