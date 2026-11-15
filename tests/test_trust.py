@@ -42,7 +42,7 @@ def test_validation_rows_convert_mae_to_tonnes_and_hide_unrun():
 
 def test_real_validation_summary_lists_all_sites():
     rows = trust.validation_rows(trust.load_validation())
-    assert len({r["County"] for r in rows}) == 14
+    assert len({r["County"] for r in rows}) >= 14
 
 
 def test_assumption_rows_badge_unverified_as_placeholder(tmp_path):
@@ -62,3 +62,10 @@ def test_assumption_rows_read_all_project_files():
 def test_docs_load():
     for name in trust.DOCS:
         assert len(trust.doc_text(name)) > 50
+
+
+def test_banner_outside_us_hidden_only_near_validated_district():
+    t = pd.DataFrame([{"site": "IN-x", "crop": "jowar", "fips": None, "status": "ok", "r": 0.3, "lat": 16.9, "lon": 79.2}])
+    s = SimpleNamespace(table=t, sites=[])
+    assert not trust.banner_for_site({"lat": 17.0, "lon": 79.0, "us_county_fips": None}, s)["show"]
+    assert trust.banner_for_site({"lat": 20.0, "lon": 79.0, "us_county_fips": None}, s)["show"]

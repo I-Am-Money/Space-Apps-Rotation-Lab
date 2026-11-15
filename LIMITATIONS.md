@@ -75,7 +75,14 @@ log to the "Logged by the team" section, or tell Person 3.
 23. **v4 engine API and yield function not on main yet (2026-11-15).** Validation uses the stand-in yield model
     (item 12) until the team's single-season yield function is merged. The trust page reads
     `api.validation_summary()` once it exists and uses the same table from `engine/correction.py` until then.
-24. **India (ICRISAT) is not in the v4 validation.** The India loader works only for the earlier Telangana build.
+24. **India validation pack: one district.** The only India check is Nalgonda district, Telangana (ICRISAT/TCI
+    District Level Database, which ends in 2017). It covers jowar, bajra and pigeon pea, rainfed, with the
+    stand-in model and the crop settings in `config/assumptions.yaml`. Training years are 1984 to 2009, because
+    NASA POWER solar data starts in 1984, and the held-out years are 2010 to 2017. Results are mixed and are
+    shown as they came out: on held-out years the correction made the average error larger for all three
+    crops. District boundaries changed in 2016, and the yields come from the older, larger district. Rice is left
+    out because district rice mixes irrigated and rainfed fields. Pins outside the US count as "validated" only
+    within 0.5 degrees of this district's centroid (team choice).
 
 ## Logged by the team
 

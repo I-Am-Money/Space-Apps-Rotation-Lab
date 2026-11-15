@@ -128,4 +128,4 @@ def test_hindcast_reads_county_yields_through_fetch_nass(tmp_path, monkeypatch):
 
 def test_hindcast_exposes_validation_summary():
     v = hc.validation_summary()
-    assert hasattr(v, "table") and hasattr(v, "sites") and len(v.sites) == 14
+    assert hasattr(v, "table") and hasattr(v, "sites") and len(v.sites) == len(hc.all_validation_sites()) >= 14

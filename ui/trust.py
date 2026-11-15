@@ -21,6 +21,7 @@ ASSUMPTION_FILES = [ROOT / "config" / "assumptions.yaml", *sorted((ROOT / "confi
 DOCS = {"Limitations": ROOT / "LIMITATIONS.md", "Data sources": ROOT / "DATA_SOURCES.md", "AI use": ROOT / "AI_USE.md"}
 NOT_VALIDATED = ("Not validated here: there are no local yield records for this location to check the model "
                  "against, so these are model estimates only.")
+NEAR_DEG = 0.5      # team choice: about one NASA POWER cell; a district is roughly this size. Team to verify.
 VERIFY_WORDS = ("team to verify", "placeholder", "unverified", "tbd")
 
 
@@ -85,22 +86,30 @@ def validated_fips(summary) -> set[str]:
 def banner_for_site(site=None, summary=None, crop: str | None = None) -> dict:
     """{"show": bool, "text": str}. The banner shows unless the pin's US county has hindcast results
     (status ok) for the crop (or any crop if crop is None). Non-US pins always show it."""
-    fips = getattr(site, "us_county_fips", None) if site is not None else None
-    if isinstance(site, dict):
-        fips = site.get("us_county_fips") or site.get("fips")
-    if not fips:
+    get = (lambda k: site.get(k)) if isinstance(site, dict) else (lambda k: getattr(site, k, None))
+    fips = (get("us_county_fips") or get("fips")) if site is not None else None
+    lat, lon = (get("lat"), get("lon")) if site is not None else (None, None)
+    if not fips and (lat is None or lon is None):
         return {"show": True, "text": NOT_VALIDATED}
     summary = load_validation() if summary is None else summary
     df = _table_df(summary)
-    if df.empty or "fips" not in df or "status" not in df:
+    if df.empty or "status" not in df:
         return {"show": True, "text": NOT_VALIDATED}
-    here = df[(df["fips"].astype(str).str.zfill(5) == str(fips).zfill(5)) & (df["status"] == "ok")]
+    ok = df[df["status"] == "ok"]
+    if fips and "fips" in ok:
+        here = ok[ok["fips"].astype(str).str.zfill(5) == str(fips).zfill(5)]
+    elif not fips and {"lat", "lon"} <= set(ok.columns):
+        # outside the US: validated districts (no FIPS) count for pins within NEAR_DEG of their centroid
+        nofips = ok[ok["fips"].isna()] if "fips" in ok else ok
+        here = nofips[((nofips["lat"] - float(lat)).abs() <= NEAR_DEG) & ((nofips["lon"] - float(lon)).abs() <= NEAR_DEG)]
+    else:
+        here = ok.iloc[0:0]
     if crop is not None:
         here = here[here["crop"] == crop]
     if here.empty:
         return {"show": True, "text": NOT_VALIDATED}
     r = here.iloc[0]
-    return {"show": False, "text": f"Checked against NASS yields in this county ({r['crop']}): held-out r = "
+    return {"show": False, "text": f"Checked against {'NASS county' if fips else 'district'} yields here ({r['crop']}): held-out r = "
                                    f"{_fmt(r.get('r'))}. See How Good Is This?"}
 
 
@@ -175,9 +184,10 @@ def render() -> None:
     summary = load_validation()
     rows = validation_rows(summary)
     st.subheader("Validation (hindcast)")
-    if not any(r["Status"] == "validated" for r in rows):
-        st.warning("Validation has not been run yet: NASS county yields are not cached (they need a NASS API key). "
-                   "The counties below are the ones that will be checked.")
+    us_ok = [r for r in rows if r["Status"] == "validated" and r["ERS region"] not in ("", "Deccan Plateau (India)")]
+    if not us_ok:
+        st.warning("US counties are not validated yet: NASS county yields are not cached (they need a NASS API "
+                   "key). The US counties below are the ones that will be checked.")
     st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
                "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
                "training years only.")

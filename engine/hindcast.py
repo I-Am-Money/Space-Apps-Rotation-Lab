@@ -171,6 +171,7 @@ VALIDATION_DIR = ROOT / "config" / "validation"
 SITES_PATH = VALIDATION_DIR / "sites.yaml"
 STANDIN_PATH = VALIDATION_DIR / "standin_crops.yaml"
 RESULTS_PATH = VALIDATION_DIR / "results.csv"
+INDIA_PATH = VALIDATION_DIR / "india.yaml"
 US_HOLDOUT_YEARS = 8
 
 
@@ -187,12 +188,57 @@ def validation_sites() -> list[dict]:
     return list(load_yaml(SITES_PATH)["sites"])
 
 
+def india_sites() -> list[dict]:
+    """India validation pack (config/validation/india.yaml), only when its ICRISAT loader works."""
+    if not INDIA_PATH.exists():
+        return []
+    cfg = load_yaml(INDIA_PATH)
+    if not cfg.get("enabled") or load_observed() is None:
+        return []
+    return list(cfg.get("sites") or [])
+
+
+def all_validation_sites() -> list[dict]:
+    return validation_sites() + india_sites()
+
+
+def crop_settings(crop: str) -> dict:
+    """Stand-in season settings: US crops from standin_crops.yaml; India crops (jowar, bajra, pigeonpea) from
+    the shared config/assumptions.yaml (crops.<id>, heat.tmax_c.<id>), same keys."""
+    us = load_yaml(STANDIN_PATH)["crops"]
+    if crop in us:
+        return us[crop]
+    shared = load_yaml(ROOT / "config" / "assumptions.yaml")
+    c = shared["crops"][crop]
+    v = lambda k: c[k]["value"] if isinstance(c[k], dict) else c[k]
+    heat = shared.get("heat", {}).get("tmax_c", {}).get(crop, {})
+    return {"plant_doy": int(v("sowing_doy")), "stages": list(v("stages_days")),
+            "kc": [v("kc_ini"), v("kc_mid"), v("kc_end")], "ky": v("ky"), "root_m": v("root_depth_m"),
+            "p": v("p"), "heat_c": heat["value"] if isinstance(heat, dict) else heat}
+
+
+def load_icrisat_yields(crop: str) -> pd.DataFrame | None:
+    """[year, yield_kg_ha] district yields from the ICRISAT loader (India pack), or None."""
+    df = load_observed()
+    if df is None:
+        return None
+    df = df[df["crop"] == crop][["year", "yield_kg_ha"]].dropna()
+    df = df[df["yield_kg_ha"] > 0]          # zero / missing records are not yields
+    return df if len(df) else None
+
+
+def load_site_yields(site: dict, crop: str) -> pd.DataFrame | None:
+    if site.get("yield_source") == "icrisat":
+        return load_icrisat_yields(crop)
+    return load_county_yields(str(site.get("fips")), crop, site.get("nass_practice"))
+
+
 # ---------------------------------------------------------------- season window and features
 
 def season_window(crop: str, year: int) -> tuple[pd.Timestamp, pd.Timestamp, dict]:
     """(first day, last day, crop settings) of the season harvested in `year` (stand-in calendar).
     A plant_doy later than the season length allows (winter wheat) starts in the previous year."""
-    c = load_yaml(STANDIN_PATH)["crops"][crop]
+    c = crop_settings(crop)
     length = int(sum(c["stages"]))
     start = pd.Timestamp(year, 1, 1) + pd.Timedelta(days=int(c["plant_doy"]) - 1)
     if int(c["plant_doy"]) + length > 366:
@@ -407,7 +453,7 @@ def hindcast_county(site: dict, crop: str, weather: pd.DataFrame | None = None,
     else:
         badge = "Estimated"
     weather = load_site_weather(site) if weather is None else weather
-    yields = load_county_yields(str(site.get("fips")), crop, site.get("nass_practice")) if yields is None else yields
+    yields = load_site_yields(site, crop) if yields is None else yields
     empty = dict(years=[], actual=[], modeled=[], train_mask=[], season_rain_mm=[], heat_days=[], ym_kg_ha=None,
                  r_train=None, r_test=None, mae_train=None, mae_test=None, mae_anom_test=None)
     if weather is None:
