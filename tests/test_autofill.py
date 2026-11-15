@@ -140,3 +140,59 @@ def test_live_address_and_crop_history():
     assert g["state"] == "DC"
     h = cdl.crop_history(42.20, -93.62)
     assert len(h) == 5 and any(r["crop"] == "maize" for r in h)
+
+
+# ------------------------------------------------------------------------------------------------ nearest cropland
+def test_inverse_projection_round_trips_and_matches_the_reference_library():
+    for lon, lat in [(-93.62, 42.20), (-97.60, 38.40), (-83.60, 31.50), (-120.1, 36.6), (-70.0, 44.0)]:
+        lo, la = cdl.from_albers(*cdl.to_albers(lon, lat))
+        assert abs(lo - lon) < 1e-9 and abs(la - lat) < 1e-9
+    pyproj = pytest.importorskip("pyproj")
+    x, y = cdl.to_albers(-91.05475, 42.49518)
+    lo, la = pyproj.Transformer.from_crs(5070, 4326, always_xy=True).transform(x, y)
+    assert abs(lo - cdl.from_albers(x, y)[0]) < 1e-9 and abs(la - cdl.from_albers(x, y)[1]) < 1e-9
+
+
+def test_a_hung_request_is_retried_instead_of_waited_for(monkeypatch):
+    cdl._history.cache_clear()
+    calls = {"n": 0}
+    def flaky(url, params=None, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise requests.ReadTimeout("hung")
+        return cdl_reply("Corn")
+    monkeypatch.setattr(requests, "get", flaky)
+    row = cdl._fetch(2025, 1.0, 2.0)
+    assert row["crop"] == "maize" and calls["n"] == 2
+    seen = {}
+    monkeypatch.setattr(requests, "get", lambda url, params=None, **k: seen.update(k) or cdl_reply("Corn"))
+    cdl._fetch(2025, 1.0, 2.0)
+    assert seen["timeout"][1] <= 10                                   # a short read timeout, not a minute
+
+
+def _ring_server(monkeypatch, farm_at_metres, crop="Soybeans"):
+    """Fake service: everything within 'farm_at_metres' of the farmhouse is Developed; the east side beyond it is `crop`."""
+    cdl._history.cache_clear()
+    x0, y0 = cdl.to_albers(-91.05475, 42.49518)
+    def fake(url, params=None, **k):
+        x, y = float(params["x"]), float(params["y"])
+        dx, dy = x - x0, y - y0
+        d = (dx * dx + dy * dy) ** 0.5
+        if d < farm_at_metres or dx <= 0:
+            return cdl_reply("Developed/Low Intensity" if d < farm_at_metres else "Grass/Pasture")
+        return cdl_reply(crop)
+    monkeypatch.setattr(requests, "get", fake)
+
+
+def test_nearest_cropland_finds_the_field_next_to_the_farmhouse(monkeypatch):
+    _ring_server(monkeypatch, farm_at_metres=100)
+    n = cdl.nearest_cropland(42.49518, -91.05475)
+    assert n["crop"] == "soybean" and n["distance_m"] == 120 and n["direction"] in ("east", "northeast", "southeast")
+    back = cdl.to_albers(n["lon"], n["lat"]); home = cdl.to_albers(-91.05475, 42.49518)
+    assert abs(((back[0] - home[0]) ** 2 + (back[1] - home[1]) ** 2) ** 0.5 - 120) < 0.5     # the returned point really is 120 m away
+
+
+def test_nearest_cropland_is_none_when_there_is_no_cropland_nearby(monkeypatch):
+    cdl._history.cache_clear()
+    monkeypatch.setattr(requests, "get", lambda *a, **k: cdl_reply("Grass/Pasture"))
+    assert cdl.nearest_cropland(42.49518, -91.05475) is None

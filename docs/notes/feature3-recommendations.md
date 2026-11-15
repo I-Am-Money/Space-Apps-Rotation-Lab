@@ -60,7 +60,9 @@ For LIMITATIONS.md:
 - The crop record is a classification, not a farm record. A pixel can be wrong, so the farmer confirms every year.
 - Lower 48 states only. Alaska and Hawaii get the location but no crop history; outside the US the farmer enters everything by hand.
 - Ownership and parcel boundaries are not connected. They come from county records, which need a paid or per-county source. The page says so and does not claim to verify ownership.
-- The crop service is slow (up to about a minute for five years). The page shows a progress message.
+- The crop service usually answers in about 3 seconds, but some requests hang. The code uses an 8 second timeout with 3 attempts, so a lookup takes about 5 to 25 seconds (23 seconds in a real test).
+- A street address lands on the farmhouse, where the satellite record says Developed. The code searches rings from 60 to 450 m around the address for the nearest cropland, uses that spot for the crop record and the pin, and tells the farmer how far away it is and in which direction. Tested on a real Iowa farm address (oats 60 m away). If no cropland is within 450 m, it says so.
+- Alfalfa and other crops this tool has no parameters for are left blank for the farmer.
 - Double-cropped years are shown as the first crop only, with a note.
 - The CDL "Millet" class is not mapped (it is not pearl millet); pasture, fallow and non-crop classes are left blank for the farmer.
 - Field outline from the CDL (a map around the pin) was tried and the service timed out, so it is not built.

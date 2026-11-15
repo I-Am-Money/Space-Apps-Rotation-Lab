@@ -18,18 +18,32 @@ NOT_CONNECTED = ("Land ownership and the exact field boundary come from county r
                  "Please check that the pin is on your field and that the crops below are right.")
 
 
+def _is_cropland(history) -> bool:
+    return bool(history) and any(r["supported"] for r in history[-2:])
+
+
 def _lookup(addr: str) -> None:
     st.session_state.pop("v4_found", None)
     try:
         with st.spinner("Finding your address…"):
             geo = address.geocode(addr)
-        with st.spinner("Reading the satellite crop record for the last five years. This can take up to a minute…"):
+        with st.spinner("Reading the satellite crop record for the last five years…"):
             hist = fetch_cdl.crop_history(geo["lat"], geo["lon"])
-        st.session_state["v4_found"] = {"geo": geo, "history": hist, "suggest": fetch_cdl.suggest_plan(hist)}
+        found = {"geo": geo, "history": hist, "moved": None}
+        if not _is_cropland(hist):
+            # A street address lands on the farmhouse or the road. Look around for the nearest cropland.
+            with st.spinner("Your address is not on cropland, so we are looking around it for the nearest field…"):
+                near = fetch_cdl.nearest_cropland(geo["lat"], geo["lon"])
+            if near:
+                with st.spinner("Reading the crop record at that field…"):
+                    found["history"] = fetch_cdl.crop_history(near["lat"], near["lon"])
+                found["moved"] = {**near, "address_category": next((r["category"] for r in reversed(hist) if r["category"]), "a non-crop area")}
+        found["suggest"] = fetch_cdl.suggest_plan(found["history"])
+        st.session_state["v4_found"] = found
     except (address.AddressNotFound, address.AddressLookupError) as e:
         st.warning(str(e))
     except ValueError as e:                       # outside the lower 48: we have the spot but no crop record
-        st.session_state["v4_found"] = {"geo": geo, "history": None, "suggest": None, "note": str(e)}
+        st.session_state["v4_found"] = {"geo": geo, "history": None, "suggest": None, "moved": None, "note": str(e)}
 
 
 def _apply() -> None:
@@ -37,8 +51,9 @@ def _apply() -> None:
     geo = f.get("geo")
     if not geo:
         return
-    st.session_state["_v4_pending_pin"] = (round(geo["lat"], 5), round(geo["lon"], 5))
-    st.session_state.update(v4_lat=round(geo["lat"], 5), v4_lon=round(geo["lon"], 5))
+    spot = f.get("moved") or geo                  # the cropland we found near the address, else the address itself
+    st.session_state["_v4_pending_pin"] = (round(spot["lat"], 5), round(spot["lon"], 5))
+    st.session_state.update(v4_lat=round(spot["lat"], 5), v4_lon=round(spot["lon"], 5))
     st.session_state["v4_cdl_plan"] = (f.get("suggest") or {}).get("plan") or []
     st.session_state["_v4_autoload"] = True
     st.session_state["v4_found_applied"] = True
@@ -55,6 +70,13 @@ def _confirm(f: dict) -> None:
     show_badge("observed")
     st.caption("Source: US Census Bureau Geocoder.")
     hist = f.get("history")
+    moved = f.get("moved")
+    if moved:
+        st.info(f"Your address is on {moved['address_category'].lower()}, such as a house or road, not a field. The nearest cropland we found "
+                f"is about {moved['distance_m']} m {moved['direction']} of it, so the crop record and the map pin below use that spot. "
+                "If your field is somewhere else, click it on the map after applying.")
+    elif hist is not None and not any(r["supported"] for r in hist):
+        st.warning("We found no cropland within about 450 m of this address. You can still apply the location, then click your field on the map.")
     if hist is None:
         st.info(f.get("note", "No crop record for this spot."))
     else:

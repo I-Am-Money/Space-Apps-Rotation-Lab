@@ -107,3 +107,41 @@ def test_address_is_never_written_to_disk(monkeypatch, tmp_path):
     at.text_input(key="v4_addr").set_value("123 County Road 5, Ames, IA").run()
     at.button(key="v4_addr_go").click().run()
     assert list(tmp_path.iterdir()) == []
+
+
+def _built_up(year):
+    return [{"year": y, **fetch_cdl.classify("Developed/Low Intensity")} for y in range(2021, 2026)]
+
+
+def test_address_on_a_building_moves_the_pin_to_the_nearest_field(monkeypatch):
+    _fresh(monkeypatch)
+    monkeypatch.setattr(fetch_cdl, "nearest_cropland", lambda lat, lon, **k: {"lat": 42.4955, "lon": -91.0540, "distance_m": 120,
+                        "direction": "east", "category": "Oats", "crop": "oats"})
+    calls = {"n": 0}
+    def history(lat, lon, years=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _built_up(None)                                                         # the address itself: a house
+        return [{"year": y, **fetch_cdl.classify(c)} for y, c in zip(range(2021, 2026), ["Corn", "Corn", "Soybeans", "Corn", "Corn"])]
+    monkeypatch.setattr(fetch_cdl, "crop_history", history)
+    at = AppTest.from_function(_app, default_timeout=60).run()
+    at.text_input(key="v4_addr").set_value("123 County Road 5, Ames, IA").run()
+    at.button(key="v4_addr_go").click().run()
+    assert not at.exception
+    t = _text(at)
+    assert "not a field" in t and "120 m east" in t and "developed/low intensity" in t.lower()
+    at.button(key="v4_addr_yes").click().run()
+    assert at.session_state["_v4_pending_pin"] == (42.4955, -91.054)                        # the field, not the house
+    assert at.session_state["v4_cdl_plan"] == ["soybean", "maize", "maize", "maize"][0:0] + ["maize", "soybean", "maize", "maize"]
+
+
+def test_no_cropland_anywhere_near_says_so_and_still_lets_the_farmer_apply(monkeypatch):
+    _fresh(monkeypatch)
+    monkeypatch.setattr(fetch_cdl, "nearest_cropland", lambda lat, lon, **k: None)
+    monkeypatch.setattr(fetch_cdl, "crop_history", lambda lat, lon, years=None: _built_up(None))
+    at = AppTest.from_function(_app, default_timeout=60).run()
+    at.text_input(key="v4_addr").set_value("123 County Road 5, Ames, IA").run()
+    at.button(key="v4_addr_go").click().run()
+    assert not at.exception and "no cropland within about 450 m" in _text(at)
+    at.button(key="v4_addr_yes").click().run()
+    assert at.session_state["_v4_pending_pin"] == (42.2, -93.62)

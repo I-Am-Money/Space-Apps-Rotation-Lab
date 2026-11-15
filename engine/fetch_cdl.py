@@ -21,6 +21,8 @@ import requests
 SERVICE = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLValue"
 LATEST_YEAR = 2025          # the newest CDL year this service answered with on 2026-11-15
 YEARS_SHOWN = 5
+READ_TIMEOUT = 8       # seconds to wait for one answer before retrying
+ATTEMPTS = 3
 
 # CDL category name -> crop id used by engine/crops.py. Anything not listed is "not supported" (pasture, forest, urban, ...).
 CROP_MAP = {
@@ -61,6 +63,21 @@ def to_albers(lon: float, lat: float) -> tuple[float, float]:
     return rho * math.sin(th), _RHO0 - rho * math.cos(th)
 
 
+def from_albers(x: float, y: float) -> tuple[float, float]:
+    """EPSG:5070 easting and northing (metres) back to (longitude, latitude) in degrees."""
+    rho = math.hypot(x, _RHO0 - y)
+    theta = math.atan2(x, _RHO0 - y)
+    q = (_C - (rho * _N / _A) ** 2) / _N
+    phi = math.asin(max(-1.0, min(1.0, q / 2)))
+    for _ in range(15):
+        s_ = math.sin(phi)
+        d = (1 - _E2 * s_ * s_) ** 2 / (2 * math.cos(phi)) * (q / (1 - _E2) - s_ / (1 - _E2 * s_ * s_) + (1 / (2 * _E)) * math.log((1 - _E * s_) / (1 + _E * s_)))
+        phi += d
+        if abs(d) < 1e-14:
+            break
+    return math.degrees(_L0 + theta / _N), math.degrees(phi)
+
+
 def in_conus(lat: float, lon: float) -> bool:
     return 24.0 <= lat <= 50.0 and -125.5 <= lon <= -66.0
 
@@ -75,18 +92,19 @@ _PAT = re.compile(r'value:\s*(\d+),\s*category:\s*"([^"]*)"')
 
 
 def _fetch(year: int, x: float, y: float) -> dict:
-    last = None
-    for _ in range(2):
+    """One value request. The service usually answers in about 3 seconds but some requests hang, so use a short
+    timeout and retry a few times instead of waiting a minute."""
+    for _ in range(ATTEMPTS):
         try:
-            r = requests.get(SERVICE, params={"year": year, "x": f"{x:.1f}", "y": f"{y:.1f}"}, timeout=45,
+            r = requests.get(SERVICE, params={"year": year, "x": f"{x:.1f}", "y": f"{y:.1f}"}, timeout=(5, READ_TIMEOUT),
                              headers={"User-Agent": "RotationLab/1.0"})
             r.raise_for_status()
             m = _PAT.search(r.text)
             if not m:
                 return {"year": year, "category": None, "crop": None, "supported": False, "note": "no value returned for this year"}
             return {"year": year, **classify(m.group(2))}
-        except requests.RequestException as e:
-            last = e
+        except requests.RequestException:
+            continue
     return {"year": year, "category": None, "crop": None, "supported": False, "note": "the crop service did not answer for this year"}
 
 
@@ -120,3 +138,26 @@ def suggest_plan(history: list[dict], n: int = 4) -> dict:
     while len(plan) < n:
         plan.insert(0, None)
     return {"plan": plan, "years": [r["year"] for r in rows], "complete": all(plan), "messages": msgs}
+
+
+_DIRS = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
+
+
+def nearest_cropland(lat: float, lon: float, year: int = LATEST_YEAR, radii: tuple = (60, 120, 200, 300, 450),
+                     bearings: int = 8) -> dict | None:
+    """A street address usually lands on the farmhouse, where the satellite record says "Developed". Look in rings
+    around the point (latest year only) for the nearest spot classified as a crop this tool plans.
+    Returns {"lat", "lon", "distance_m", "direction", "category", "crop"} or None if there is none within the largest ring."""
+    x0, y0 = to_albers(lon, lat)
+    pts = [(r, b, x0 + r * math.sin(math.radians(b)), y0 + r * math.cos(math.radians(b)))
+           for r in radii for b in range(0, 360, 360 // bearings)]
+    with ThreadPoolExecutor(max_workers=16) as ex:
+        res = list(ex.map(lambda p: (p, _fetch(year, p[2], p[3])), pts))
+    for r in radii:
+        hits = [(p, row) for p, row in res if p[0] == r and row["supported"]]
+        if hits:
+            top = max({row["crop"] for _, row in hits}, key=lambda c: sum(1 for _, row in hits if row["crop"] == c))
+            p, row = next((p, row) for p, row in hits if row["crop"] == top)
+            lo, la = from_albers(p[2], p[3])
+            return {"lat": la, "lon": lo, "distance_m": r, "direction": _DIRS[int(round(p[1] / 45)) % 8], "category": row["category"], "crop": row["crop"]}
+    return None
