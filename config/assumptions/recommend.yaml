@@ -1,0 +1,197 @@
+# Parameters for Feature 3: recommendations and what to measure (Build Spec v5). Owner: Person 1.
+# Every value has a source note and a range. "team to verify" = not confirmed from a primary source.
+# Badges: observed, estimated, your_input, assumption, placeholder (placeholder = no verified source yet).
+
+soil_score:
+  label: {value: "Rule-based score from NRCS soil health principles. Not a soil test.", range: null, unit: text, source: "Required wording, Build Spec v4 R11.", badge: assumption}
+  weights:
+    cover:     {value: 0.25, range: [0.1, 0.4], unit: "share of base score", source: "Team choice, equal weight per NRCS principle (maximize soil cover). Team to verify.", badge: assumption}
+    roots:     {value: 0.25, range: [0.1, 0.4], unit: "share of base score", source: "Team choice, equal weight per NRCS principle (maximize continuous living roots). Team to verify.", badge: assumption}
+    diversity: {value: 0.25, range: [0.1, 0.4], unit: "share of base score", source: "Team choice, equal weight per NRCS principle (maximize biodiversity), includes legumes. Team to verify.", badge: assumption}
+    residue:   {value: 0.25, range: [0.1, 0.4], unit: "share of base score", source: "Team choice: residue carbon input as a proxy for feeding soil biology. Team to verify.", badge: assumption}
+  diversity:
+    species_for_full_credit: {value: 4, range: [3, 6], unit: "distinct species in 4 years (cash + cover)", source: "Team choice. Team to verify.", badge: assumption}
+    legume_share_for_full_credit: {value: 0.25, range: [0.25, 0.5], unit: "share of seasons with a legume (cash or cover)", source: "Team choice: one legume season in four years earns full legume credit. Team to verify.", badge: assumption}
+    legume_part: {value: 0.4, range: [0.2, 0.6], unit: "share of diversity component", source: "Team choice. Team to verify.", badge: assumption}
+  residue:
+    carbon_fraction: {value: 0.45, range: [0.40, 0.47], unit: "kg C per kg residue dry matter", source: "Commonly used value for crop residue; team to verify against a primary source.", badge: placeholder}
+    c_for_full_credit_t_ha_yr: {value: 4.0, range: [2.0, 5.0], unit: "t C/ha/yr", source: "Team choice for the top of the residue scale. Team to verify.", badge: assumption}
+    dm_for_full_cover_t_ha: {value: 4.0, range: [2.0, 6.0], unit: "t residue dry matter/ha", source: "Team choice: residue amount treated as full surface cover in the off-season. Team to verify.", badge: assumption}
+  repetition:
+    points_per_repeat: {value: 5, range: [2, 10], unit: "points off per back-to-back season of the same cash crop", source: "Team choice reflecting NRCS biodiversity principle (monocultures are a biological disturbance). Team to verify.", badge: assumption}
+    monoculture_extra_points: {value: 10, range: [5, 20], unit: "extra points off when one cash crop is the whole plan", source: "Team choice. Team to verify.", badge: assumption}
+  tillage:
+    points:
+      no_till:      {value: 5, range: [0, 10], unit: points, source: "Team choice reflecting NRCS principle minimize disturbance. Team to verify.", badge: assumption}
+      reduced:      {value: 0, range: [0, 5], unit: points, source: "Team choice (reference level). Team to verify.", badge: assumption}
+      conventional: {value: -5, range: [-10, 0], unit: points, source: "Team choice reflecting NRCS principle minimize disturbance. Team to verify.", badge: assumption}
+    residue_left_on_surface:
+      no_till:      {value: 0.9, range: [0.7, 1.0], unit: "share of residue left on the surface", source: "Team to verify.", badge: placeholder}
+      reduced:      {value: 0.5, range: [0.3, 0.7], unit: "share of residue left on the surface", source: "Team to verify.", badge: placeholder}
+      conventional: {value: 0.15, range: [0.0, 0.3], unit: "share of residue left on the surface", source: "Team to verify.", badge: placeholder}
+    default: {value: reduced, range: [no_till, reduced, conventional], unit: category, source: "Used when the farmer gives no tillage answer. Team choice.", badge: assumption}
+  history_points:
+    erosion:      {value: -5, range: [-10, 0], unit: points, source: "Team choice: field already shows erosion. Team to verify.", badge: assumption}
+    waterlogging: {value: -3, range: [-10, 0], unit: points, source: "Team choice: field often waterlogged. Team to verify.", badge: assumption}
+    salinity:     {value: -5, range: [-10, 0], unit: points, source: "Team choice: field has salinity. Team to verify.", badge: assumption}
+  # Per crop: legume (yes/no), living_days (days of living cover and roots per season), harvest_index (grain / total
+  # above-ground dry matter), dry_matter (grain dry matter share at the yield's reporting moisture).
+  crops:
+    maize:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 150, range: [125, 180], unit: days, source: "FAO-56 Table 11, Maize (grain) 30/40/50/30 = 150 (April planting, Calif.); Idaho row 170.", badge: observed}
+      harvest_index: {value: 0.50, range: [0.45, 0.55], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.845, range: [0.84, 0.86], unit: "-", source: "15.5% moisture, the usual US corn grain reporting basis. Team to verify.", badge: placeholder}
+    soybean:
+      legume: {value: true, range: [false, true], unit: flag, source: "Legume (nitrogen fixing).", badge: observed}
+      living_days: {value: 140, range: [120, 145], unit: days, source: "FAO-56 Table 11, Soybeans, Central USA, May planting: 140 days total.", badge: observed}
+      harvest_index: {value: 0.42, range: [0.35, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.87, range: [0.86, 0.88], unit: "-", source: "13% moisture reporting basis. Team to verify.", badge: placeholder}
+    wheat_winter:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 270, range: [180, 335], unit: days, source: "FAO-56 Table 11 winter wheat rows: 180 (Calif., Dec) to 335 (Idaho, Oct). 270 is a team mid value for Great Plains fall sowing; team to verify.", badge: assumption}
+      harvest_index: {value: 0.40, range: [0.35, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.865, range: [0.86, 0.87], unit: "-", source: "13.5% moisture reporting basis. Team to verify.", badge: placeholder}
+    wheat_spring:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 120, range: [100, 130], unit: days, source: "Team to verify (FAO-56 Table 11 spring wheat rows were not read as US rows).", badge: placeholder}
+      harvest_index: {value: 0.40, range: [0.35, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.865, range: [0.86, 0.87], unit: "-", source: "13.5% moisture reporting basis. Team to verify.", badge: placeholder}
+    cotton:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 180, range: [180, 225], unit: days, source: "FAO-56 Table 11, Cotton, Texas, April planting: 30/50/55/45 = 180.", badge: observed}
+      harvest_index: {value: 0.35, range: [0.25, 0.45], unit: "-", source: "Team to verify (lint yield basis).", badge: placeholder}
+      dry_matter: {value: 0.92, range: [0.90, 0.95], unit: "-", source: "Team to verify.", badge: placeholder}
+    sorghum:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 130, range: [110, 140], unit: days, source: "FAO-56 Table 11, Sorghum, USA (May/June): 20/35/40/30 = 130.", badge: observed}
+      harvest_index: {value: 0.45, range: [0.35, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.86, range: [0.85, 0.87], unit: "-", source: "14% moisture reporting basis. Team to verify.", badge: placeholder}
+    rice:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 150, range: [120, 160], unit: days, source: "Team to verify (no US row in FAO-56 Table 11).", badge: placeholder}
+      harvest_index: {value: 0.45, range: [0.40, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.86, range: [0.85, 0.88], unit: "-", source: "Team to verify.", badge: placeholder}
+    peanut:
+      legume: {value: true, range: [false, true], unit: flag, source: "Legume (nitrogen fixing).", badge: observed}
+      living_days: {value: 135, range: [120, 150], unit: days, source: "Team to verify (no US row in FAO-56 Table 11).", badge: placeholder}
+      harvest_index: {value: 0.40, range: [0.30, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.90, range: [0.88, 0.92], unit: "-", source: "Team to verify.", badge: placeholder}
+    barley:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 120, range: [100, 150], unit: days, source: "Team to verify.", badge: placeholder}
+      harvest_index: {value: 0.45, range: [0.40, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.855, range: [0.85, 0.87], unit: "-", source: "Team to verify.", badge: placeholder}
+    oats:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 110, range: [90, 130], unit: days, source: "Team to verify.", badge: placeholder}
+      harvest_index: {value: 0.40, range: [0.35, 0.50], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.86, range: [0.85, 0.87], unit: "-", source: "Team to verify.", badge: placeholder}
+    pearl_millet:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 90, range: [75, 110], unit: days, source: "Team to verify.", badge: placeholder}
+      harvest_index: {value: 0.30, range: [0.20, 0.40], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.88, range: [0.86, 0.90], unit: "-", source: "Team to verify.", badge: placeholder}
+    pigeonpea:
+      legume: {value: true, range: [false, true], unit: flag, source: "Legume (nitrogen fixing).", badge: observed}
+      living_days: {value: 180, range: [150, 240], unit: days, source: "Team to verify.", badge: placeholder}
+      harvest_index: {value: 0.30, range: [0.20, 0.40], unit: "-", source: "Team to verify.", badge: placeholder}
+      dry_matter: {value: 0.90, range: [0.88, 0.92], unit: "-", source: "Team to verify.", badge: placeholder}
+  # Cover crops: grown in the off-season, not harvested. biomass = above-ground dry matter left as residue.
+  cover_crops:
+    cereal_rye:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume.", badge: observed}
+      living_days: {value: 180, range: [120, 210], unit: days, source: "Fall-seeded, terminated in spring. Team to verify.", badge: placeholder}
+      biomass_t_ha: {value: 4.0, range: [2.0, 8.0], unit: "t DM/ha", source: "Team to verify.", badge: placeholder}
+    crimson_clover:
+      legume: {value: true, range: [false, true], unit: flag, source: "Legume (nitrogen fixing).", badge: observed}
+      living_days: {value: 180, range: [120, 210], unit: days, source: "Team to verify.", badge: placeholder}
+      biomass_t_ha: {value: 3.0, range: [1.5, 6.0], unit: "t DM/ha", source: "Team to verify.", badge: placeholder}
+    hairy_vetch:
+      legume: {value: true, range: [false, true], unit: flag, source: "Legume (nitrogen fixing).", badge: observed}
+      living_days: {value: 200, range: [150, 230], unit: days, source: "Team to verify.", badge: placeholder}
+      biomass_t_ha: {value: 3.5, range: [1.5, 6.0], unit: "t DM/ha", source: "Team to verify.", badge: placeholder}
+    oats_cover:
+      legume: {value: false, range: [false, true], unit: flag, source: "Not a legume; winter-killed in cold climates.", badge: observed}
+      living_days: {value: 75, range: [50, 100], unit: days, source: "Team to verify.", badge: placeholder}
+      biomass_t_ha: {value: 2.5, range: [1.0, 4.0], unit: "t DM/ha", source: "Team to verify.", badge: placeholder}
+  # Used for any crop or cover crop not listed above, so the score never fails; results flag it as Placeholder.
+  unknown_crop:
+    living_days: {value: 120, range: [90, 180], unit: days, source: "Fallback for an unlisted crop. Team to verify.", badge: placeholder}
+    harvest_index: {value: 0.45, range: [0.3, 0.55], unit: "-", source: "Fallback for an unlisted crop. Team to verify.", badge: placeholder}
+    dry_matter: {value: 0.87, range: [0.85, 0.9], unit: "-", source: "Fallback for an unlisted crop. Team to verify.", badge: placeholder}
+    cover_biomass_t_ha: {value: 3.0, range: [1.0, 6.0], unit: "t DM/ha", source: "Fallback for an unlisted cover crop. Team to verify.", badge: placeholder}
+
+# ---------------------------------------------------------------- candidates (R5): climate fit
+# A crop is offered when, in at least `min_share_of_years` of the last `recent_years`, a window of its season
+# length exists whose mean daily temperature stays between the crop's limits and (if frost sensitive) has no
+# day colder than the frost limit. Season lengths come from FAO-56 Table 11 through crops.py (Person 2), or the
+# stand-in table config/validation/standin_crops.yaml until crops.py has them.
+candidates:
+  min_share_of_years: {value: 0.70, range: [0.5, 0.9], unit: "share of years", source: "Team choice: offered if it fits the climate in 7 of 10 recent years. Team to verify.", badge: assumption}
+  recent_years:       {value: 20, range: [10, 30], unit: years, source: "Same 20-year window as the climate card (Build Spec v4 R17).", badge: assumption}
+  frost_limit_c:      {value: 0.0, range: [-2.0, 2.0], unit: "degC daily minimum", source: "Team choice for frost-sensitive crops. Team to verify.", badge: assumption}
+  # Mean-temperature limits over the growing window, degC. NOT yet read from FAO EcoCrop (ecocrop.apps.fao.org);
+  # its crop-name search could not be scripted in this session. Recalled literature ranges: team to verify each row.
+  crops:
+    maize:        {t_mean_min: 14, t_mean_max: 30, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    soybean:      {t_mean_min: 15, t_mean_max: 30, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    sorghum:      {t_mean_min: 18, t_mean_max: 33, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    pearl_millet: {t_mean_min: 20, t_mean_max: 35, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    cotton:       {t_mean_min: 18, t_mean_max: 33, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    rice:         {t_mean_min: 18, t_mean_max: 33, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    peanut:       {t_mean_min: 18, t_mean_max: 32, frost_sensitive: true,  source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    wheat_spring: {t_mean_min: 5,  t_mean_max: 24, frost_sensitive: false, source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+    wheat_winter: {t_mean_min: -5, t_mean_max: 24, frost_sensitive: false, source: "Recalled literature range, not read from EcoCrop. Team to verify.", badge: placeholder}
+
+# ---------------------------------------------------------------- economics: unit conversions (display only)
+# The engine works in kg/ha, currency per tonne and per hectare. These convert US units for display and for US data.
+units:
+  ha_per_acre:   {value: 0.40468564224, range: null, unit: "ha per acre", source: "Exact: 1 international acre = 4046.8564224 m2 (NIST SP 811, Appendix B.8).", badge: observed}
+  kg_per_lb:     {value: 0.45359237,    range: null, unit: "kg per lb",   source: "Exact: 1959 international yard and pound agreement (NIST SP 811).", badge: observed}
+  # Standard bushel weights in pounds. Common USDA and NIST Handbook 44 values; re-check against the NASS
+  # "Weights, Measures, and Conversion Factors for Agricultural Commodities" before relying on them.
+  bushel_lb:
+    maize:        {value: 56, range: null, unit: "lb per bushel", source: "Standard test weight (USDA, NIST HB 44). Team to verify against the NASS conversion table.", badge: assumption}
+    soybean:      {value: 60, range: null, unit: "lb per bushel", source: "Standard test weight (USDA, NIST HB 44). Team to verify against the NASS conversion table.", badge: assumption}
+    wheat_winter: {value: 60, range: null, unit: "lb per bushel", source: "Standard test weight (USDA, NIST HB 44). Team to verify against the NASS conversion table.", badge: assumption}
+    wheat_spring: {value: 60, range: null, unit: "lb per bushel", source: "Standard test weight (USDA, NIST HB 44). Team to verify against the NASS conversion table.", badge: assumption}
+    sorghum:      {value: 56, range: null, unit: "lb per bushel", source: "Standard test weight (USDA, NIST HB 44). Team to verify against the NASS conversion table.", badge: assumption}
+  kg_per_tonne: {value: 1000, range: null, unit: "kg per tonne", source: "Definition of the metric tonne.", badge: observed}
+
+# ---------------------------------------------------------------- optimize: scoring and picks (R10, R13, R14)
+optimize:
+  worst_tail:        {value: 0.10, range: [0.05, 0.20], unit: "share of scenarios", source: "Build Spec v4 R10/v2 section 7: worst 10% gives enough scenarios for a stable tail.", badge: assumption}
+  default_sliders:
+    bad_year:             {value: 0.3, range: [0, 1], unit: "0 to 1", source: "Team choice for the starting position of the slider. Team to verify.", badge: assumption}
+    water:                {value: 0.0, range: [0, 1], unit: "0 to 1", source: "Team choice. Team to verify.", badge: assumption}
+    soil:                 {value: 0.5, range: [0, 1], unit: "0 to 1", source: "Team choice. Team to verify.", badge: assumption}
+    profit_tolerance_pct: {value: 0.0, range: [0, 25], unit: "percent", source: "Build Spec v4 R13: default tolerance 0%.", badge: assumption}
+  max_rotations_scored: {value: 4000, range: [500, 20000], unit: rotations, source: "Performance cap so a new pin finishes in about 15 s (R23). Team to verify.", badge: assumption}
+  # Energy content, kcal per kg of harvested grain. Person 2's crops.py is meant to own these with a source;
+  # until it does, these stand-ins are NOT verified (USDA FoodData Central would be the source).
+  calories_kcal_per_kg:
+    maize:        {value: 3650, range: [3500, 3800], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    soybean:      {value: 4460, range: [4000, 4700], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    wheat_winter: {value: 3390, range: [3200, 3500], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    wheat_spring: {value: 3390, range: [3200, 3500], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    sorghum:      {value: 3390, range: [3200, 3500], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    rice:         {value: 3600, range: [3400, 3700], unit: "kcal/kg", source: "Recalled value (milled), not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    pearl_millet: {value: 3610, range: [3400, 3800], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    peanut:       {value: 5670, range: [5500, 5900], unit: "kcal/kg", source: "Recalled value, not read from USDA FoodData Central. Team to verify.", badge: placeholder}
+    cotton:       {value: 0,    range: null,         unit: "kcal/kg", source: "Fibre crop: no food energy counted.", badge: assumption}
+
+# ---------------------------------------------------------------- evpi (R19): what to measure next
+# EVPI = mean_k[ max_r J(r, a_k) ] - max_r mean_k[ J(r, a_k) ] with k equally weighted values of the uncertain input.
+evpi:
+  samples:                  {value: 9, range: [5, 15], unit: "values per input", source: "Build Spec v2 section 8.3 (9 equally weighted values).", badge: assumption}
+  awc_relative_range:       {value: 0.25, range: [0.1, 0.4], unit: "fraction of the soil's water capacity", source: "Build Spec v2 section 8.2: plus or minus 25% when only one value is known.", badge: assumption}
+  water_relative_range:     {value: 0.30, range: [0.1, 0.5], unit: "fraction of the stated supply", source: "Team choice for the farmer's own supply estimate. Team to verify.", badge: assumption}
+  organic_matter_range_pct: {value: 1.0, range: [0.5, 2.0], unit: "percentage points either side", source: "Team choice when no soil test is entered. Team to verify.", badge: assumption}
+  # How much 1 percentage point of organic matter changes available water capacity. No verified value yet,
+  # so organic matter is reported as "needs a verified relation" and its EVPI is not computed from a guess.
+  awc_mm_per_m_per_om_pct:  {value: null, range: null, unit: "mm per m per percentage point", source: "TEAM TO FILL from a primary soil-physics source (for example Hudson 1994 or NRCS). Not invented.", badge: placeholder}
+  test_cost_per_ha:
+    water_supply:    {value: null, range: null, unit: "currency per ha", source: "Farmer enters a quote for a flow or well test. No default.", badge: placeholder}
+    soil_water:      {value: null, range: null, unit: "currency per ha", source: "Farmer enters a lab quote. No default.", badge: placeholder}
+    organic_matter:  {value: null, range: null, unit: "currency per ha", source: "Farmer enters a lab quote. No default.", badge: placeholder}

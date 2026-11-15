@@ -191,3 +191,100 @@ def economics_badges(prices: dict) -> dict:
             "prices": "placeholder" if any(v == "placeholder" for k, v in b.items() if k.startswith("price_")) else "observed",
             "operating_cost": "placeholder" if "placeholder" in costs else "local" if costs and all(v == "local" for v in costs) else "assumption",
             "n_cost": b["n_cost_rs_per_kg"]}
+
+
+# =====================================================================================================
+# Build Spec v4 / v5 (Feature 3): generic profit per hectare for any pin. Everything above this line is the
+# v3 India module and is left untouched. Parameters live in config/assumptions/recommend.yaml (units section).
+# The engine is metric: yield kg/ha, price currency per tonne, cost currency per ha. US units are for display
+# and for US data only.
+# =====================================================================================================
+import yaml as _yaml
+
+_RECOMMEND_YAML = ROOT / "config" / "assumptions" / "recommend.yaml"
+
+
+class InputNeeded(ValueError):
+    """A money number cannot be computed because the farmer has not given a price or cost and no source has one.
+    Never replaced by a default: the UI shows a prompt for `crop` and `field` ("price" or "cost")."""
+
+    def __init__(self, crop: str, field: str):
+        super().__init__(f"input needed: {field} for {crop}")
+        self.crop, self.field = crop, field
+
+
+def _units() -> dict:
+    return _yaml.safe_load(_RECOMMEND_YAML.read_text())["units"]
+
+
+def _u(name: str) -> float:
+    return float(_units()[name]["value"])
+
+
+def acres_to_ha(acres: float) -> float:
+    return acres * _u("ha_per_acre")
+
+
+def ha_to_acres(ha: float) -> float:
+    return ha / _u("ha_per_acre")
+
+
+def kg_per_bushel(crop: str) -> float:
+    b = _units()["bushel_lb"].get(crop)
+    if b is None:
+        raise KeyError(f"no bushel weight for {crop}; enter yield and price in kg/ha and per tonne")
+    return float(b["value"]) * _u("kg_per_lb")
+
+
+def bu_ac_to_kg_ha(bu_per_acre: float, crop: str) -> float:
+    return bu_per_acre * kg_per_bushel(crop) / _u("ha_per_acre")
+
+
+def kg_ha_to_bu_ac(kg_per_ha: float, crop: str) -> float:
+    return kg_per_ha * _u("ha_per_acre") / kg_per_bushel(crop)
+
+
+def price_per_bu_to_per_tonne(price_per_bu: float, crop: str) -> float:
+    return price_per_bu / kg_per_bushel(crop) * _u("kg_per_tonne")
+
+
+def price_per_tonne_to_per_bu(price_per_tonne: float, crop: str) -> float:
+    return price_per_tonne * kg_per_bushel(crop) / _u("kg_per_tonne")
+
+
+def cost_per_acre_to_per_ha(cost_per_acre: float) -> float:
+    return cost_per_acre / _u("ha_per_acre")
+
+
+def cost_per_ha_to_per_acre(cost_per_ha: float) -> float:
+    return cost_per_ha * _u("ha_per_acre")
+
+
+def _pick(obj, name):
+    if obj is None:
+        return None
+    return obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+
+
+def crop_economics(crop: str, us_defaults=None, crop_overrides: dict | None = None) -> dict:
+    """Price and cost for one crop: the farmer's entry first, then US data, otherwise raise InputNeeded.
+    Returns {"price_per_t", "cost_per_ha", "price_badge", "cost_badge"}; badges are your_input or observed."""
+    ov = (crop_overrides or {}).get(crop) or {}
+    out = {}
+    for field, key, bucket in (("price", "price", "prices"), ("cost", "cost", "costs")):
+        v, badge = ov.get(key), "your_input"
+        if v is None:
+            v = (_pick(us_defaults, bucket) or {}).get(crop)
+            badge = "observed"
+        if v is None:
+            raise InputNeeded(crop, field)
+        out[f"{field}_per_t" if field == "price" else "cost_per_ha"] = float(v)
+        out[f"{field}_badge"] = badge
+    return out
+
+
+def profit_per_ha(yield_kg_ha, price_per_tonne: float, cost_per_ha: float):
+    """Profit per hectare = yield (kg/ha) / 1000 * price per tonne - cost per ha. Works on numbers or numpy arrays.
+    Yields are never negative; a zero yield loses the whole cost."""
+    y = np.maximum(np.asarray(yield_kg_ha, dtype=float), 0.0)
+    return y / _u("kg_per_tonne") * price_per_tonne - cost_per_ha
