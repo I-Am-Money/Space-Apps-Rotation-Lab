@@ -76,7 +76,9 @@ Tipping points (R18). What-if changes to real weather years, not forecasts.
   rotations of at most 4 crops (the current plan's, the three picks', then the most profitable others). The curves
   and their bands always use all 500 plans. With a short time budget the search uses fewer plans (never fewer than
   40) and then a coarser map; the page says when it did.
-- The same crops in the same order, started in a different year, count as one plan on the map and the curves.
+- The same crops in the same order, started in a different year, count as one plan on the map and the curves. In
+  the search they are simulated once and share the result with the plan years renumbered. That is exact for the
+  bootstrap plans, whose four years are drawn independently; it is not used for blocks of consecutive real years.
 - The band on a curve is the 10th to 90th percentile across weather plans of one plan's result. The range given for
   a tipping point is the 10th to 90th percentile of where the two plans' averages are equal when the weather plans
   are drawn again (200 draws, seed 42). When the winner changes because of the risk or soil settings rather than the
@@ -128,4 +130,6 @@ runs inside Feature 2 at run time: the simulation, climate modes and tipping poi
 - Inside `engine.simulate.what_if(...)` every `simulate()` call runs under that what-if. A cache that stores
   recommendation results across calls must include `engine.simulate.current_what_if()` in its key.
 - Speed: a new farm's tipping analysis is 57 what-if points, each a recommendation over a short list of crops. With
-  four crops it took 20 to 45 seconds on the build machine. Pre-cache it for the demo presets.
+  four crops it took about 11 seconds on the build machine (4 cores); expect longer on a small cloud machine, where
+  the time budget (40 seconds) makes it use fewer weather plans and then a coarser map. Pre-cache it for the demo
+  presets.

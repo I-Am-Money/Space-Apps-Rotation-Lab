@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -181,13 +181,16 @@ _WHAT_IF: ContextVar = ContextVar("rotationlab_what_if", default=None)
 
 @contextmanager
 def what_if(rain_mult: float | None = None, heat_shift_c: float | None = None, water=None, scenarios=None,
-            climate_shift: str | None = None):
+            climate_shift: str | None = None, share_shifts: bool | None = None):
     """Run every simulate() call inside the block under a what-if (not a forecast):
 
     rain_mult      every day's rain times this            heat_shift_c   every day's maximum temperature plus this
     water          a water answer (mode, normal_mm, dry_mm) used for the irrigation supply instead of the farm's
     scenarios      a Scenarios set used instead of whatever the caller passes (before rain and heat are applied)
     climate_shift  "historical" | "recent" | "trend": used when the caller passes no Scenarios set
+    share_shifts   True: in a simulate_many() batch on bootstrap plans, rotations that are the same crops in the
+                   same order started in a different year are simulated once and share the result (see
+                   _simulate_shared). Used by the tipping search for speed.
 
     The farm's own answers still set the potential yields (a typical yield was achieved with the farm's real
     water and weather) and the planting dates. Blocks can be nested; an inner block keeps the outer settings it
@@ -195,7 +198,7 @@ def what_if(rain_mult: float | None = None, heat_shift_c: float | None = None, w
     """
     new = dict(_WHAT_IF.get() or {})
     for k, v in (("rain_mult", rain_mult), ("heat_shift_c", heat_shift_c), ("water", water),
-                 ("scenarios", scenarios), ("climate_shift", climate_shift)):
+                 ("scenarios", scenarios), ("climate_shift", climate_shift), ("share_shifts", share_shifts)):
         if v is not None:
             new[k] = v
     token = _WHAT_IF.set(new)
@@ -286,6 +289,8 @@ def simulate_many(site, inputs, rotations, scenarios=None) -> list:
     """simulate() for many rotations in one batch (same site, inputs and scenarios). Same order as given."""
     p = _site_parts(site)
     scen = _scenarios_in_force(site, scenarios)
+    if (_WHAT_IF.get() or {}).get("share_shifts") and scen.kind == "bootstrap" and len(rotations) > 1:
+        return _simulate_shared(site, inputs, rotations, scenarios)
     clim = site_climate(site)
     irrigated = _is_irrigated(inputs)
     water = (_WHAT_IF.get() or {}).get("water")
@@ -333,6 +338,66 @@ def simulate_many(site, inputs, rotations, scenarios=None) -> list:
                     "yield": "Estimated (FAO-33)", "calendar": "Estimated (team planting rules, team to verify)"},
             notes=list(notes))
     return results
+
+
+def _simulate_shared(site, inputs, rotations, scenarios) -> list:
+    """simulate_many() where year-shifted versions of a rotation are simulated once.
+
+    The plan repeats every four years and a bootstrap plan's four weather years are drawn independently, so
+    'maize, soybean, maize, soybean' and 'soybean, maize, soybean, maize' face the same odds: the second is the
+    first with its plan years renumbered. The first shift (in sorted order) is simulated and the others get that
+    result with the plan years moved round. Their averages over the plan are then exactly equal, instead of
+    differing by sampling noise. Not used for historical blocks or stress tests, where the order of years matters.
+    """
+    keys = []
+    for rot in rotations:
+        try:
+            crops, covers = WB.normalize_rotation(rot)
+            keys.append((tuple(tuple(y) for y in crops), tuple(covers)))
+        except Exception:
+            keys.append(None)
+    n = WB.PLAN_YEARS_V4
+
+    def shift(key, k):
+        return key[0][k:] + key[0][:k], key[1][k:] + key[1][:k]
+
+    canon, todo = [], {}
+    for key in keys:
+        if key is None:
+            canon.append(None)
+            continue
+        first = min((shift(key, k) for k in range(n)), key=repr)
+        k = next(k for k in range(n) if shift(first, k) == key)        # key = first started k years later
+        canon.append((first, k))
+        todo.setdefault(first, None)
+    firsts = list(todo)
+    token = _WHAT_IF.set({**(_WHAT_IF.get() or {}), "share_shifts": False})
+    try:
+        base = simulate_many(site, inputs, [{"crops": [list(y) for y in f[0]], "cover_crops": list(f[1])} for f in firsts], scenarios)
+        solo = {i: simulate_many(site, inputs, [rotations[i]], scenarios)[0] for i, key in enumerate(keys) if key is None}
+    finally:
+        _WHAT_IF.reset(token)
+    done = dict(zip(firsts, base))
+    out = []
+    for i, c in enumerate(canon):
+        if c is None:
+            out.append(solo[i])
+            continue
+        first, k = c
+        res = done[first]
+        if k == 0:
+            out.append(res)
+            continue
+
+        def roll(a):
+            return None if a is None else np.roll(a, -k, axis=1)
+        out.append(replace(res, crops=[list(y) for y in keys[i][0]], cover_crops=list(keys[i][1]),
+                           seasons=[{**s, "plan_year": (s["plan_year"] - 1 - k) % n + 1} for s in res.seasons],
+                           irrigation_mm=roll(res.irrigation_mm), supply_mm=roll(res.supply_mm), rain_mm=roll(res.rain_mm),
+                           total_water_mm=roll(res.total_water_mm), runoff_mm=roll(res.runoff_mm),
+                           drainage_mm=roll(res.drainage_mm),
+                           notes=list(res.notes) + ["Shares the simulation of the same rotation started in another year."]))
+    return out
 
 
 def simulate(site, inputs, rotation, scenarios=None) -> SimResult:
