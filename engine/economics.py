@@ -213,8 +213,17 @@ class InputNeeded(ValueError):
         self.crop, self.field = crop, field
 
 
-def _units() -> dict:
+import functools as _functools
+
+
+@_functools.lru_cache(maxsize=2)
+def _units_read(version) -> dict:
     return _yaml.safe_load(_RECOMMEND_YAML.read_text())["units"]
+
+
+def _units() -> dict:
+    """Parsed `units` section of recommend.yaml; re-read only when the file changes."""
+    return _units_read(_RECOMMEND_YAML.stat().st_mtime_ns)
 
 
 def _u(name: str) -> float:
