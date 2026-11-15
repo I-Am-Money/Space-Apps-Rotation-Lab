@@ -1,0 +1,15 @@
+id,fips,state,county,ers_region,lat,lon,water,crops
+IA-story,19169,IA,"Story County",Heartland,42.037538,-93.466093,rain,maize soybean
+IL-mclean,17113,IL,"McLean County",Heartland,40.494559,-88.844539,rain,maize soybean
+OH-darke,39037,OH,"Darke County",Heartland,40.131467,-84.621191,rain,maize soybean wheat_winter
+NE-lancaster,31109,NE,"Lancaster County",Heartland,40.783547,-96.688658,rain,maize soybean
+KS-sumner,20191,KS,"Sumner County",Prairie Gateway,37.236662,-97.493352,rain,wheat_winter sorghum soybean
+ND-cass,38017,ND,"Cass County",Northern Great Plains,46.927003,-97.252375,rain,wheat_spring soybean maize
+TX-lubbock,48303,TX,"Lubbock County",Prairie Gateway,33.611469,-101.819944,rain,cotton sorghum
+WA-whitman,53075,WA,"Whitman County",Basin and Range,46.905944,-117.53539,rain,wheat_winter wheat_spring
+PA-lancaster,42071,PA,"Lancaster County",Northern Crescent,40.041992,-76.250198,rain,maize soybean
+GA-mitchell,13205,GA,"Mitchell County",Southern Seaboard,31.228997,-84.192038,irrigated,cotton peanut maize
+MS-washington,28151,MS,"Washington County",Mississippi Portal,33.273174,-90.944446,irrigated,soybean cotton rice
+KY-warren,21227,KY,"Warren County",Eastern Uplands,36.995634,-86.423579,rain,maize soybean
+CA-colusa,06011,CA,"Colusa County",Fruitful Rim,39.177739,-122.237563,irrigated,rice
+AR-poinsett,05111,AR,"Poinsett County",Mississippi Portal,35.56887,-90.681104,irrigated,rice soybean

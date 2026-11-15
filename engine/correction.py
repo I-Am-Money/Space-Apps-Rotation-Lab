@@ -1,4 +1,6 @@
 # AI use: this file was written by Claude Code (Anthropic) under the team's direction, then reviewed by the team. See AI_USE.md.
+# TODO (partial): works and is tested; config/validation/results.csv is not generated yet because NASS county yields
+# need NASS_API_KEY. Then run: python -m engine.fetch_nass --precache-validation && python -m engine.correction
 """Hybrid bias correction (Build Spec v4, R12) and validation_summary() for api.py. Owner: Person 3.
 
 In counties with enough NASS history, a numpy linear regression of (actual - modeled yield) on season rain,
@@ -113,7 +115,7 @@ def evaluate(h: hc.CountyHindcast) -> CorrectedResult:
 # ---------------------------------------------------------------- validation summary (api.validation_summary)
 
 COLUMNS = ["site", "crop", "r", "mae", "r_corrected", "mae_corrected", "n_train", "n_test", "r_train",
-           "mae_train", "region", "state", "county", "fips", "lat", "lon", "water", "badge", "status", "notes"]
+           "mae_train", "region", "ers_region", "state", "county", "fips", "lat", "lon", "water", "badge", "status", "notes"]
 
 
 @dataclass
@@ -135,25 +137,30 @@ def _summary_cls():
 
 def run_validation(sites: list[dict] | None = None, weather_loader=None, yield_loader=None) -> pd.DataFrame:
     """Hindcast + correction for every site and crop in config/validation/sites.yaml. One row per site and crop."""
-    sites = hc.validation_sites() if sites is None else sites
+    sites = hc.all_validation_sites() if sites is None else sites
     weather_loader = weather_loader or hc.load_site_weather
-    yield_loader = yield_loader or hc.load_county_yields
     rows = []
     for s in sites:
-        w = weather_loader(s)
+        ys = {crop: (hc.load_site_yields(s, crop) if yield_loader is None else yield_loader(str(s.get("fips")), crop))
+              for crop in s["crops"]}
+        # weather is only loaded when there is at least one yield series to compare with
+        w = weather_loader(s) if any(y is not None and len(y) for y in ys.values()) else None
         for crop in s["crops"]:
-            if w is None:
+            y = ys[crop]
+            if y is None or len(y) == 0:
+                e = CorrectedResult(s["id"], crop, 0, 0, None, None, None, None, None, None, False,
+                                    hc.yield_function()[1], "no NASS data" if s.get("yield_source") != "icrisat"
+                                    else "no yield data",
+                                    ["No yield records loaded (NASS_API_KEY not set and nothing cached, or withheld)"])
+            elif w is None:
                 e = CorrectedResult(s["id"], crop, 0, 0, None, None, None, None, None, None, False,
                                     hc.yield_function()[1], "no weather", ["NASA POWER weather not cached"])
             else:
-                y = yield_loader(str(s["fips"]), crop)
-                if y is None:
-                    y = pd.DataFrame(columns=["year", "yield_kg_ha"])
                 e = evaluate(hc.hindcast_county(s, crop, weather=w, yields=y))
             rows.append({"site": s["id"], "crop": crop, "r": e.r, "mae": e.mae, "r_corrected": e.r_corrected,
                          "mae_corrected": e.mae_corrected, "n_train": e.n_train, "n_test": e.n_test,
                          "r_train": e.r_train, "mae_train": e.mae_train, "region": s.get("region"),
-                         "state": s.get("state"), "county": s.get("county"), "fips": s.get("fips"),
+                         "ers_region": s.get("ers_region"), "state": s.get("state"), "county": s.get("county"), "fips": s.get("fips"),
                          "lat": s.get("lat"), "lon": s.get("lon"), "water": s.get("water"), "badge": e.badge,
                          "status": e.status, "notes": "; ".join(e.notes)})
     return pd.DataFrame(rows, columns=COLUMNS)
@@ -163,14 +170,14 @@ def validation_summary(recompute: bool = False):
     """A5 ValidationSummary(table, sites). Reads config/validation/results.csv (written by
     `python -m engine.correction`) so the deployed app needs no API keys; recompute=True reruns everything."""
     cls = _summary_cls()
-    sites = hc.validation_sites()
+    sites = hc.all_validation_sites()
     if recompute:
         table = run_validation(sites)
     elif hc.RESULTS_PATH.exists():
         table = pd.read_csv(hc.RESULTS_PATH, dtype={"fips": str})
     else:      # never fetch inside the app: show every site as not run yet
-        table = pd.DataFrame([{"site": s["id"], "crop": c, "region": s.get("region"), "state": s.get("state"),
-                               "county": s.get("county"), "fips": s.get("fips"), "lat": s.get("lat"),
+        table = pd.DataFrame([{"site": s["id"], "crop": c, "region": s.get("region"), "ers_region": s.get("ers_region"),
+                               "state": s.get("state"), "county": s.get("county"), "fips": s.get("fips"), "lat": s.get("lat"),
                                "lon": s.get("lon"), "water": s.get("water"), "status": "validation not run yet",
                                "notes": "Run python -m engine.correction after NASS yields are cached."}
                               for s in sites for c in s["crops"]])

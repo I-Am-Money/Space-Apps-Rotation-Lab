@@ -1,0 +1,13 @@
+# India validation pack (Build Spec v4 R20 "plus India if working"). Owner: Person 3.
+# Uses the ICRISAT/TCI District Level Database loader that already works for the earlier India build
+# (engine/fetch_icrisat.py, DOI 10.21421/D2/XFB1BZ; see DATA_SOURCES.md). District yields, not county yields.
+# Crop settings are NOT copied here: they are read from config/assumptions.yaml (sections crops.<id> and
+# heat.tmax_c.<id>), which keeps one source of truth with their own sources and "team to verify" notes.
+# lat/lon: the district centroid in config/region.yaml (computed from the OpenStreetMap boundary).
+enabled: true
+sites:
+  - {id: IN-nalgonda, country: India, state: Telangana, county: Nalgonda district, region: Deccan Plateau (India),
+     ers_region: "", lat: 16.877, lon: 79.193, water: rain, yield_source: icrisat,
+     crops: [jowar, bajra, pigeonpea]}
+# Rice is left out: district rice mixes irrigated and rainfed fields and seasons, so a rainfed water-limited
+# model is not a fair check there (see LIMITATIONS.md).

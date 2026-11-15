@@ -26,12 +26,13 @@ log to the "Logged by the team" section, or tell Person 3.
     into a 0 to 100 number are team choices. Many are marked "team to verify" with a Placeholder badge (see
     `config/assumptions.yaml`, section `soil_score`). If yields are missing, residue carbon is left out instead
     of guessed. Field history adjustments (erosion, waterlogging, salinity) shift every plan by the same amount.
-12. **Hindcast model.** Until the team's yield function for hindcasts is in place, validation uses a stand-in
-    single-season model: FAO-56 single crop coefficient water balance, Hargreaves ET0, FAO-33 Ky, a fixed US
-    planting day per crop, and a default 150 mm/m soil water capacity. These settings are in
-    `config/validation/standin_crops.yaml` and its results are badged "stand-in". It has no rotation effects,
-    pests, varieties or management changes. It is rainfed, so agreement in mostly irrigated counties (Georgia,
-    Mississippi Delta, Arkansas rice) is expected to be weaker, and that is reported, not hidden.
+12. **Hindcast model.** Validation uses the team's single-season yield function
+    (`engine.yieldmodel.season_relative_yield`): the v4 FAO-56 water balance and FAO-33 Ky with the crop library
+    in `config/assumptions.yaml`, the crop grown every year, rainfed, with a default soil water capacity. It has
+    no pests, varieties or management changes. Agreement in mostly irrigated counties (Georgia, Mississippi Delta,
+    Arkansas and California rice) is expected to be weaker, and that is reported, not hidden. The older stand-in
+    model (`config/validation/standin_crops.yaml`) is used only if that function is missing, and its rows are
+    badged "stand-in".
 13. **Validation design.** Both series are detrended with lines fitted on training years only. The latest 8
     years are held out from the trend, the potential yield (Ym) and the correction. Pearson r on 8 held-out
     years is noisy. County yields average many farms. Agreement with county yields does not prove the model is
@@ -43,15 +44,45 @@ log to the "Logged by the team" section, or tell Person 3.
     and crop names, not wording. A reply that passes the guard can still word things loosely. Without an API key
     the fixed template is used.
 
+## US data limits (Feature 4)
+
+16. **Default yields and prices.** Default yield is the mean of the latest 5 published NASS county yields
+    (team choice). If NASS withholds the county value, the state average is used and labelled "State
+    average". Prices are the latest marketing-year price received in the state, or the national price
+    (labelled). The hindcast never uses state numbers in place of county yields.
+17. **Costs.** USDA ERS costs are "operating costs" for the county's Farm Resource Region (latest year 2025).
+    They leave out land rent, unpaid labor and machinery capital recovery, because those are about the same
+    whichever rotation is picked. ERS covers only 9 field crops, so any other crop needs your own cost before
+    money numbers show. ERS does not split wheat into winter and spring. Rice uses the ERS U.S. average,
+    because ERS reports rice by its own rice areas, not by Farm Resource Region. A crop that ERS does not survey
+    in your region uses the U.S. average, labelled.
+18. **County to region map.** This uses the ERS county file (3,112 counties). Counties created after it, such as
+    the Connecticut planning regions from 2022, are not mapped and use the U.S. average.
+19. **Irrigated default.** A county is "mostly irrigated" when Census irrigated acres are at least half of its
+    cropland acres. The 50% threshold is a team choice. When the share is unknown, the app asks.
+20. **Orchards** are recognized by name from a fixed list (`config/assumptions/us_data.yaml`), not by NASS category.
+
 ## Blocked items and the fallback used
 
-16. **NASS yields not loaded yet (2026-11-15).** No `NASS_API_KEY` is set in this environment and the v4 NASS
-    fetcher is not on main yet, so the validation table shows "validation not run yet" or "no NASS data" for
-    every county. Nothing is filled in. Fallback: rerun `python -m engine.correction` once yields are cached.
-17. **v4 engine API not on main yet (2026-11-15).** Soil score, hindcast, correction and explanation modules are
-    built against the A5 interface in the build spec, with stand-ins inside their own files. They switch to the
-    real `engine/api.py` types when it lands.
-18. **India (ICRISAT) is not in the v4 validation.** The India loader works only for the earlier Telangana build.
+21. **NASS key missing (2026-11-15).** No `NASS_API_KEY` is set in the build environment. `engine/fetch_nass.py`
+    is finished and tested against synthetic NASS-shaped records, but no real NASS data has been downloaded.
+    Fallback: cached copies when they exist. Otherwise US pins show "NASS data unavailable" and ask the farmer
+    for yield and price, the same way pins outside the US work. The validation table shows "validation not run
+    yet". Nothing is filled in. When a key is available, run `python -m engine.fetch_nass --precache-validation`,
+    then `python -m engine.correction`.
+22. **NASS query names not checked live.** Commodity, class and practice strings, and the Census `short_desc`
+    names for irrigated and cropland acres, follow Quick Stats naming but have not been tried against the live
+    API. Team to verify.
+23. **v4 engine API not on main yet (2026-11-15).** The trust page reads `api.validation_summary()` once it
+    exists and uses the same table from `engine/correction.py` until then.
+24. **India validation pack: one district.** The only India check is Nalgonda district, Telangana (ICRISAT/TCI
+    District Level Database, which ends in 2017). It covers jowar, bajra and pigeon pea, rainfed, with the team's
+    yield function. Training years are 1981 to 2009, and the held-out years are 2010 to 2017. Results are mixed
+    and are shown as they came out (`config/validation/results.csv`). Held-out r ranges from 0.34 to 0.50 without
+    the correction and from 0.45 to 0.57 with it. The correction made the average error larger for jowar and bajra
+    and slightly smaller for pigeon pea. District boundaries changed in 2016, and the yields come from the older,
+    larger district. Rice is left out because district rice mixes irrigated and rainfed fields. Pins outside the
+    US count as "validated" only within 0.5 degrees of this district's centroid (team choice).
 
 ## Logged by the team
 
