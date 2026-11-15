@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from engine import api, boundaries, optimize as opt
+from engine import api_v3 as api, boundaries, optimize as opt
 from tests.decision_fakes import synthetic_annual
 
 

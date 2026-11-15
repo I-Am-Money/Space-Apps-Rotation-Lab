@@ -5,7 +5,7 @@ from threading import Barrier
 import numpy as np
 import pytest
 
-from engine import api, optimize as opt
+from engine import api_v3 as api, optimize as opt
 from engine import boundaries, fetch_icrisat
 from engine.cache import ArrayCache
 from engine.monsoon import detect_onset

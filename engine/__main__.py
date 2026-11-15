@@ -8,7 +8,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from engine import api, fetch_icrisat, optimize
+from engine import api_v3 as api, fetch_icrisat, optimize
 
 
 def main():

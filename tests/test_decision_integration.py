@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("engine.waterbalance")
 pytest.importorskip("engine.yieldmodel")
-from engine import api
+from engine import api_v3 as api
 from engine import optimize as opt
 
 
