@@ -105,9 +105,38 @@ def test_winner_comes_from_recommend_inside_the_what_if(weather):
     assert m["water_mm"] == [0.0, 50.0, 100.0, 150.0, 200.0, 250.0] and m["current"]["water_mm"] == 200.0
     assert m["winner"][0] == [dry] * 9 and m["winner"][m["current"]["row"]] == rc["winner"]
     assert tp["water_curve"]["winner"] == [dry, dry, wet, wet, wet, wet]
-    # the first call is the farm as it is; later calls carry the what-if and the reduced scenario set
+    # the first call is the farm as it is; later calls carry the what-if and the weather plans to use
     assert seen[0].get("rain_mult") is None and any(w.get("rain_mult") == 0.5 for w in seen[1:])
-    assert all(w["scenarios"].n <= 100 for w in seen[1:]) and SIM.current_what_if() == {}
+    # this stand-in answers at once, so the search can afford every weather plan and says so
+    assert all(w["scenarios"].n == 500 for w in seen[1:]) and SIM.current_what_if() == {}
+    assert tp["method"]["scenarios_winner"] == 500 and not any("for speed" in n for n in tp["notes"])
+
+
+def test_fewer_weather_plans_alone_never_show_a_tipping_point(weather, monkeypatch):
+    """Two nearly tied plans can swap places when the search uses 100 weather plans instead of 500. That is not a
+    tipping point: a change of plan is shown only where the same search picks differently than at the current setting."""
+    rule = T.C.rule
+    monkeypatch.setattr(T.C, "rule", lambda name: 0 if name == "tipping_full_search_s" else rule(name))
+    sizes = []
+
+    def recommend(site, inputs, sliders):
+        wi = SIM.current_what_if()
+        n = wi["scenarios"].n if wi.get("scenarios") is not None else 500
+        sizes.append(n)
+        swapped = n < 500                                                # the near-tie falls the other way on fewer plans
+        dry = wi.get("rain_mult", 1.0) < 0.75
+        crops = [["soybean"]] * 4 if dry else ([["maize"], ["soybean"], ["soybean"], ["soybean"]] if swapped else [[c] for c in MS])
+        pick = {"crops": crops, "cover_crops": [False] * 4, "mean_profit": 1.0}
+        return {"headline": pick, "highest_profit": pick, "best_soil": pick, "all_results": [pick], "example": False}
+
+    tp = T.tipping_points(make_site(weather), make_inputs(plan=MS), {"climate_shift": "historical"}, recommend=recommend)
+    wet, dry = f"{T.CURRENT}: Maize > Soybeans > Maize > Soybeans", "Soybeans > Soybeans > Soybeans > Soybeans"
+    assert tp["method"]["scenarios_winner"] == 100 and 100 in sizes
+    assert any("pick a different plan than they pick at your current setting" in n for n in tp["notes"])
+    # the swap on fewer plans is not shown; the real change below 0.75 x rain still is
+    assert tp["rainfall_curve"]["winner"] == [dry] * 3 + [wet] * 6
+    assert tp["heat_curve"]["winner"] == [wet] * 4 and len(tp["rainfall_curve"]["crossovers"]) == 1
+    assert {v for row in tp["map_2d"]["winner"] for v in row} == {wet, dry}
 
 
 def test_stub_or_failing_recommend_is_never_shown_as_a_winner(weather):

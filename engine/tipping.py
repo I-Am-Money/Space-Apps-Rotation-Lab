@@ -21,8 +21,10 @@ simulate.what_if(...) block, so Feature 3's own picks decide the winner (its hea
 pick if it has no headline). The what-if only changes the weather and the water supply that simulate() sees;
 the farm's potential yields and planting dates stay as they are. To stay fast, the search away from the farm's
 current setting uses a short list of crops (the current plan's, the three picks', then the most profitable
-others) and the first 100 of the 500 weather plans; both are settings in simulation.yaml and both are reported
-on the result. If recommend() is missing, still a stub, needs a price or cost, or fails, the module says so and
+others), and all 500 weather plans only when that is quick, otherwise the first 100; both are settings in
+simulation.yaml and both are reported on the result. The same search is also run at the current setting, and a
+what-if point counts as a change of plan only where its pick differs from that one, so two nearly tied plans
+swapping places on fewer weather plans is never shown as a tipping point. If recommend() is missing, still a stub, needs a price or cost, or fails, the module says so and
 falls back to ranking rotations itself by average profit (or by share of potential yield when a price or cost
 is missing).
 
@@ -423,13 +425,19 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
     def plan(points):
         return [p for p in dict.fromkeys(points) if p not in winners]
 
-    def run(points, s):
+    used = {}                                                        # point -> how many weather plans found its winner
+
+    def solve(p, s):
+        r, h, k = p
         scen = full.subset(np.arange(s)) if s < full.n else full
+        with SIM.what_if(rain_mult=r, heat_shift_c=h, water=water_of[k], scenarios=scen, share_shifts=True):
+            return same_rotation(ask(scen), prefer)
+
+    def run(points, s):
+        s = min(int(s), full.n)
         for p in points:
-            r, h, k = p
             try:
-                with SIM.what_if(rain_mult=r, heat_shift_c=h, water=water_of[k], scenarios=scen, share_shifts=True):
-                    winners[p] = same_rotation(ask(scen), prefer)
+                winners[p], used[p] = solve(p, s), s
             except Exception as e:
                 winners[p] = None
                 if not any("could not be worked out" in n for n in notes):
@@ -441,26 +449,51 @@ def tipping_points(site, inputs, sliders=None, recommend=None, progress=None, bu
     total = [len(todo) + 1]
     coarse = False
     if todo:
+        # Every weather plan when that is quick (the first point is timed with all of them); otherwise the
+        # first tipping_winner_scenarios plans, fewer still if the time budget needs it, then a coarser map.
         t0 = time.perf_counter()
-        run(todo[:1], s_w)
-        dt = time.perf_counter() - t0
+        run(todo[:1], full.n)
+        dt_full = time.perf_counter() - t0
         left = budget - (time.perf_counter() - t_start)
-        need = dt * (len(todo) - 1)
-        if need > max(left, 1.0):
-            s_new = int(max(s_min, min(s_w, np.floor(s_w * max(left, 1.0) / need / 10.0) * 10)))
-            need *= s_new / s_w
-            s_w = s_new
-            if need > 1.5 * max(left, 1.0):                           # still too slow: a coarser map, full curves
-                coarse = True
-                map_rains = [r for i, r in enumerate(rains) if i % 2 == 0 or r == 1.0]
-                map_w = [k for i, k in enumerate(wkeys) if i % 2 == 0 or k == CUR or i == len(wkeys) - 1]
-                todo = todo[:1] + plan(curve_pts + [(r, 0.0, k) for k in map_w for r in map_rains])
-                total[0] = len(todo) + 1
-        run(todo[1:], s_w)
+        if s_w >= full.n or dt_full * (len(todo) - 1) <= min(float(C.rule("tipping_full_search_s")), max(left, 1.0)):
+            s_w = full.n
+            run(todo[1:], s_w)
+        else:
+            t0 = time.perf_counter()
+            run(todo[1:2], s_w)
+            dt = time.perf_counter() - t0
+            left = budget - (time.perf_counter() - t_start)
+            need = dt * (len(todo) - 2)
+            if need > max(left, 1.0):
+                s_new = int(max(s_min, min(s_w, np.floor(s_w * max(left, 1.0) / need / 10.0) * 10)))
+                need *= s_new / s_w
+                s_w = s_new
+                if need > 1.5 * max(left, 1.0):                       # still too slow: a coarser map, full curves
+                    coarse = True
+                    map_rains = [r for i, r in enumerate(rains) if i % 2 == 0 or r == 1.0]
+                    map_w = [k for i, k in enumerate(wkeys) if i % 2 == 0 or k == CUR or i == len(wkeys) - 1]
+                    todo = todo[:2] + plan(curve_pts + [(r, 0.0, k) for k in map_w for r in map_rains])
+                    total[0] = len(todo) + 1
+            run(todo[2:], s_w)
+
+    # ---- like with like. The winner at the farm's current setting comes from the full recommendation; a what-if
+    # point may be searched with fewer weather plans. Two plans that are nearly tied could then swap places for
+    # that reason alone and show a tipping point that is not there. So the same search is also run at the current
+    # setting, and a what-if point counts as a change of plan only where its pick differs from that one.
+    ref = {}
+    for s in sorted(set(used.values())):
+        try:
+            ref[s] = solve(base_pt, s)
+        except Exception:
+            ref[s] = None
+    for p, s in used.items():
+        if winners.get(p) is not None and ref.get(s) is not None and winners[p] == ref[s]:
+            winners[p] = base_winner
     method.update(scenarios_winner=s_w, coarse_map=coarse)
     if s_w < full.n:
         notes.append(f"Winners away from your current setting are found with the first {s_w} of the {full.n} weather plans "
-                     f"(for speed); the curves and bands use all {full.n}.")
+                     f"(for speed); the curves and bands use all {full.n}. A change of plan is shown only where those "
+                     f"{s_w} plans pick a different plan than they pick at your current setting.")
     if coarse:
         notes.append("The map is drawn on a coarser grid to keep the wait short.")
     notes.append("The same crops in the same order, started in a different year, count as one plan.")

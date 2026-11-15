@@ -75,10 +75,13 @@ Tipping points (R18). What-if changes to real weather years, not forecasts.
 - Water what-if on a rain-fed farm ("what if you had 100 mm of irrigation") counts the yield gain but not the cost of
   getting the water, and assumes the same amount in dry years.
 - Potential yields and planting dates stay those of the farm today at every what-if point.
-- The winner away from the farm's current setting is searched with the first 100 of the 500 weather plans and among
-  rotations of at most 4 crops (the current plan's, the three picks', then the most profitable others). The curves
-  and their bands always use all 500 plans. With a short time budget the search uses fewer plans (never fewer than
-  40) and then a coarser map; the page says when it did.
+- The winner away from the farm's current setting is searched among rotations of at most 4 crops (the current
+  plan's, the three picks', then the most profitable others). It uses all 500 weather plans when that is expected to
+  take no more than about 15 seconds; otherwise the first 100, with a short time budget fewer (never fewer than 40)
+  and then a coarser map. The page says when it did. The curves and their bands always use all 500 plans.
+- Two plans that are nearly tied can swap places when fewer weather plans are used. So the same search is also run
+  at the farm's current setting, and a change of plan is shown only where the search picks differently than it does
+  there. A real but small change that falls inside that noise is not shown.
 - The same crops in the same order, started in a different year, count as one plan on the map and the curves. In
   the search they are simulated once and share the result with the plan years renumbered. That is exact for the
   bootstrap plans, whose four years are drawn independently; it is not used for blocks of consecutive real years.
@@ -133,8 +136,9 @@ runs inside Feature 2 at run time: the simulation, climate modes and tipping poi
 - Inside `engine.simulate.what_if(...)` every `simulate()` call runs under that what-if. A cache that stores
   recommendation results across calls must include `engine.simulate.current_what_if()` in its key.
 - Speed: a new farm's tipping analysis is 57 what-if points, each a recommendation over a short list of crops. With
-  four crops it took about 11 seconds on the build machine (4 cores); expect longer on a small cloud machine, where
-  the time budget (40 seconds) makes it use fewer weather plans and then a coarser map. Pre-cache it for the demo
+  four crops it took about 15 seconds on the build machine (4 cores), and about 7 seconds for a two-crop farm using
+  all 500 weather plans; expect longer on a small cloud machine, where the time budget (40 seconds) makes it use
+  fewer weather plans and then a coarser map. Pre-cache it for the demo
   presets.
 - Speed for Feature 3 (optional, one line): wrapping the recommendation call in
   `with engine.simulate.what_if(share_shifts=True):` simulates each rotation once for all of its starting years.
