@@ -428,3 +428,362 @@ def simulate_plan(scen: dict, plan: Sequence[str], awc_mm_per_m: float, irrigati
         elif k != "plans":
             out[k] = v
     return out
+
+
+# =====================================================================================================
+# v4 (universal, any farm). Feature 2, Person 2. Everything above is the v3 Nalgonda code, kept working.
+#
+# One continuous daily root-zone water balance across the whole 4-year plan (FAO-56 ch.8, single Kc),
+# vectorized over rotations and scenarios:
+#   build_timeline(rotation, clim)   when each crop of the plan is planted and harvested at this location
+#   yearly_supply(water, scenarios)  irrigation water available in each plan year (dry years get less, R6)
+#   run_balance(timelines, ...)      the daily balance; returns season and yearly water numbers
+#
+# The soil is one column as deep as the deepest-rooted crop of the plan. It is split into the root zone of
+# whatever is growing today (for bare soil: the thin layer that dries by evaporation) and the layer below.
+# Rain and irrigation fill the root zone first, the surplus fills the layer below, and what is left drains
+# away. When the root depth changes (planting, harvest) the column's water is shared out evenly by depth.
+# Water in = water out exactly: rain + irrigation = ET + runoff + drainage + change in stored soil water.
+# =====================================================================================================
+from dataclasses import dataclass as _dc, field as _fld
+
+from engine import crops as _crops
+
+PLAN_YEARS_V4 = 4
+NDOY = 365
+D4 = PLAN_YEARS_V4 * NDOY
+
+
+@_dc
+class Segment:
+    kind: str                 # "crop" (cash crop) or "cover"
+    crop: str
+    name: str
+    plan_year: int            # 0..3: the plan year this crop belongs to (the year it is harvested in)
+    start: int                # day index on the 4-year timeline; negative = planted before plan year 1 began
+    days: int
+    plant_doy: int            # 0-based day of year
+    harvest_doy: int
+    shifted: bool = False     # planted later than its preferred day because the field was still busy
+    ky: float = 0.0
+    heat_tmax_c: float = 99.0
+    flower_start: int = 0     # day offset in the season where the heat-sensitive window starts
+    flower_days: int = 0
+    kc: np.ndarray = _fld(default=None, repr=False)
+    root_depth_m: float = 0.0
+    p: float = 0.5
+
+    @property
+    def end(self) -> int:
+        return self.start + self.days - 1
+
+    def idx(self) -> np.ndarray:
+        """Timeline day indexes of the season (wrapped onto the 4-year cycle)."""
+        return (self.start + np.arange(self.days)) % D4
+
+    def timing(self) -> dict:
+        return {"kind": self.kind, "crop": self.crop, "name": self.name, "plan_year": self.plan_year + 1,
+                "plant_day_of_year": self.plant_doy + 1, "harvest_day_of_year": self.harvest_doy + 1,
+                "season_days": self.days, "starts_in_previous_year": self.start < self.plan_year * NDOY,
+                "planted_late_after_previous_crop": self.shifted}
+
+
+@_dc
+class Timeline:
+    feasible: bool
+    reason: str = ""
+    crops: list = _fld(default_factory=list)          # normalized: 4 lists of crop ids
+    cover_crops: list = _fld(default_factory=list)    # normalized: 4 cover ids or None
+    segments: list = _fld(default_factory=list)       # cash crops first (in time order), then cover crops
+    kc: np.ndarray = _fld(default=None, repr=False)   # [1460] crop coefficient (fallow value on bare days)
+    zr: np.ndarray = _fld(default=None, repr=False)   # [1460] root-zone depth (m)
+    p: np.ndarray = _fld(default=None, repr=False)    # [1460] depletion fraction
+    irrigable: np.ndarray = _fld(default=None, repr=False)   # [1460] cash crop growing
+    covered: np.ndarray = _fld(default=None, repr=False)     # [1460] crop or cover growing (runoff curve number)
+
+    @property
+    def cash(self) -> list:
+        return [s for s in self.segments if s.kind == "crop"]
+
+
+def normalize_rotation(rotation) -> tuple[list, list]:
+    """Any rotation shape -> (4 lists of crop ids, 4 cover crop ids or None).
+
+    Accepts a list of crop names, a list whose items are lists (double crops in one year), or an object or
+    dict with crops and cover_crops. A shorter plan repeats to fill 4 years (corn, soy -> corn, soy, corn, soy).
+    "fallow", "" or None in a year means nothing is grown that year.
+    """
+    cov = None
+    if isinstance(rotation, dict):
+        cr, cov = rotation.get("crops"), rotation.get("cover_crops")
+    elif hasattr(rotation, "crops"):
+        cr, cov = rotation.crops, getattr(rotation, "cover_crops", None)
+    else:
+        cr = rotation
+    if isinstance(cr, str):
+        cr = [cr]
+    cr = list(cr or [])
+    if not cr:
+        raise ValueError("the rotation has no crops")
+
+    def entry(e):
+        if e is None or (isinstance(e, str) and e.strip().lower() in ("", "fallow", "none")):
+            return []
+        return [_crops.crop_id(e)] if isinstance(e, str) else [_crops.crop_id(x) for x in e]
+
+    def cover(e):
+        if e is None or str(e).strip().lower() in ("", "none", "no", "false"):
+            return None
+        return str(e).strip().lower().replace(" ", "_")
+
+    crops4 = [entry(cr[i % len(cr)]) for i in range(PLAN_YEARS_V4)]
+    cov = list(cov) if cov else [None]
+    return crops4, [cover(cov[i % len(cov)]) for i in range(PLAN_YEARS_V4)]
+
+
+def _clim_of(clim_or_weather) -> dict:
+    return clim_or_weather if isinstance(clim_or_weather, dict) else _crops.climatology(clim_or_weather)
+
+
+def build_timeline(rotation, clim_or_weather, irrigated: bool = True) -> Timeline:
+    """Lay the plan's crops on a repeating 4-year (1460-day) timeline using this location's climate calendar.
+
+    The crop of plan year y is the one harvested in year y (winter wheat harvested in year 2 was planted in
+    the fall of year 1; for year 1 it wraps to the fall of year 4, because the plan repeats). A crop that
+    would be planted while the field is still busy is planted after the previous harvest plus the turnaround
+    days if the season still fits; if it does not, the rotation is not feasible and the reason says why.
+    """
+    clim = _clim_of(clim_or_weather)
+    lib, covers = _crops.crop_library(), _crops.cover_crops()
+    crops4, cov4 = normalize_rotation(rotation)
+    turn = int(_crops.rule("turnaround_days"))
+
+    def bad(reason):
+        return Timeline(False, reason, crops4, cov4)
+
+    segs = []
+    for y, entry in enumerate(crops4):
+        prev_end = None
+        for j, cid in enumerate(entry):
+            if cid not in lib:
+                return bad(f"unknown crop '{cid}'")
+            c = lib[cid]
+            if j == 0:
+                cal = _crops.crop_calendar(c, clim, irrigated=irrigated)
+                if not cal.feasible:
+                    return bad(f"{c.name}: {cal.reason}")
+                start = y * NDOY + cal.harvest_doy - (cal.season_days - 1)
+            else:
+                e = prev_end + turn + 1
+                cal = _crops.crop_calendar(c, clim, earliest=e % NDOY, irrigated=irrigated)
+                if not cal.feasible:
+                    return bad(f"{c.name} as a second crop: {cal.reason}")
+                start = e + (cal.plant_doy - e) % NDOY
+            segs.append([c, cal, y, start])
+            prev_end = start + cal.season_days - 1
+    if not segs:
+        return bad("nothing is grown in any year")
+    segs.sort(key=lambda s: s[3])
+    n = len(segs)
+    for i in range(n if n > 1 else 0):
+        prev, cur = segs[i - 1], segs[i]
+        prev_end = prev[3] + prev[1].season_days - 1 - (D4 if i == 0 else 0)
+        if cur[3] < prev_end + turn + 1:
+            e = prev_end + turn + 1
+            cal = _crops.crop_calendar(cur[0], clim, earliest=e % NDOY, irrigated=irrigated)
+            if not cal.feasible:
+                return bad(f"{cur[0].name} cannot follow {prev[0].name}: {cal.reason}")
+            cur[1], cur[3] = cal, e + (cal.plant_doy - e) % NDOY
+    for i in range(n if n > 1 else 0):
+        prev, cur = segs[i - 1], segs[i]
+        prev_end = prev[3] + prev[1].season_days - 1 - (D4 if i == 0 else 0)
+        if cur[3] < prev_end + 1:
+            return bad(f"{cur[0].name} cannot follow {prev[0].name}: the seasons overlap")
+
+    out = []
+    for c, cal, y, start in segs:
+        st = cal.stages_days
+        out.append(Segment("crop", c.id, c.name, y, int(start), int(cal.season_days), int(cal.plant_doy),
+                           int(cal.harvest_doy), bool(cal.shifted or start != y * NDOY + cal.harvest_doy - (cal.season_days - 1)),
+                           ky=c.ky, heat_tmax_c=c.heat_tmax_c, flower_start=int(st[0] + st[1]),
+                           flower_days=int(min(c.flowering_days, st[2])),
+                           kc=_crops.kc_curve(st, cal.kc_ini, c.kc_mid, c.kc_end), root_depth_m=c.root_depth_m, p=c.p))
+    # cover crops: in the gap after the last cash crop of a plan year, ended before the next cash crop is planted
+    frozen = float(clim["tmean"][clim["coldest_doy"]]) < 0.0
+    kc0 = float(_crops.rule("cover_kc_start_frozen" if frozen else "cover_kc_start"))
+    min_days, before = int(_crops.rule("cover_min_days")), int(_crops.rule("cover_terminate_days_before"))
+    cover_segs = []
+    for i, s in enumerate(out):
+        nxt = out[(i + 1) % n]
+        last_of_year = not any(o.plan_year == s.plan_year and o.start > s.start for o in out)
+        cid = cov4[s.plan_year]
+        if cid is None or not last_of_year:
+            continue
+        if cid not in covers:
+            return bad(f"unknown cover crop '{cid}'")
+        cc = covers[cid]
+        first = s.end + turn + 1
+        last = nxt.start + (D4 if i == n - 1 else 0) - before - 1
+        length = min(last - first + 1, cc.max_days)
+        if length < min_days:
+            continue                                   # gap too short: no cover crop this year
+        cover_segs.append(Segment("cover", cc.id, cc.name, s.plan_year, int(first), int(length), int(first % NDOY),
+                                  int((first + length - 1) % NDOY), kc=np.linspace(kc0, cc.kc_full, length),
+                                  root_depth_m=cc.root_depth_m, p=cc.p))
+    kc = np.full(D4, float(_crops.sim_setting("fallow", "kc")))
+    zr = np.full(D4, float(_crops.sim_setting("fallow", "evap_depth_m")))
+    pp = np.full(D4, float(_crops.sim_setting("fallow", "depletion_fraction")))
+    irrigable, covered = np.zeros(D4, bool), np.zeros(D4, bool)
+    for s in out + cover_segs:
+        ix = s.idx()
+        kc[ix], zr[ix], pp[ix], covered[ix] = s.kc, s.root_depth_m, s.p, True
+        if s.kind == "crop":
+            irrigable[ix] = True
+    return Timeline(True, "", crops4, cov4, out + cover_segs, kc, zr, pp, irrigable, covered)
+
+
+def scs_runoff_v4(precip, cn: float, ia_ratio: float):
+    """Daily runoff (mm) by the SCS curve number method (NRCS NEH 630 ch.10): Q = (P - Ia)^2 / (P - Ia + S)."""
+    s = 25400.0 / cn - 254.0
+    ia = ia_ratio * s
+    pe = np.maximum(np.asarray(precip, float) - ia, 0.0)
+    return pe * pe / (pe + s)
+
+
+def curve_numbers(hydrologic_group: str | None) -> tuple[float, float]:
+    """(curve number under a crop, curve number on bare soil) for the soil's hydrologic group (A to D)."""
+    g = str(hydrologic_group or _crops.rule("default_hydrologic_group")).strip().upper()[:1]
+    if g not in "ABCD" or not g:
+        g = str(_crops.rule("default_hydrologic_group"))
+    return (float(_crops.sim_setting("hydrology", f"cn_crop_group_{g}")),
+            float(_crops.sim_setting("hydrology", f"cn_fallow_group_{g}")))
+
+
+def yearly_supply(water, scenarios) -> np.ndarray:
+    """[S,4] irrigation water available in each plan year (mm).
+
+    Rain-fed: 0. Irrigated with no amount given: unlimited. Otherwise the farmer's normal-year amount, falling
+    in a straight line to the dry-year amount as that plan year's rainfall falls from the record's median year
+    to its dry year (rule dry_year_quantile, default a 1-in-10 dry year) (R6). Never above the normal amount.
+    """
+    get = (lambda k: water.get(k)) if isinstance(water, dict) else (lambda k: getattr(water, k, None))
+    shape = (scenarios.n, PLAN_YEARS_V4)
+    mode = str(get("mode") or "rain").lower()
+    if water is None or mode.startswith("rain"):
+        return np.zeros(shape)
+    normal = get("normal_mm")
+    if normal is None:
+        return np.full(shape, np.inf)
+    normal = max(float(normal), 0.0)
+    dry = get("dry_mm")
+    dry = normal if dry is None else min(max(float(dry), 0.0), normal)
+    rain = scenarios.annual_rain()
+    span = max(scenarios.rain_normal_mm - scenarios.rain_dry_mm, 1e-9)
+    return dry + (normal - dry) * np.clip((rain - scenarios.rain_dry_mm) / span, 0.0, 1.0)
+
+
+def run_balance(timelines, scenarios, supply, awc_mm_per_m: float, hydrologic_group: str | None = None,
+                keep_daily: bool = False) -> dict:
+    """Daily water balance of R timelines over S scenarios (all feasible timelines; arrays are [R,S,...]).
+
+    Each day, in this order: rain minus runoff soaks in; on cash-crop days the farmer irrigates just enough to
+    keep the crop out of water stress today, as long as this year's supply lasts; the crop (or bare soil)
+    takes ET, reduced when the root zone is drier than the FAO-56 readily available water; surplus water fills
+    the layer below the roots and then drains. The plan repeats, so one full pass is run first to get a
+    realistic soil water start, and the second pass is reported.
+
+    Returns per cash-crop season (K = most seasons in any timeline; unused slots are NaN):
+      eta, etm, irr_season [R,S,K] (mm)
+    and per plan year [R,S,4] (mm): irrigation, eta_year, runoff, drainage, rain; plus storage_change [R,S],
+    closure_error [R,S] (rain + irrigation - ET - runoff - drainage - storage change; 0 up to rounding),
+    and with keep_daily=True the daily root-zone depletion, its limit and irrigation ([R,S,1460]).
+    """
+    tls = list(timelines)
+    R, S = len(tls), scenarios.n
+    et0 = scenarios.et0.reshape(S, D4)
+    precip = scenarios.precip.reshape(S, D4)
+    awc = float(awc_mm_per_m)
+    KC = np.stack([t.kc for t in tls])
+    TAW = awc * np.stack([t.zr for t in tls])                     # [R,D] root-zone capacity today
+    RAW = np.stack([t.p for t in tls]) * TAW
+    IRR = np.stack([t.irrigable for t in tls])
+    COV = np.stack([t.covered for t in tls])
+    tawcol = TAW.max(axis=1)                                       # [R] whole column capacity
+    cn_crop, cn_fallow = curve_numbers(hydrologic_group)
+    ia = float(_crops.sim_setting("hydrology", "ia_ratio"))
+    ro_crop, ro_fallow = scs_runoff_v4(precip, cn_crop, ia), scs_runoff_v4(precip, cn_fallow, ia)
+    supply = np.broadcast_to(np.asarray(supply, float), (S, PLAN_YEARS_V4))
+
+    K = max(len(t.cash) for t in tls)
+    eta_s = np.full((R, S, K), np.nan)
+    irr_s = np.full((R, S, K), np.nan)
+    etm_s = np.full((R, S, K), np.nan)
+    starts, ends = {}, {}
+    for r, t in enumerate(tls):
+        for k, s in enumerate(t.cash):
+            starts.setdefault(s.start % D4, []).append(r)
+            ends.setdefault(s.end % D4, []).append((r, k))
+            etm_s[r, :, k] = et0[:, s.idx()] @ s.kc
+    change = np.roll(TAW, 1, axis=1) != TAW                        # [R,D] root depth differs from yesterday
+    change_rows = {d: np.nonzero(change[:, d])[0] for d in np.nonzero(change.any(axis=0))[0]}
+
+    f0 = float(_crops.rule("init_depletion_frac"))
+    dr = np.repeat((f0 * TAW[:, -1])[:, None], S, axis=1)          # root-zone depletion (mm)
+    db = np.repeat((f0 * (tawcol - TAW[:, -1]))[:, None], S, axis=1)   # depletion of the layer below
+    acc_eta, acc_irr = np.zeros((R, S)), np.zeros((R, S))
+    yr = {k: np.zeros((R, S, PLAN_YEARS_V4)) for k in ("irrigation", "eta_year", "runoff", "drainage")}
+    daily = {k: np.zeros((R, S, D4)) for k in ("depletion", "irrigation_daily")} if keep_daily else None
+    rem = np.zeros((R, S))
+    store0 = None
+    for main in (False, True):
+        if main:
+            store0 = dr + db
+        for d in range(D4):
+            y = d // NDOY
+            if d % NDOY == 0:
+                rem = np.repeat(supply[None, :, y], R, axis=0)
+            rows = change_rows.get(d)
+            if rows is not None:                                   # root depth changed: share the water out by depth
+                tot = dr[rows] + db[rows]
+                dr[rows] = tot * (TAW[rows, d] / tawcol[rows])[:, None]
+                db[rows] = tot - dr[rows]
+            if d in starts:
+                acc_eta[starts[d]] = 0.0
+                acc_irr[starts[d]] = 0.0
+            taw, raw = TAW[:, d, None], RAW[:, d, None]
+            etc = KC[:, d, None] * et0[None, :, d]
+            ro = np.where(COV[:, d, None], ro_crop[None, :, d], ro_fallow[None, :, d])
+            x = dr - (precip[None, :, d] - ro)
+            irr = np.minimum(rem, np.maximum(x + etc - raw, 0.0) * IRR[:, d, None])
+            rem = rem - irr
+            x = x - irr
+            perc = np.maximum(-x, 0.0)
+            x = np.maximum(x, 0.0)
+            a = np.clip(raw - x, 0.0, etc)                         # taken at the full rate (no stress)
+            eta = a + (taw - x - a) * -np.expm1(-(etc - a) / (taw - raw))   # the rest under stress (Ks < 1), exact
+            dr = x + eta
+            xb = db - perc
+            drain = np.maximum(-xb, 0.0)
+            db = np.maximum(xb, 0.0)
+            acc_eta += eta
+            acc_irr += irr
+            if main:
+                yr["irrigation"][:, :, y] += irr
+                yr["eta_year"][:, :, y] += eta
+                yr["runoff"][:, :, y] += ro
+                yr["drainage"][:, :, y] += drain
+                if keep_daily:
+                    daily["depletion"][:, :, d] = dr
+                    daily["irrigation_daily"][:, :, d] = irr
+                for r, k in ends.get(d, ()):
+                    eta_s[r, :, k] = acc_eta[r]
+                    irr_s[r, :, k] = acc_irr[r]
+    rain = np.broadcast_to(scenarios.annual_rain()[None], (R, S, PLAN_YEARS_V4))
+    storage_change = store0 - (dr + db)                            # + = soil ended wetter than it started
+    out = {"eta": eta_s, "etm": etm_s, "irr_season": irr_s, "rain": rain, "storage_change": storage_change, **yr}
+    out["closure_error"] = (rain.sum(2) + yr["irrigation"].sum(2) - yr["eta_year"].sum(2) - yr["runoff"].sum(2)
+                            - yr["drainage"].sum(2) - storage_change)
+    if keep_daily:
+        out.update(daily)
+        out["root_zone_capacity"] = TAW
+    return out

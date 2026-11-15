@@ -1,0 +1,458 @@
+# RotationLab Feature 2 (Simulation and Tipping Points) settings. Owner: Person 2 (Max).
+# Read by engine/crops.py, engine/waterbalance.py, engine/yieldmodel.py, engine/scenarios.py, engine/tipping.py.
+# Every leaf has value, range, unit, source, badge. Badges: observed | assumption | placeholder.
+# "team to verify" = not read in a primary document; the value is flagged, not trusted.
+#
+# Sources, re-read from the FAO web copies on 2026-11-15:
+#   FAO-56 (Allen et al. 1998) Table 11 (stage lengths) and Table 12 (Kc): https://www.fao.org/4/x0490e/x0490e0b.htm
+#   FAO-56 Table 22 (root depth Zr and depletion fraction p): https://www.fao.org/4/x0490e/x0490e0e.htm
+#   FAO-66 (Steduto et al. 2012) Table 1, "Seasonal Ky values from FAO I&D Paper No. 33": https://www.fao.org/4/i2800e/i2800e02.pdf
+#   Calories: USDA FoodData Central (SR Legacy), https://fdc.nal.usda.gov
+#   Runoff curve numbers: USDA NRCS National Engineering Handbook Part 630 ch.9 Table 9-1 (read 2026-11-14),
+#     https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf
+# Where a Kc ini cell is blank in Table 12 the crop-group value from the group header row is used and says so.
+# root_depth_m is the middle of the Table 22 range (the table gives a range, not one value).
+# Planting and climate-fit settings (season_type, t_plant_c, t_min_grow_c, t_max_grow_c), the heat settings and
+# harvest_index were NOT read in a primary source: they are team rules of thumb, every one marked "team to verify".
+
+rules:
+  turnaround_days: {value: 7, range: [0, 21], unit: days, source: "Days between harvesting one crop and planting the next. Team choice, team to verify.", badge: assumption}
+  climate_smoothing_days: {value: 31, range: [15, 45], unit: days, source: "Window of the running mean applied to the day-of-year temperature normals before planting rules are applied. Team choice.", badge: assumption}
+  winter_wheat_maturity_c: {value: 22, range: [20, 24], unit: degC, source: "Winter wheat is taken as mature when the smoothed mean temperature first reaches this value after winter (or at the hottest day if it never does). Team rule of thumb, team to verify.", badge: assumption}
+  winter_wheat_vernalization_max_c: {value: 12, range: [8, 14], unit: degC, source: "Winter wheat is offered only where the coldest part of the year has a smoothed mean temperature at or below this. Team rule of thumb, team to verify.", badge: assumption}
+  winter_wheat_season_days: {value: [180, 335], range: [[150, 200], [300, 335]], unit: days, source: "Shortest and longest winter wheat seasons in FAO-56 Table 11 (180 Calif., 335 Idaho); the local season length is kept inside this range.", badge: observed}
+  heat_pen_per_day: {value: 0.01, range: [0.0, 0.02], unit: "fraction of yield per hot day in the flowering window", source: "Carried over from Build Spec v3 section 5.4 (default 1 percent, range 0 to 2 percent). Team to verify.", badge: assumption}
+  heat_enabled: {value: true, range: [false, true], unit: "on/off", source: "Heat penalty toggle (Person 2 task 7).", badge: assumption}
+  dry_year_quantile: {value: 0.10, range: [0.05, 0.25], unit: "quantile of yearly rainfall", source: "A 'dry year' for the farmer's dry-year water supply answer is a 1-in-10 dry year; supply is interpolated between this and the median year. Team choice, team to verify.", badge: assumption}
+  init_depletion_frac: {value: 0.5, range: [0.0, 1.0], unit: "fraction of column water capacity", source: "Soil water deficit at the very start of the spin-up pass. With the spin-up on (default) the result barely depends on it. Team to verify.", badge: assumption}
+  cover_kc_start: {value: 0.70, range: [0.40, 0.70], unit: "-", source: "Kc of a cover crop while it is small. FAO-56 Table 12 has no cover-crop rows; stand-in: Winter Wheat Kc ini 0.7 (non-frozen soils). Team to verify.", badge: assumption}
+  cover_kc_start_frozen: {value: 0.40, range: [0.40, 0.70], unit: "-", source: "Same, where the coldest month is below 0 degC. Stand-in: FAO-56 Table 12 Winter Wheat Kc ini 0.4 (frozen soils). Team to verify.", badge: assumption}
+  cover_min_days: {value: 30, range: [14, 60], unit: days, source: "A cover crop is only grown when the gap between cash crops is at least this long. Team choice, team to verify.", badge: assumption}
+  cover_terminate_days_before: {value: 14, range: [0, 30], unit: days, source: "A cover crop is terminated this many days before the next cash crop is planted. Team choice, team to verify.", badge: assumption}
+  heat_shift_et0_pct_per_c: {value: 0.0, range: [0.0, 4.0], unit: "percent ET0 per degC", source: "What-if heat shift: extra reference evapotranspiration per degree of warming. 0 = the heat shift changes heat days only. Team to verify before turning on.", badge: assumption}
+  n_bootstrap: {value: 500, range: [200, 1000], unit: plans, source: "Build Spec v4 R7: 500 bootstrap plans.", badge: assumption}
+  seed: {value: 42, range: [42, 42], unit: "-", source: "Build Spec v4 A7: fixed random seed 42.", badge: assumption}
+  default_awc_mm_per_m: {value: 150, range: [60, 200], unit: "mm of water per m of soil", source: "Used only when a caller gives no soil water capacity (single-season hindcast helper). Middle of the loam range; not re-read in a primary source, team to verify.", badge: placeholder}
+  ym_min_reference_rel: {value: 0.25, range: [0.1, 0.5], unit: "-", source: "When a typical yield is turned into a potential yield, it is divided by the model's median relative yield for that crop at the site, never by less than this. Team choice, team to verify.", badge: assumption}
+  ym_nass_quantile: {value: 0.90, range: [0.8, 0.95], unit: "quantile", source: "Final prompts v5, Person 2 task 4: potential yield = 90th percentile of detrended county yields.", badge: assumption}
+  recent_years: {value: 20, range: [10, 30], unit: years, source: "Final prompts v5 task 7 (R8): 'Recent' climate mode counts the last 20 years twice.", badge: assumption}
+  recent_weight: {value: 2.0, range: [1.0, 4.0], unit: "x", source: "Final prompts v5 task 7 (R8): the last 20 years count 2x in 'Recent' mode.", badge: assumption}
+  default_hydrologic_group: {value: B, range: [A, D], unit: group, source: "Used only when the soil source gives no hydrologic group. Team choice, team to verify.", badge: assumption}
+
+# Daily runoff: SCS curve number. Values read in NRCS NEH Part 630 ch.9 Table 9-1 on 2026-11-14 (carried over from v3).
+hydrology:
+  cn_crop_group_A: {value: 67, range: [64, 72], unit: "-", source: "NRCS NEH 630 ch.9 Table 9-1 (p.9-2), Row crops, straight row, Good hydrologic condition, group A = 67 (Poor 72, SR+CR Good 64). https://irrigationtoolbox.com/NEH/Part630_Hydrology/H_210_630_09.pdf", badge: assumption}
+  cn_crop_group_B: {value: 78, range: [75, 81], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group B = 78 (Poor 81, SR+CR Good 75). Same URL.", badge: assumption}
+  cn_crop_group_C: {value: 85, range: [82, 88], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group C = 85 (Poor 88, SR+CR Good 82). Same URL.", badge: assumption}
+  cn_crop_group_D: {value: 89, range: [85, 91], unit: "-", source: "NRCS NEH 630 Table 9-1, Row crops SR Good, group D = 89 (Poor 91, SR+CR Good 85). Same URL.", badge: assumption}
+  cn_fallow_group_A: {value: 77, range: [74, 77], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group A = 77 (Crop residue Good 74). Same URL.", badge: assumption}
+  cn_fallow_group_B: {value: 86, range: [83, 86], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group B = 86 (CR Good 83). Same URL.", badge: assumption}
+  cn_fallow_group_C: {value: 91, range: [88, 91], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group C = 91 (CR Good 88). Same URL.", badge: assumption}
+  cn_fallow_group_D: {value: 94, range: [90, 94], unit: "-", source: "NRCS NEH 630 Table 9-1, Fallow Bare Soil, group D = 94 (CR Good 90). Same URL.", badge: assumption}
+  ia_ratio: {value: 0.2, range: [0.05, 0.2], unit: "-", source: "team to verify. Standard SCS initial abstraction ratio 0.2 (NEH-4); not read in a primary source.", badge: assumption}
+
+# Days with no crop in the ground: evaporation from bare or residue-covered soil.
+fallow:
+  kc: {value: 0.30, range: [0.15, 0.50], unit: "-", source: "team to verify. Bare/fallow soil Kc between seasons; not read from FAO-56 ch.7.", badge: placeholder}
+  evap_depth_m: {value: 0.12, range: [0.10, 0.15], unit: m, source: "team to verify. Depth of the surface layer that evaporates (FAO-56 ch.7 Ze); not read in a primary source.", badge: placeholder}
+  depletion_fraction: {value: 0.5, range: [0.3, 0.7], unit: "-", source: "team to verify. Fraction of evaporation-layer water that evaporates at full rate.", badge: placeholder}
+
+crops:
+  maize:
+    name: {value: "Maize (corn, grain)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.2, range: [1.2, 1.2], unit: "-", source: "FAO-56 Table 12: Maize, Field (grain) 1.20.", badge: observed}
+    kc_end: {value: 0.35, range: [0.35, 0.6], unit: "-", source: "FAO-56 Table 12: Maize, Field (grain) 0.60-0.35; 0.35 = grain dried in the field.", badge: observed}
+    stages_days: {value: [30, 40, 50, 30], range: [[20, 30], [35, 50], [40, 60], [30, 50]], unit: "days", source: "FAO-56 Table 11: Maize (grain) 30/40/50/30 = 150, April, Spain and Calif. (other rows 125 to 180 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.35, range: [1.0, 1.7], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.7 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.25, range: [1.05, 1.45], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Maize 1.25. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 13, range: [10, 16], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 8, range: [5, 11], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 30, range: [27, 33], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.5, range: [0.4, 0.6], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  soybean:
+    name: {value: "Soybeans", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Legumes group Kc ini 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Soybeans 1.15.", badge: observed}
+    kc_end: {value: 0.5, range: [0.5, 0.5], unit: "-", source: "FAO-56 Table 12: Soybeans 0.50.", badge: observed}
+    stages_days: {value: [20, 35, 60, 25], range: [[15, 20], [15, 35], [40, 75], [15, 30]], unit: "days", source: "FAO-56 Table 11: Soybeans 20/30-35/60/25 = 140, May, Central USA. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.95, range: [0.6, 1.3], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.6-1.3 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.5, range: [0.45, 0.55], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.5.", badge: observed}
+    ky: {value: 0.85, range: [0.65, 1.05], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Soybean 0.85. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 16, range: [13, 19], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 10, range: [7, 13], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 30, range: [27, 33], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.42, range: [0.32, 0.52], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  wheat_winter:
+    name: {value: "Winter wheat", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: winter, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.7, range: [0.7, 0.7], unit: "-", source: "FAO-56 Table 12: Winter Wheat Kc ini 0.7 with non-frozen soils; 0.4 with frozen soils is used where the coldest month is below 0 degC (kc_ini_frozen). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Winter Wheat 1.15.", badge: observed}
+    kc_end: {value: 0.25, range: [0.25, 0.4], unit: "-", source: "FAO-56 Table 12: Wheat 0.25-0.40; 0.25 = dry harvest.", badge: observed}
+    kc_ini_frozen: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Winter Wheat Kc ini 0.4 with frozen soils.", badge: observed}
+    stages_days_short: {value: [20, 60, 70, 30], range: [[20, 30], [60, 140], [40, 70], [30, 30]], unit: "days", source: "FAO-56 Table 11: Winter Wheat 20/60/70/30 = 180, December, Calif. (Mediterranean row: 30/140/40/30 = 240).", badge: observed}
+    stages_days: {value: [160, 75, 75, 25], range: [[20, 160], [60, 140], [40, 75], [25, 30]], unit: "days", source: "FAO-56 Table 11: Winter Wheat 160/75/75/25 = 335, October, Idaho; 20/60/70/30 = 180, December, Calif. (stages_days_short). The engine interpolates between the two rows by local season length. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.65, range: [1.5, 1.8], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.5-1.8 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.05, range: [0.85, 1.25], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Winter wheat 1.05. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 15, range: [12, 18], unit: "degC", source: "Winter crop: planted in fall when the smoothed mean temperature falls to this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: -12, range: [-15, -9], unit: "degC", source: "Winter crop: not offered where the coldest part of the year is colder than this (winter kill). Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 24, range: [21, 27], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 3270, range: [3106, 3433], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Wheat, hard red winter' (FDC ID 168890): 327 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/168890/nutrients", badge: observed}
+  wheat_spring:
+    name: {value: "Spring wheat", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Spring Wheat 1.15.", badge: observed}
+    kc_end: {value: 0.25, range: [0.25, 0.4], unit: "-", source: "FAO-56 Table 12: Spring Wheat 0.25-0.40; 0.25 = dry harvest.", badge: observed}
+    stages_days: {value: [20, 25, 60, 30], range: [[15, 40], [25, 60], [40, 65], [20, 40]], unit: "days", source: "FAO-56 Table 11: Barley/Oats/Wheat 20/25/60/30 = 135, March/April, 35-45 deg latitude. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.25, range: [1.0, 1.5], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.5 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Spring wheat 1.15. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 5, range: [2, 8], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 2, range: [-1, 5], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 22, range: [19, 25], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  barley:
+    name: {value: "Barley", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Barley 1.15.", badge: observed}
+    kc_end: {value: 0.25, range: [0.25, 0.25], unit: "-", source: "FAO-56 Table 12: Barley 0.25.", badge: observed}
+    stages_days: {value: [20, 25, 60, 30], range: [[15, 40], [25, 60], [40, 65], [20, 40]], unit: "days", source: "FAO-56 Table 11: Barley/Oats/Wheat 20/25/60/30 = 135, March/April, 35-45 deg latitude. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.25, range: [1.0, 1.5], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.5 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Barley is not in the table; the spring wheat value 1.15 is used as a stand-in, team to verify.", badge: placeholder}
+    t_plant_c: {value: 5, range: [2, 8], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 2, range: [-1, 5], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 22, range: [19, 25], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 3540, range: [3363, 3717], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Barley, hulled' (FDC ID 170283): 354 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/170283/nutrients", badge: observed}
+  oats:
+    name: {value: "Oats", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Oats 1.15.", badge: observed}
+    kc_end: {value: 0.25, range: [0.25, 0.25], unit: "-", source: "FAO-56 Table 12: Oats 0.25.", badge: observed}
+    stages_days: {value: [20, 25, 60, 30], range: [[15, 40], [25, 60], [40, 65], [20, 40]], unit: "days", source: "FAO-56 Table 11: Barley/Oats/Wheat 20/25/60/30 = 135, March/April, 35-45 deg latitude. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.25, range: [1.0, 1.5], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.5 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Oats are not in the table; the spring wheat value 1.15 is used as a stand-in, team to verify.", badge: placeholder}
+    t_plant_c: {value: 5, range: [2, 8], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 2, range: [-1, 5], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 21, range: [18, 24], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  sorghum:
+    name: {value: "Sorghum (grain)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.05, range: [0.975, 1.125], unit: "-", source: "FAO-56 Table 12: Sorghum grain 1.00-1.10, mid value.", badge: observed}
+    kc_end: {value: 0.55, range: [0.55, 0.55], unit: "-", source: "FAO-56 Table 12: Sorghum grain 0.55.", badge: observed}
+    stages_days: {value: [20, 35, 40, 30], range: [[20, 20], [35, 35], [40, 45], [30, 30]], unit: "days", source: "FAO-56 Table 11: Sorghum 20/35/40/30, May/June, USA, Pakistan, Mediterranean (the table prints a total of 130; the four stages add to 125). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.5, range: [1.0, 2.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-2.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 0.9, range: [0.7, 1.1], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Sorghum 0.9. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 18, range: [15, 21], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 12, range: [9, 15], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 32, range: [29, 35], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 38, range: [36, 40], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  pearl_millet:
+    name: {value: "Pearl millet", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Cereals group Kc ini 0.3. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.0, range: [1.0, 1.0], unit: "-", source: "FAO-56 Table 12: Millet 1.00.", badge: observed}
+    kc_end: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Millet 0.30.", badge: observed}
+    stages_days: {value: [15, 25, 40, 25], range: [[15, 20], [25, 30], [40, 55], [25, 35]], unit: "days", source: "FAO-56 Table 11: Millet 15/25/40/25 = 105, June, Pakistan (Central USA row: 20/30/55/35 = 140). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.5, range: [1.0, 2.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-2.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 0.9, range: [0.7, 1.1], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Millet is not in the table; the sorghum value 0.9 is used as a stand-in, team to verify.", badge: placeholder}
+    t_plant_c: {value: 20, range: [17, 23], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 15, range: [12, 18], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 34, range: [31, 37], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 40, range: [38, 42], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.3, range: [0.2, 0.4], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  rice:
+    name: {value: "Rice", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 1.05, range: [1.05, 1.05], unit: "-", source: "FAO-56 Table 12: Rice 1.05. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.2, range: [1.2, 1.2], unit: "-", source: "FAO-56 Table 12: Rice 1.20.", badge: observed}
+    kc_end: {value: 0.75, range: [0.6, 0.9], unit: "-", source: "FAO-56 Table 12: Rice 0.90-0.60, mid value.", badge: observed}
+    stages_days: {value: [30, 30, 60, 30], range: [[30, 30], [30, 30], [60, 80], [30, 40]], unit: "days", source: "FAO-56 Table 11: Rice 30/30/60/30 = 150, Tropics and Mediterranean (other row 30/30/80/40 = 180). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.75, range: [0.5, 1.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.5-1.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.2, range: [0.15, 0.25], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.2 (of saturation, table footnote).", badge: observed}
+    ky: {value: 1.0, range: [0.8, 1.2], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Rice is not in the table; 1.0 is a placeholder, team to verify.", badge: placeholder}
+    t_plant_c: {value: 16, range: [13, 19], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 13, range: [10, 16], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 32, range: [29, 35], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 3650, range: [3467, 3832], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Rice, white, long-grain, regular, raw, unenriched' (FDC ID 169756): 365 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/169756/nutrients Yield is rough (paddy) rice; the calorie value is for milled white rice. edible_fraction converts.", badge: observed}
+    edible_fraction: {value: 0.66, range: [0.62, 0.7], unit: "-", source: "Milled rice per kg of paddy, 0.66, from the ICRISAT documentation already cited in config/prices_india.yaml (milled_rice_per_paddy).", badge: observed}
+    irrigated_only: {value: true, range: [false, true], unit: "flag", source: "Offered only when the farm is irrigated. US rice is flooded; the model treats it as a fully irrigated crop without a ponded layer (see LIMITATIONS).", badge: assumption}
+  cotton:
+    name: {value: "Cotton (upland)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Fibre crops group Kc ini 0.35. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.175, range: [1.1, 1.25], unit: "-", source: "FAO-56 Table 12: Cotton 1.15-1.20, mid value.", badge: observed}
+    kc_end: {value: 0.6, range: [0.5, 0.7], unit: "-", source: "FAO-56 Table 12: Cotton 0.70-0.50, mid value.", badge: observed}
+    stages_days: {value: [30, 50, 55, 45], range: [[30, 45], [50, 90], [45, 60], [45, 55]], unit: "days", source: "FAO-56 Table 11: Cotton 30/50/55/45 = 180, April, Texas (other rows 195 and 225 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.35, range: [1.0, 1.7], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.7 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.65, range: [0.6, 0.7], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.65.", badge: observed}
+    ky: {value: 0.85, range: [0.65, 1.05], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Cotton 0.85. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 18, range: [15, 21], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 12, range: [9, 15], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 33, range: [30, 36], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 38, range: [36, 40], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 40, range: [30, 50], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.35, range: [0.25, 0.45], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 0, range: null, unit: "kcal/kg", source: "Fibre crop: no food calories counted (cottonseed is not counted).", badge: assumption}
+  peanut:
+    name: {value: "Peanuts (groundnut)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Legumes group Kc ini 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Groundnut (Peanut) 1.15.", badge: observed}
+    kc_end: {value: 0.6, range: [0.6, 0.6], unit: "-", source: "FAO-56 Table 12: Groundnut (Peanut) 0.60.", badge: observed}
+    stages_days: {value: [35, 35, 35, 35], range: [[25, 35], [35, 45], [35, 45], [25, 35]], unit: "days", source: "FAO-56 Table 11: Groundnut 35/35/35/35 = 140, May, High Latitudes (other rows 130 and 140 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.75, range: [0.5, 1.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.5-1.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.5, range: [0.45, 0.55], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.5.", badge: observed}
+    ky: {value: 0.7, range: [0.5, 0.9], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Groundnuts 0.70. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 19, range: [16, 22], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 15, range: [12, 18], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 32, range: [29, 35], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    edible_fraction: {value: 1.0, range: [0.5, 1.0], unit: "-", source: "Yield is in-shell peanuts; the calorie value is for shelled kernels. edible_fraction is team to verify. 1.0 overstates food calories until verified.", badge: placeholder}
+  dry_bean:
+    name: {value: "Dry beans", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Beans, dry and Pulses 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Beans, dry and Pulses 1.15.", badge: observed}
+    kc_end: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Beans, dry and Pulses 0.35.", badge: observed}
+    stages_days: {value: [20, 30, 40, 20], range: [[15, 25], [25, 30], [30, 40], [20, 20]], unit: "days", source: "FAO-56 Table 11: Beans (dry) 20/30/40/20 = 110, May/June, Continental Climates. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.75, range: [0.6, 0.9], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.6-0.9 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.45, range: [0.4, 0.5], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.45.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Beans 1.15. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 16, range: [13, 19], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 10, range: [7, 13], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 28, range: [25, 31], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 32, range: [30, 34], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  chickpea:
+    name: {value: "Chickpea", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Legumes group Kc ini 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.0, range: [1.0, 1.0], unit: "-", source: "FAO-56 Table 12: Chick pea 1.00.", badge: observed}
+    kc_end: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Chick pea 0.35.", badge: observed}
+    stages_days: {value: [20, 30, 60, 40], range: [[20, 25], [30, 35], [60, 70], [40, 40]], unit: "days", source: "Chick pea is not in FAO-56 Table 11; the Lentil row 20/30/60/40 = 150 (April, Europe) is used as a stand-in, team to verify.", badge: placeholder}
+    root_depth_m: {value: 0.8, range: [0.6, 1.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.6-1.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.5, range: [0.45, 0.55], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.5.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Chick pea is not in the table; the Beans value 1.15 is used as a stand-in, team to verify.", badge: placeholder}
+    t_plant_c: {value: 8, range: [5, 11], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 5, range: [2, 8], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 25, range: [22, 28], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  lentil:
+    name: {value: "Lentil", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Legumes group Kc ini 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.1, range: [1.1, 1.1], unit: "-", source: "FAO-56 Table 12: Lentil 1.10.", badge: observed}
+    kc_end: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Lentil 0.30.", badge: observed}
+    stages_days: {value: [20, 30, 60, 40], range: [[20, 25], [30, 35], [60, 70], [40, 40]], unit: "days", source: "FAO-56 Table 11: Lentil 20/30/60/40 = 150, April, Europe (other row 170 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.7, range: [0.6, 0.8], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.6-0.8 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.5, range: [0.45, 0.55], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.5.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Lentil is not in the table; the Peas value 1.15 is used as a stand-in, team to verify.", badge: placeholder}
+    t_plant_c: {value: 6, range: [3, 9], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 3, range: [0, 6], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 22, range: [19, 25], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 30, range: [28, 32], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 3520, range: [3344, 3696], unit: "kcal/kg", source: "USDA FoodData Central, SR Legacy, 'Lentils, raw' (FDC ID 172420): 352 kcal per 100 g, read from the FDC API on 2026-11-15. https://fdc.nal.usda.gov/fdc-app.html#/food-details/172420/nutrients", badge: observed}
+  pea:
+    name: {value: "Dry peas", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.4, 0.4], unit: "-", source: "FAO-56 Table 12: Legumes group Kc ini 0.4. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Peas, Dry/Seed 1.15.", badge: observed}
+    kc_end: {value: 0.3, range: [0.3, 0.3], unit: "-", source: "FAO-56 Table 12: Peas, Dry/Seed 0.30.", badge: observed}
+    stages_days: {value: [35, 25, 30, 20], range: [[15, 35], [25, 30], [30, 35], [15, 20]], unit: "days", source: "FAO-56 Table 11: Peas 35/25/30/20 = 110, April, Idaho (other rows 90 and 100 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.8, range: [0.6, 1.0], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.6-1.0 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.4, range: [0.35, 0.45], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.4.", badge: observed}
+    ky: {value: 1.15, range: [0.95, 1.35], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Peas 1.15. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 6, range: [3, 9], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 3, range: [0, 6], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 21, range: [18, 24], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 30, range: [28, 32], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.45, range: [0.35, 0.55], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  sunflower:
+    name: {value: "Sunflower", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Oil crops group Kc ini 0.35. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.075, range: [1.0, 1.15], unit: "-", source: "FAO-56 Table 12: Sunflower 1.0-1.15, mid value.", badge: observed}
+    kc_end: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Sunflower 0.35.", badge: observed}
+    stages_days: {value: [25, 35, 45, 25], range: [[25, 25], [35, 35], [45, 45], [25, 25]], unit: "days", source: "FAO-56 Table 11: Sunflower 25/35/45/25 = 130, April/May, Mediterranean and California. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 1.15, range: [0.8, 1.5], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.8-1.5 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.45, range: [0.4, 0.5], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.45.", badge: observed}
+    ky: {value: 0.95, range: [0.75, 1.15], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Sunflower 0.95. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 12, range: [9, 15], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 8, range: [5, 11], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 30, range: [27, 33], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 15, range: [5, 25], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.35, range: [0.25, 0.45], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+    edible_fraction: {value: 1.0, range: [0.5, 1.0], unit: "-", source: "Yield includes the hull; the calorie value is for kernels. edible_fraction is team to verify. 1.0 overstates food calories until verified.", badge: placeholder}
+  canola:
+    name: {value: "Canola (rapeseed)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Oil crops group Kc ini 0.35. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.075, range: [1.0, 1.15], unit: "-", source: "FAO-56 Table 12: Canola (Rapeseed) 1.0-1.15, mid value.", badge: observed}
+    kc_end: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Canola (Rapeseed) 0.35.", badge: observed}
+    stages_days: {value: [25, 35, 55, 30], range: [[20, 35], [35, 55], [45, 60], [25, 40]], unit: "days", source: "Canola is not in FAO-56 Table 11; the Safflower row 25/35/55/30 = 145 (March, High Latitudes) is used as a stand-in, team to verify.", badge: placeholder}
+    root_depth_m: {value: 1.25, range: [1.0, 1.5], unit: "m", source: "FAO-56 Table 22: maximum root depth 1.0-1.5 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.6, range: [0.55, 0.65], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.6.", badge: observed}
+    ky: {value: 1.0, range: [0.8, 1.2], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Canola is not in the table; 1.0 is a placeholder, team to verify.", badge: placeholder}
+    t_plant_c: {value: 6, range: [3, 9], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 3, range: [0, 6], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 22, range: [19, 25], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 30, range: [28, 32], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 20, range: [10, 30], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.3, range: [0.2, 0.4], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 0, range: null, unit: "kcal/kg", source: "Processed into oil and meal: calories per kg of seed are team to verify, none counted.", badge: placeholder}
+  potato:
+    name: {value: "Potato", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.5, range: [0.5, 0.5], unit: "-", source: "FAO-56 Table 12: Roots and Tubers group Kc ini 0.5. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.15, range: [1.15, 1.15], unit: "-", source: "FAO-56 Table 12: Potato 1.15.", badge: observed}
+    kc_end: {value: 0.75, range: [0.75, 0.75], unit: "-", source: "FAO-56 Table 12: Potato 0.75.", badge: observed}
+    stages_days: {value: [25, 30, 45, 30], range: [[25, 45], [30, 35], [30, 70], [20, 30]], unit: "days", source: "FAO-56 Table 11: Potato 25/30/45/30 = 130, May, Continental Climate (other rows 115 to 165 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.5, range: [0.4, 0.6], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.4-0.6 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.35, range: [0.3, 0.4], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.35.", badge: observed}
+    ky: {value: 1.1, range: [0.9, 1.3], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Potato 1.1. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 8, range: [5, 11], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 5, range: [2, 8], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 23, range: [20, 26], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 30, range: [28, 32], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.75, range: [0.65, 0.85], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+  sugarbeet:
+    name: {value: "Sugar beet", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    season_type: {value: cool, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.35, range: [0.35, 0.35], unit: "-", source: "FAO-56 Table 12: Sugar Beet 0.35. https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    kc_mid: {value: 1.2, range: [1.2, 1.2], unit: "-", source: "FAO-56 Table 12: Sugar Beet 1.20.", badge: observed}
+    kc_end: {value: 0.7, range: [0.7, 0.7], unit: "-", source: "FAO-56 Table 12: Sugar Beet 0.70.", badge: observed}
+    stages_days: {value: [50, 40, 50, 40], range: [[25, 50], [30, 75], [50, 100], [10, 65]], unit: "days", source: "FAO-56 Table 11: Sugarbeet 50/40/50/40 = 180, April, Idaho (other rows 155 to 255 days). https://www.fao.org/4/x0490e/x0490e0b.htm", badge: observed}
+    root_depth_m: {value: 0.95, range: [0.7, 1.2], unit: "m", source: "FAO-56 Table 22: maximum root depth 0.7-1.2 m; the middle of the range is used. https://www.fao.org/4/x0490e/x0490e0e.htm", badge: observed}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "FAO-56 Table 22: depletion fraction p = 0.55.", badge: observed}
+    ky: {value: 1.0, range: [0.8, 1.2], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Sugarbeet 1.0. https://www.fao.org/4/i2800e/i2800e02.pdf", badge: observed}
+    t_plant_c: {value: 6, range: [3, 9], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 3, range: [0, 6], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 24, range: [21, 27], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 0, range: [0, 10], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.6, range: [0.5, 0.7], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: 0, range: null, unit: "kcal/kg", source: "Processed into sugar: calories per kg of beet are team to verify, none counted.", badge: placeholder}
+  pigeonpea:
+    name: {value: "Pigeon pea", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    season_type: {value: warm, range: [warm, cool, winter], unit: "category", source: "warm = planted when it warms up; cool = planted in the cool part of the year; winter = fall-planted, overwinters. Team classification, team to verify.", badge: assumption}
+    kc_ini: {value: 0.4, range: [0.3, 0.5], unit: "-", source: "Not in FAO-56 Table 12. Stand-in: the Beans, dry and Pulses row (0.4 / 1.15 / 0.35), team to verify.", badge: assumption}
+    kc_mid: {value: 1.15, range: [1.05, 1.25], unit: "-", source: "Not in FAO-56 Table 12. Stand-in: the Beans, dry and Pulses row (0.4 / 1.15 / 0.35), team to verify.", badge: assumption}
+    kc_end: {value: 0.35, range: [0.25, 0.45], unit: "-", source: "Not in FAO-56 Table 12. Stand-in: the Beans, dry and Pulses row (0.4 / 1.15 / 0.35), team to verify.", badge: assumption}
+    stages_days: {value: [25, 35, 70, 40], range: [[20, 30], [30, 45], [50, 90], [30, 50]], unit: "days", source: "No pigeon pea row in FAO-56 Table 11; 170 days is a flagged guess for a medium-duration crop (carried over from the v3 settings), team to verify.", badge: placeholder}
+    root_depth_m: {value: 1.05, range: [0.6, 1.5], unit: "m", source: "Not in FAO-56 Table 22; nearest rows are Beans/pulses 0.6-0.9 and Chick pea 0.6-1.0. team to verify.", badge: assumption}
+    p: {value: 0.5, range: [0.45, 0.55], unit: "-", source: "Not in FAO-56 Table 22; Chick pea p = 0.50 is the nearest row. team to verify.", badge: assumption}
+    ky: {value: 0.9, range: [0.7, 1.1], unit: "-", source: "FAO-66 Table 1 (seasonal Ky from FAO-33): Pigeon pea is not in the table; 0.9 is a placeholder, team to verify.", badge: placeholder}
+    t_plant_c: {value: 20, range: [17, 23], unit: "degC", source: "Planted when the smoothed mean air temperature reaches this value. Team rule of thumb, team to verify.", badge: assumption}
+    t_min_grow_c: {value: 15, range: [12, 18], unit: "degC", source: "The smoothed mean temperature must stay at or above this from planting to the end of mid-season. Team rule of thumb, team to verify.", badge: assumption}
+    t_max_grow_c: {value: 32, range: [29, 35], unit: "degC", source: "The mean temperature over the mid-season stage must not exceed this. Team rule of thumb, team to verify.", badge: assumption}
+    heat_tmax_c: {value: 35, range: [33, 37], unit: "degC", source: "A day with Tmax at or above this in the flowering window counts as a heat day. Not read in a primary source, team to verify.", badge: assumption}
+    flowering_days: {value: 30, range: [20, 40], unit: "days", source: "Length of the heat-sensitive window from the start of the FAO-56 mid-season stage (0 = no heat penalty). Team to verify.", badge: assumption}
+    harvest_index: {value: 0.3, range: [0.2, 0.4], unit: "-", source: "Harvested part as a share of above-ground dry matter, for residue (Person 3). Not read in a primary source, team to verify.", badge: placeholder}
+    kcal_per_kg: {value: null, range: null, unit: "kcal/kg", source: "Not yet read from USDA FoodData Central, team to verify. Calories are not counted for this crop until it is.", badge: placeholder}
+# Cover crops (ids match Person 3's soil score). Grown between cash crops, not harvested, never irrigated.
+# Kc: FAO-56 Table 12 has no cover-crop rows. Stand-in: the Winter Wheat initial values (0.7 non-frozen, 0.4 frozen)
+# while the cover is small, rising to kc_full at termination. Team to verify.
+cover_crops:
+  cereal_rye:
+    name: {value: "Cereal rye", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    max_days: {value: 210, range: [150, 240], unit: "days", source: "Longest time the cover stays in the field before it is terminated. Team to verify.", badge: placeholder}
+    kc_full: {value: 1.0, range: [0.8, 1.15], unit: "-", source: "Kc at termination. Not in FAO-56 Table 12, team to verify.", badge: placeholder}
+    root_depth_m: {value: 0.6, range: [0.3, 1.0], unit: "m", source: "Not in FAO-56 Table 22, team to verify.", badge: placeholder}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "Stand-in: FAO-56 Table 22 small-grain value 0.55, team to verify.", badge: assumption}
+  crimson_clover:
+    name: {value: "Crimson clover", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    max_days: {value: 210, range: [150, 240], unit: "days", source: "Longest time the cover stays in the field before it is terminated. Team to verify.", badge: placeholder}
+    kc_full: {value: 0.9, range: [0.7, 1.05], unit: "-", source: "Kc at termination. Not in FAO-56 Table 12, team to verify.", badge: placeholder}
+    root_depth_m: {value: 0.6, range: [0.3, 1.0], unit: "m", source: "Not in FAO-56 Table 22, team to verify.", badge: placeholder}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "Stand-in: FAO-56 Table 22 small-grain value 0.55, team to verify.", badge: assumption}
+  hairy_vetch:
+    name: {value: "Hairy vetch", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: true, range: [false, true], unit: "flag", source: "Legume (nitrogen fixing).", badge: observed}
+    max_days: {value: 230, range: [170, 260], unit: "days", source: "Longest time the cover stays in the field before it is terminated. Team to verify.", badge: placeholder}
+    kc_full: {value: 0.9, range: [0.7, 1.05], unit: "-", source: "Kc at termination. Not in FAO-56 Table 12, team to verify.", badge: placeholder}
+    root_depth_m: {value: 0.6, range: [0.3, 1.0], unit: "m", source: "Not in FAO-56 Table 22, team to verify.", badge: placeholder}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "Stand-in: FAO-56 Table 22 small-grain value 0.55, team to verify.", badge: assumption}
+  oats_cover:
+    name: {value: "Oats (cover)", range: null, unit: "text", source: "Display name.", badge: observed}
+    legume: {value: false, range: [false, true], unit: "flag", source: "Not a legume.", badge: observed}
+    max_days: {value: 100, range: [40, 130], unit: "days", source: "Longest time the cover stays in the field before it is terminated. Team to verify.", badge: placeholder}
+    kc_full: {value: 1.0, range: [0.8, 1.15], unit: "-", source: "Kc at termination. Not in FAO-56 Table 12, team to verify.", badge: placeholder}
+    root_depth_m: {value: 0.6, range: [0.3, 1.0], unit: "m", source: "Not in FAO-56 Table 22, team to verify.", badge: placeholder}
+    p: {value: 0.55, range: [0.5, 0.6], unit: "-", source: "Stand-in: FAO-56 Table 22 small-grain value 0.55, team to verify.", badge: assumption}

@@ -1,7 +1,7 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
-# TODO (Person 2 handoff, 2026-11-15 12:56 PM): the v4 section at the bottom (crop_library, climatology, crop_calendar,
-# climate_fit) runs and was smoke-tested on one site, but has NO unit tests yet and the planting rules are unreviewed.
-# Calories are filled only for crops already read from USDA FoodData Central; the rest are null (not counted).
+# The v4 section at the bottom (crop_library, climatology, crop_calendar, climate_fit) reads
+# config/assumptions/simulation.yaml. Planting rules are team rules of thumb ("team to verify"). Calories are filled
+# only for crops read from USDA FoodData Central; the rest are null (not counted).
 """Crop parameters and assumption lookup. Reads config/assumptions.yaml (nothing hard-coded here)."""
 from __future__ import annotations
 
@@ -143,7 +143,7 @@ def load_crops(params: dict | None = None) -> dict[str, CropParams]:
 # climate_fit(...)    the calendar of every crop: the climate filter behind api.get_candidates().
 #
 # Day numbers here are 0-based day-of-year indexes (0 = 1 January) on a 365-day year (29 February dropped).
-# Nothing is hard-coded: every number comes from assumptions.yaml with its source and badge.
+# Nothing is hard-coded: every number comes from config/assumptions/simulation.yaml with its source and badge.
 # =====================================================================================================
 import pandas as _pd
 
@@ -227,18 +227,26 @@ def kc_curve(stages, kc_ini, kc_mid, kc_end) -> np.ndarray:
     return kc
 
 
+SIM_PATH = ROOT / "config" / "assumptions" / "simulation.yaml"
+
+
 def _library_raw() -> dict:
-    return _read_library(ASSUMPTIONS_PATH.stat().st_mtime_ns)
+    return _read_library(SIM_PATH.stat().st_mtime_ns)
 
 
 @lru_cache(maxsize=2)
 def _read_library(version) -> dict:
-    return (yaml.safe_load(ASSUMPTIONS_PATH.read_text()) or {}).get("crop_library") or {}
+    return yaml.safe_load(SIM_PATH.read_text()) or {}
 
 
 def rule(name: str):
-    """A value from crop_library.rules (turnaround_days, heat_pen_per_day, ...)."""
+    """A value from the rules section of config/assumptions/simulation.yaml (turnaround_days, ...)."""
     return _library_raw()["rules"][name]["value"]
+
+
+def sim_setting(section: str, name: str):
+    """A value from another section of simulation.yaml (hydrology, fallow)."""
+    return _library_raw()[section][name]["value"]
 
 
 @lru_cache(maxsize=2)
@@ -265,7 +273,7 @@ def _build_library(version) -> tuple:
         nums = [c.kc_ini, c.kc_mid, c.kc_end, c.root_depth_m, c.p, c.ky]
         if (len(c.stages_days) != 4 or min(c.stages_days) <= 0 or not np.isfinite(nums).all() or min(nums) <= 0
                 or not 0 < c.p < 1 or c.season_type not in ("warm", "cool", "winter")):
-            raise ValueError(f"crop_library.{cid}: invalid crop parameters in config/assumptions.yaml")
+            raise ValueError(f"crop_library.{cid}: invalid crop parameters in config/assumptions/simulation.yaml")
     for cid, node in (raw.get("cover_crops") or {}).items():
         v = {k: leaf["value"] for k, leaf in node.items()}
         covers[cid] = CoverCrop(cid, str(v["name"]), bool(v["legume"]), int(v["max_days"]), float(v["kc_full"]),
@@ -277,11 +285,11 @@ def _build_library(version) -> tuple:
 
 def crop_library() -> dict[str, Crop]:
     """All v4 annual crops, keyed by id."""
-    return dict(_build_library(ASSUMPTIONS_PATH.stat().st_mtime_ns)[0])
+    return dict(_build_library(SIM_PATH.stat().st_mtime_ns)[0])
 
 
 def cover_crops() -> dict[str, CoverCrop]:
-    return dict(_build_library(ASSUMPTIONS_PATH.stat().st_mtime_ns)[1])
+    return dict(_build_library(SIM_PATH.stat().st_mtime_ns)[1])
 
 
 def get_crop(name: str) -> Crop:
