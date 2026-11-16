@@ -1,7 +1,7 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """What to measure next (Build Spec v4 R19). Owner: Feature 3.
 
-Built-in Streamlit only: no custom colors, CSS or HTML. Each question is one bordered card; the test-quote inputs sit in the side panel. Data labels use badge() from
+Native widgets with the shared planner theme. Each question is one bordered card; the test-quote inputs sit in the side panel. Data labels use badge() from
 ui/components.py. Ranks the unknowns (water supply, soil water capacity, organic matter) by their expected value of
 perfect information, in plain words: "could change your answer" or "probably won't". EVPI is an upper bound on what a
 real test is worth, not what it will earn. All numbers come from engine/evpi.py.
@@ -35,7 +35,7 @@ def _money(per_acre: float, per_ha: float, currency: str, area_unit: str) -> str
 
 
 def show_row(rank: int, r: dict, currency: str, area_unit: str, example: bool) -> None:
-    with st.container(border=True):
+    with st.container(border=True, key=f'rl_question_{rank}'):
         st.subheader(f"{rank}. {r['question']}")
         if example:
             show_badge("example")
@@ -43,8 +43,10 @@ def show_row(rank: int, r: dict, currency: str, area_unit: str, example: bool) -
         words.write(r["plain"])
         if r["computed"]:
             with number:
-                st.metric("The most it could be worth to know this exactly", _money(r["evpi_per_acre"], r["evpi_per_ha"], currency, area_unit),
-                          border=True)
+                st.caption('THE VALUE OF A PERFECT ANSWER')
+                value = r['evpi_per_acre'] if area_unit == 'acre' else r['evpi_per_ha']
+                st.metric("The most it could be worth to know this exactly", f'{currency} {value:,.0f}', border=True)
+                st.caption(f"Per {'acre' if area_unit == 'acre' else 'hectare'} · upper bound")
                 show_badge(r["badge"])
         if r.get("worth_it") is not None and r.get("test_cost_per_ha") is not None:
             st.write("Your test quote: " + ("worth getting." if r["worth_it"] else "costs more than the most it could save."))
@@ -55,7 +57,9 @@ def show_row(rank: int, r: dict, currency: str, area_unit: str, example: bool) -
 def render(site, inputs, sliders=None, currency: str = "USD", area_unit: str = "ha", key: str = "meas", simulate=None,
            scenarios=None, crops=None, question_fn=None, controls=None) -> list | None:
     """`controls` is where the test-quote inputs are drawn (the side panel by default)."""
-    st.header("What to check first")
+    from ui.planner_style import page_intro
+    page_intro('04 / Make your next move', 'What to check first',
+               'Find out which missing details could change your crop plan before you pay for a test.')
     st.caption(DISCLAIMER)
     st.caption(UPPER_BOUND)
     costs = {}

@@ -26,6 +26,8 @@ if st.session_state.get('legacy_app') or st.session_state.get('nav'):
 else:
     from engine import api
     from ui import setup
+    from ui.planner_style import brand, inject
+    inject()
     pending = st.session_state.pop('_v5_go', None)
     if pending:
         st.session_state['v5_page'] = pending
@@ -36,9 +38,11 @@ else:
                   'What to measure next': '4. What to check first', 'How good is this?': 'Can I trust this?'}
     # The side panel holds everything you can press: the page list, the controls of the open page, then the farm actions.
     with st.sidebar:
-        st.title('RotationLab')
-        st.caption('Four-year crop plans tested against decades of NASA weather records.')
-        page = st.radio('Pages', list(PAGE_NAMES), key='v5_page', format_func=PAGE_NAMES.get)
+        brand()
+        st.caption('Better crop plans, grounded in real weather.')
+        with st.container(key='rl_navigation'):
+            page = st.radio('Your planning workspace', list(PAGE_NAMES), key='v5_page', format_func=PAGE_NAMES.get)
+        st.divider()
         controls = st.container()                 # each page puts its sliders and inputs here
         st.divider()
         if 'v4_inputs' in st.session_state and page not in ('Farm setup', 'How good is this?'):
@@ -70,10 +74,15 @@ else:
                 """The standing notes for every results page: the disclaimer, the example-farm note and the accuracy check."""
                 # the two pages below print the first sentence themselves, under their heading
                 first = '' if page in ('Recommendations', 'What to measure next') else 'Modeled estimates for planning. Not a guarantee of yield or profit. '
-                st.caption(first + 'This tool supports, and does not replace, your own judgment and local advice.')
+                if first:
+                    st.caption(first)
                 if st.session_state.get('v4_example_farm'):
-                    st.caption('Example farm: ' + st.session_state['v4_example_farm'] + '. The weather, soil, yields, prices and costs are real '
-                               'records for this place. The farm answers are an example: change them with "Edit farm details".')
+                    st.caption('EXAMPLE FARM · ' + st.session_state['v4_example_farm'])
+                with st.expander('About these results'):
+                    st.caption('This tool supports, and does not replace, your own judgment and local advice.')
+                    if st.session_state.get('v4_example_farm'):
+                        st.caption('This example uses weather, soil and agricultural records for the location, with example farm answers. '
+                                   'Change those answers with "Edit farm details".')
                 try:
                     if 'v4_validation' not in st.session_state:
                         st.session_state['v4_validation'] = api.validation_summary()

@@ -285,7 +285,7 @@ def r_chart_frame(rows: list[dict]) -> pd.DataFrame:
 
 def _validation_tab(st, summary, rows) -> None:
     us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
-    with st.container(border=True):
+    with st.container(border=True, key='rl_card_validation'):
         st.subheader("Validation (hindcast)")
         if not us_ok:
             st.warning("US counties are not validated yet: NASS county yields are not cached. The US counties below "
@@ -311,7 +311,7 @@ def _validation_tab(st, summary, rows) -> None:
             st.altair_chart(bars.properties(height=max(240, 24 * len(chart))), width="stretch")
     shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
     if len(shown):
-        with st.container(border=True):
+        with st.container(border=True, key='rl_card_validation_table'):
             st.subheader("Every check, as a table")
             st.caption("United States (USDA NASS county yields)")
             st.dataframe(shown.drop(columns=["Country"]), hide_index=True)
@@ -319,7 +319,7 @@ def _validation_tab(st, summary, rows) -> None:
     if len(pts):
         pts = pts[pts["lat"].between(24, 50) & pts["lon"].between(-125.5, -66)]
     if len(pts):
-        with st.container(border=True):
+        with st.container(border=True, key='rl_card_validation_map'):
             st.subheader("Validation sites")
             st.caption("The counties where the model was checked against USDA yield records.")
             st.map(pts)
@@ -328,7 +328,7 @@ def _validation_tab(st, summary, rows) -> None:
 def _assumptions_tab(st) -> None:
     a = pd.DataFrame([r for r in assumption_rows()
                       if not _NOT_US.search(" ".join(str(v) for v in r.values())) and "assumptions.yaml" not in str(r.get("File", ""))])
-    with st.container(border=True):
+    with st.container(border=True, key='rl_card_assumptions'):
         st.subheader("Assumptions")
         if a.empty:
             st.info("No assumption files were found.")
@@ -349,7 +349,7 @@ def _assumptions_tab(st) -> None:
                   .groupby(["File", "Kind"]).size().unstack(fill_value=0).reset_index())
         st.caption("Values per file:")
         st.dataframe(counts, hide_index=True)
-    with st.container(border=True):
+    with st.container(border=True, key='rl_card_assumption_table'):
         st.subheader("Every value, with its range and source")
         st.caption("The Badge column is the data label of each value. Placeholder (team to verify) means it is not a measurement.")
         for col in ("Value", "Range", "Unit"):
@@ -361,7 +361,9 @@ def _assumptions_tab(st) -> None:
 def render() -> None:
     import streamlit as st
 
-    st.header("Can I trust this?")
+    from ui.planner_style import page_intro
+    page_intro('The evidence behind your plan', 'Can I trust this?',
+               'See how the model was checked, where the data comes from, and what remains uncertain.')
     st.write("We re-ran the crop model on past NASA weather in US counties with long USDA yield records, then compared it "
              "with what farmers actually harvested. The latest 8 years of each record were never used to tune anything, "
              "so those numbers show how the model does on years it has not seen.")
@@ -373,7 +375,7 @@ def render() -> None:
     with tabs[1]:
         _assumptions_tab(st)
     for tab, name in zip(tabs[2:], DOCS):
-        with tab, st.container(border=True):
+        with tab, st.container(border=True, key=f'rl_card_trust_doc_{name}'):
             st.markdown(us_only_text(doc_text(name)))
 
 

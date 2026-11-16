@@ -6,16 +6,14 @@ import logging
 
 import folium
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 from ui import autofill
+from ui.planner_style import page_intro
 from ui.theme import crop_name as farmer_crop_name
 from streamlit_folium import st_folium
 from engine import api
-from ui.planner_model import (DEMO_SITES, record, area_value, provenance,
-                              contains_example, input_errors, currency,
-                              finite_number, guardrail_allows, badge_labels)
+from ui.planner_model import (contains_example, input_errors, currency,
+                              finite_number, badge_labels)
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_API = ('Site', 'WaterInput', 'UserInputs', 'Sliders', 'get_site', 'get_candidates',
@@ -134,27 +132,38 @@ def stamp(value=None, badges=None):
 
 
 def style():
-    """Kept so older callers still work. The pages use built-in Streamlit components only, so there is nothing to inject."""
+    """Compatibility hook. The app shell now injects ui.planner_style once."""
 
 
 def start():
-    st.title('Healthier soil. A more resilient farm.')
-    st.write('Tell us where you farm in the United States and what you grow. RotationLab tests four-year crop plans against decades '
-             'of NASA weather records for your location, then shows which plan is best for your soil without earning you less.')
-    if st.button('Plan my farm', type='primary'):
-        st.session_state['v4_screen'] = 'farm'
-        st.rerun()
+    with st.container(key='rl_welcome'):
+        st.caption('Four seasons. A clearer plan.')
+        st.title('Healthier soil. A more resilient farm.')
+        st.write('Explore four-year crop rotations for your US farm, tested against decades of NASA weather. '
+                 'Compare profit, soil health and water use, with your priorities in control.')
+        if st.button('Plan my farm', type='primary', icon=':material/arrow_forward:'):
+            st.session_state['v4_screen'] = 'farm'
+            st.rerun()
+    for col, title, detail in zip(st.columns(3),
+                                ('01 · Set up your farm', '02 · Compare your options', '03 · Plan with confidence'),
+                                ('Choose a location and tell us what you grow.',
+                                 'See the tradeoffs in profit, soil and water.',
+                                 'Explore what could change your choice.')):
+        with col:
+            st.write('**' + title + '**')
+            st.caption(detail)
+    st.divider()
     chosen = None
-    with st.container(border=True):
-        st.subheader('Or see it on an example farm')
-        st.caption('One click: real NASA weather and USDA records for the place, with example answers you can change afterwards.')
-        for col, preset in zip(st.columns(3), demo_presets()):
-            with col:
-                with st.container(border=True):
-                    st.write(f"**{preset['label']}**")
-                    st.caption('Example farm: ' + preset_summary(preset))
-                    if st.button('Explore ' + preset['label'].split(' · ')[-1], use_container_width=True):
-                        chosen = preset
+    st.subheader('Start with an example farm')
+    st.caption('Real NASA weather and USDA records, with example farm answers you can edit.')
+    for i, (col, preset) in enumerate(zip(st.columns(3), demo_presets())):
+        with col, st.container(border=True, height='stretch', key=f'rl_card_demo_{i}'):
+            st.subheader(preset['label'])
+            st.caption(preset['place'])
+            st.write(f"{preset['acres']:,.0f} acres · " + ('Rainfed' if preset['water'] == 'rain' else 'Irrigated'))
+            st.caption(preset_summary(preset).split(' · ')[1].capitalize())
+            if st.button('Explore ' + preset['label'].split(' · ')[-1], use_container_width=True, icon=':material/arrow_forward:'):
+                chosen = preset
     if chosen:
         open_preset(chosen)
         st.rerun()
@@ -225,9 +234,9 @@ def location_map():
 
 
 def farm():
-    st.title('Tell us about your farm')
-    st.write('Start with where you farm. Then tell us what you grow, how big the farm is and where your water comes from.')
-    step1 = st.container(border=True)
+    page_intro('01 / Your farm', 'Tell us about your farm',
+               'Start with your location, then add your crops and water supply. You can come back and edit these details anytime.')
+    step1 = st.container(border=True, key='rl_card_location')
     with step1:
         st.subheader('1. Where is your farm?')
         saved = st.session_state.get('_v4_farm_widgets', {})
@@ -261,7 +270,7 @@ def farm():
         return
     with step1:
         stamp(site, record(site).get('badges'))
-    step2 = st.container(border=True)
+    step2 = st.container(border=True, key='rl_card_crops')
     with step2:
         st.subheader('2. What do you grow now?')
         guess = getattr(site, 'currency', None) or (currency(site) if currency(site) != 'local currency' else '')
@@ -296,7 +305,7 @@ def farm():
                 if c:
                     st.session_state.setdefault(f'v4_crop_text{i}', c)
             plan = [col.text_input(f'Year {i+1}', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
-    step3 = st.container(border=True)
+    step3 = st.container(border=True, key='rl_card_water')
     with step3:
         st.subheader('3. Your farm and its water')
         acres = st.number_input('How big is your farm? (acres)', min_value=0., value=0., key='v4_farm_acres')
@@ -396,7 +405,7 @@ def climate_rows(trend):
 
 
 def climate_card(site):
-    with st.container(border=True):
+    with st.container(border=True, key='rl_card_climate'):
         _climate_card(site)
 
 

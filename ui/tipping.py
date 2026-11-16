@@ -205,8 +205,10 @@ def _show_map(m: dict, colors: dict | None = None) -> None:
 
 
 def render(site=None, inputs=None, sliders=None, result=None) -> None:
-    st.header("Tipping points")
-    st.caption("Where would a different plan become the better choice? Each view changes one thing about your farm's "
+    from ui.planner_style import page_intro
+    page_intro('03 / Explore the uncertainty', 'Tipping points',
+               'See where a different crop plan becomes the better choice.')
+    st.caption("Each view changes one thing about your farm's "
                "weather or water and finds the best plan again. These are what-if changes to real weather years, "
                "not forecasts.")
     if result is None:
@@ -226,7 +228,7 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
 
     climate = result.get("climate") or {}
     if result.get("headlines") or climate:
-        with st.container(border=True):              # the answer first, in one box
+        with st.container(border=True, key='rl_card_tipping_summary'):
             for line in result.get("headlines", []):
                 st.markdown(f"- {line}")
             if climate:
@@ -239,15 +241,15 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
     what = f"average profit per {unit} per year, in the currency of your prices" if money else "share of the best possible yield"
     # one what-if per tab, one chart in each
     t_map, t_rain, t_water, t_heat = st.tabs(["Rainfall and water map", "Rainfall", "Water supply", "Heat"])
-    with t_map, st.container(border=True):
+    with t_map, st.container(border=True, key='rl_card_tipping_map'):
         _show_map(result["map_2d"], colors)
-    with t_rain, st.container(border=True):
+    with t_rain, st.container(border=True, key='rl_card_tipping_rain'):
         _show_curve("If rainfall changes", result["rainfall_curve"],
                     f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale, colors)
-    with t_water, st.container(border=True):
+    with t_water, st.container(border=True, key='rl_card_tipping_water'):
         _show_curve("If your water supply changes", result["water_curve"],
                     f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale, colors)
-    with t_heat, st.container(border=True):
+    with t_heat, st.container(border=True, key='rl_card_tipping_heat'):
         _show_curve("If it gets hotter", result["heat_curve"],
                     f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale, colors)
 

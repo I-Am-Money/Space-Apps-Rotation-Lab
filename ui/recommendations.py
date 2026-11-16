@@ -1,10 +1,10 @@
 # AI use: this file was written and revised by Claude Code (Anthropic) under the team's direction. See AI_USE.md.
 """Best crop plans page (Build Spec v4 R13 to R16). Owner: Feature 3.
 
-The answer comes first: three bordered plan cards (the headline is full width), each with the four years, st.metric cards
-with the difference from today's plan, one plain sentence and a comparison table. The priority sliders sit in the side
-panel and the chart of every plan has its own tab. Built-in Streamlit components only; data labels use badge() from
-ui/components.py (through badge_md).
+The answer comes first: a full-width headline and two compact alternative cards.
+Priority sliders sit in the sidebar; detailed comparisons and charts have their
+own expanders and tabs. Native widgets share ui/planner_style.py's presentation.
+Data labels use badge() from ui/components.py (through badge_md).
 Every number comes from engine/optimize.py. Nothing here is computed except display formatting and unit conversion.
 
     render(site, inputs, currency="USD", area_unit="ha", key="rec", simulate=None, scenarios=None, crops=None,
@@ -24,6 +24,7 @@ import streamlit as st
 
 from engine import economics, optimize as opt
 from ui.components import badge_md
+from ui.planner_style import page_intro
 from ui.theme import crop_name
 
 DISCLAIMER = "Modeled estimates for planning. Not a guarantee of yield or profit."
@@ -173,9 +174,10 @@ def summary_row(result: dict, current: dict, currency: str, area_unit: str) -> N
 
 def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_unit: str, big: bool, example: bool,
               same_as: str | None = None) -> None:
-    """One recommended plan in a bordered card: its four years, five metric cards against today's plan, one plain
-    sentence and the full comparison (open on the headline card, folded on the others)."""
-    with st.container(border=True):
+    """A plan timeline, its key measures and a folded comparison of all five measures."""
+    with st.container(border=True, key='rl_headline' if big else f'rl_pick_{name}', height='stretch'):
+        if big:
+            st.caption('RECOMMENDED FOR YOUR PRIORITIES')
         st.subheader(PICK_TITLES[name])
         if example:
             st.markdown(badge_md("example"))
@@ -191,20 +193,22 @@ def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_un
         numbers = plan_numbers(rot, current, currency, area_unit)
         u, wu = _unit(area_unit), _water(0.0, area_unit)[1]
         units = f"Profit in {currency} per {u} each year. Soil Health Score out of 100."
-        metric_cards(numbers, ("profit", "bad_year", "soil", "water", "food"), 5)
+        metric_cards(numbers, ("profit", "bad_year", "soil") if big else ("profit", "soil"), 3 if big else 2)
+        if big:
+            water, food = numbers[3], numbers[4]
+            st.caption(f"Water use: {water['value']} {wu} / year · Food grown: {food['value']} million calories / {u}")
         units += f" Water in {wu} a year. Food in million calories per {u}."
         if not same_plan(rot, current):
             units += " The small figure under each number is the difference from what you grow today."
         st.caption(units + " Data label: " + badge_md("estimated"))
         st.write(plain_summary(rot, current, currency, area_unit))
-        if not same_plan(rot, current):
-            with st.expander("All the numbers beside your plan today", expanded=big):
-                st.markdown(compare_table(rot, current, currency, area_unit))
+        with st.expander("All the numbers beside your plan today"):
+            st.markdown(compare_table(rot, current, currency, area_unit))
 
 
 def tradeoff_chart(result: dict, currency: str, area_unit: str):
     """Profit against Soil Health Score for every plan; the three picks and the current plan are marked by shape.
-    Colors are left to the Streamlit chart theme."""
+    The palette and light grid match the shared planner theme."""
     allr = result["all_results"]
     names = [" > ".join(crop_label(yr[0]) for yr in r["crops"]) for r in allr]
     fig = go.Figure(go.Scatter(
@@ -221,7 +225,13 @@ def tradeoff_chart(result: dict, currency: str, area_unit: str):
                                  marker=dict(symbol=sym, size=24 if sym == "square" else 17, line=dict(width=2)),
                                  text=[" > ".join(crop_label(yr[0]) for yr in r["crops"])],
                                  hovertemplate=label + "<br>%{text}<br>Average profit %{x:,.0f}<br>Soil Health Score %{y:.0f}<extra></extra>"))
-    fig.update_layout(height=460, margin=dict(l=10, r=10, t=16, b=10), legend=dict(orientation="h", y=-0.22, x=0))
+    fig.update_layout(height=460, margin=dict(l=10, r=10, t=16, b=10),
+                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#ffffff',
+                      font=dict(family='Arial, sans-serif', color='#20342e', size=13),
+                      colorway=['#729b88', '#536b64', '#b58e44', '#6584a3', '#236653'],
+                      legend=dict(orientation="h", y=-0.22, x=0))
+    fig.update_xaxes(gridcolor='#e8eee9')
+    fig.update_yaxes(gridcolor='#e8eee9')
     fig.update_xaxes(title=f"Average profit ({currency} per {_unit(area_unit)} a year)", zeroline=False)
     fig.update_yaxes(title="Soil Health Score (0 to 100)", range=[0, 100], zeroline=False)
     return fig
@@ -272,7 +282,8 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
            crops=None, recommend_fn=None, controls=None, extra_tabs: dict | None = None) -> dict | None:
     """`controls` is where the sliders are drawn (the side panel by default). `extra_tabs` maps a tab title to a
     function that draws it, so the app shell can add its own tab beside the plans and the chart."""
-    st.header("Your best crop plans")
+    page_intro('02 / Compare your options', 'Your best crop plans',
+               'Four-year rotations, compared with what you grow today. Adjust your priorities in the sidebar to explore the tradeoffs.')
     st.caption(DISCLAIMER)
     st.caption("Year 1 is your next growing season, then Years 2, 3 and 4 follow it. Each plan was tested against hundreds of real past "
                "four-year stretches of weather (1981 to 2025), so no forecast is involved.")
@@ -302,19 +313,21 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
     with tabs[0]:
         if head is not None and same_plan(head, cur):
             st.info("What you grow today is already the best match for your priorities. No other plan keeps your average profit and scores higher.")
-        with st.container(border=True):
+        with st.container(border=True, key='rl_current'):
             st.subheader("What you grow today")
             st.write(f"{plan_words(cur)}. It earns {money(cur['mean_profit'], currency, area_unit)} per {_unit(area_unit)} a year "
                      f"on average and {money(cur['worst10_profit'], currency, area_unit)} in a bad year, with a Soil Health Score of {cur['soil_score']:.0f} out of 100. "
                      "Each plan below is compared with this.")
-        summary_row(result, cur, currency, area_unit)
         pick_card("headline", head, cur, currency, area_unit, True, ex)
         shown = [("headline", head)]
-        for name in ("highest_profit", "best_soil"):
-            pick = result[name]
-            twin = next((other for other, r in shown if same_plan(pick, r)), None)
-            pick_card(name, pick, cur, currency, area_unit, False, ex, same_as=twin)
-            shown.append((name, pick))
+        st.subheader('Other ways to balance your priorities')
+        with st.container(key='rl_secondary_plans'):
+            for col, name in zip(st.columns(2), ("highest_profit", "best_soil")):
+                pick = result[name]
+                twin = next((other for other, r in shown if same_plan(pick, r)), None)
+                with col:
+                    pick_card(name, pick, cur, currency, area_unit, False, ex, same_as=twin)
+                shown.append((name, pick))
         if result.get("excluded_crops"):
             st.caption("Left out until you enter them: " + ", ".join(f"{crop_label(x['crop'])} (needs your {x['field']})" for x in result["excluded_crops"]) + ".")
         if result.get("cover_crop_note"):
@@ -323,7 +336,7 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
             from engine import explain as ex_mod
             st.info(ex_mod.explain_pick(result["headline"], result["current_plan_result"], pick="headline", use_api=True))
     with tabs[1]:
-        with st.container(border=True):
+        with st.container(border=True, key='rl_card_tradeoffs'):
             st.subheader("Every plan we tested")
             st.caption("Each dot is one four-year plan. Further right earns more. Higher up is better for your soil. "
                        "The marked shapes are the three plans and what you grow today.")
