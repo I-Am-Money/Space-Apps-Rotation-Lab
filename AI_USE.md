@@ -65,8 +65,8 @@ the repo's own results and documents (`config/validation/results.csv`, `LIMITATI
 file). No number in them was written by hand or generated. The team edits, builds the slides, records the video
 and submits. The slides use app screenshots only. In the 30-second video every view of the app is a real screen
 recording. Any farmland shot at the start or end that is not a screen recording was made with an AI video tool
-(Higgsfield) and carries a visible AI-generated watermark for its whole time on screen. Music, if any, is
-AI-generated or absent. There are no people, no voices and no NASA logos or branding anywhere, and no AI tool
+(Higgsfield) and carries a visible AI-generated watermark for its whole time on screen. No AI-generated
+music or voice is used. There are no people, no voices and no NASA logos or branding anywhere, and no AI tool
 redraws the app's screens or numbers.
 
 ### How these docs are put together

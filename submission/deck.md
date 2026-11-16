@@ -136,8 +136,8 @@ Limit: 30 seconds. A longer video makes the project ineligible for Global Judgin
 Every view of the app is a real screen recording. **No voice-over, no webcam, no people.** The guide forbids
 audio and likeness of anyone under 18, so the words go on screen as captions. A short farmland shot at the start
 or end may be AI-generated (Higgsfield); it must carry a visible AI-generated watermark for its whole time on
-screen, show no people and no NASA branding, and never redraw the app. Music is optional; use only AI-generated
-music the team has the right to use, or none.
+screen, show no people and no NASA branding, and never redraw the app. Music is optional; use only music the team
+has the right to use, or none. No AI-generated music is used.
 
 | Time | On screen | Caption |
 |---|---|---|
