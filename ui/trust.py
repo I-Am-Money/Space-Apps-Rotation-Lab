@@ -276,6 +276,88 @@ def us_only_text(text: str) -> str:
     return "\n".join(out)
 
 
+def r_chart_frame(rows: list[dict]) -> pd.DataFrame:
+    """The held-out r of every validated row, labelled 'County, ST: crop', for the validation bar chart. No new numbers."""
+    data = [{"Place and crop": f"{r['County']}: {r['Crop']}", "r": float(r["r (held out)"])}
+            for r in rows if r["Status"] == "validated" and r["r (held out)"] != "n/a"]
+    return pd.DataFrame(data, columns=["Place and crop", "r"])
+
+
+def _validation_tab(st, summary, rows) -> None:
+    us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
+    with st.container(border=True):
+        st.subheader("Validation (hindcast)")
+        if not us_ok:
+            st.warning("US counties are not validated yet: NASS county yields are not cached. The US counties below "
+                       "are the ones that will be checked.")
+        st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
+                   "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
+                   "training years only.")
+        for line in validation_headline(rows):
+            st.write(line)
+        if any(r["Status"] == "validated" for r in rows):
+            st.caption("Results are mixed and shown as they came out. Each r comes from only 8 held-out years, so it "
+                       "is rough. The model tracks water stress, so it is expected to do worse where most fields are "
+                       "irrigated. Details are under Limitations.")
+        chart = r_chart_frame(rows)
+        if len(chart):
+            st.caption("How well the model followed real yields in the years it never saw, one bar per place and crop. "
+                       "Data label: " + badge("estimated"))
+            import altair as alt
+            bars = alt.Chart(chart).mark_bar().encode(
+                x=alt.X("r:Q", title="Held-out correlation r (no unit; 1 = perfect, 0 = no skill)"),
+                y=alt.Y("Place and crop:N", sort=None, title="County and crop", axis=alt.Axis(labelLimit=320)),
+                tooltip=["Place and crop", alt.Tooltip("r:Q", format=".2f")])
+            st.altair_chart(bars.properties(height=max(240, 24 * len(chart))), width="stretch")
+    shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
+    if len(shown):
+        with st.container(border=True):
+            st.subheader("Every check, as a table")
+            st.caption("United States (USDA NASS county yields)")
+            st.dataframe(shown.drop(columns=["Country"]), hide_index=True)
+    pts = site_points(summary)
+    if len(pts):
+        pts = pts[pts["lat"].between(24, 50) & pts["lon"].between(-125.5, -66)]
+    if len(pts):
+        with st.container(border=True):
+            st.subheader("Validation sites")
+            st.caption("The counties where the model was checked against USDA yield records.")
+            st.map(pts)
+
+
+def _assumptions_tab(st) -> None:
+    a = pd.DataFrame([r for r in assumption_rows()
+                      if not _NOT_US.search(" ".join(str(v) for v in r.values())) and "assumptions.yaml" not in str(r.get("File", ""))])
+    with st.container(border=True):
+        st.subheader("Assumptions")
+        if a.empty:
+            st.info("No assumption files were found.")
+            return
+        n_ph = int((a["Badge"] == "placeholder").sum())
+        n_obs = int((a["Badge"] == "observed").sum())
+        n_asm = len(a) - n_ph - n_obs
+        cols = st.columns(4)
+        cols[0].metric("Listed values", len(a), border=True)
+        cols[1].metric("From a published source", n_obs, border=True)
+        cols[2].metric("Planning assumptions", n_asm, border=True)
+        cols[3].metric("Placeholder (team to verify)", n_ph, border=True)
+        st.write(f"The model runs on {len(a)} listed values. {n_obs} are taken from a published source (for example FAO-56, "
+                 f"FAO-33 or USDA). {n_asm} are stated planning assumptions. {n_ph} are team choices or values still to be "
+                 f"checked against a source, such as the Soil Health Score weights: they are marked Placeholder so that nobody "
+                 f"mistakes them for measurements.")
+        counts = (a.assign(Kind=a["Badge"].map({"observed": "Published source", "placeholder": "Placeholder (team to verify)"}).fillna("Assumption"))
+                  .groupby(["File", "Kind"]).size().unstack(fill_value=0).reset_index())
+        st.caption("Values per file:")
+        st.dataframe(counts, hide_index=True)
+    with st.container(border=True):
+        st.subheader("Every value, with its range and source")
+        st.caption("The Badge column is the data label of each value. Placeholder (team to verify) means it is not a measurement.")
+        for col in ("Value", "Range", "Unit"):
+            a[col] = a[col].map(lambda v: "" if v is None else str(v))
+        a["Badge"] = a["Badge"].map(badge)
+        st.dataframe(a, hide_index=True)
+
+
 def render() -> None:
     import streamlit as st
 
@@ -285,52 +367,13 @@ def render() -> None:
              "so those numbers show how the model does on years it has not seen.")
     summary = load_validation()
     rows = [r for r in validation_rows(summary) if r["Country"] == "US"]        # US farms only for now
-    st.subheader("Validation (hindcast)")
-    us_ok = [r for r in rows if r["Status"] == "validated" and r["Country"] == "US"]
-    if not us_ok:
-        st.warning("US counties are not validated yet: NASS county yields are not cached. The US counties below "
-                   "are the ones that will be checked.")
-    st.caption("r: correlation of year-to-year ups and downs after removing the long-term trend (1 = perfect). "
-               "MAE: average miss in tonnes per hectare. 'Corrected' adds the small bias correction (R12), fitted on "
-               "training years only.")
-    for line in validation_headline(rows):
-        st.write(line)
-    if any(r["Status"] == "validated" for r in rows):
-        st.caption("Results are mixed and shown as they came out. Each r comes from only 8 held-out years, so it "
-                   "is rough. The model tracks water stress, so it is expected to do worse where most fields are "
-                   "irrigated. Details are under Limitations below.")
-    shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
-    if len(shown):
-        st.caption("United States (USDA NASS county yields)")
-        st.dataframe(shown.drop(columns=["Country"]), hide_index=True)
-    pts = site_points(summary)
-    if len(pts):
-        pts = pts[pts["lat"].between(24, 50) & pts["lon"].between(-125.5, -66)]
-    if len(pts):
-        st.caption("Validation sites")
-        st.map(pts)
-
-    st.subheader("Assumptions")
-    a = pd.DataFrame([r for r in assumption_rows()
-                      if not _NOT_US.search(" ".join(str(v) for v in r.values())) and "assumptions.yaml" not in str(r.get("File", ""))])
-    if not a.empty:
-        n_ph = int((a["Badge"] == "placeholder").sum())
-        n_obs = int((a["Badge"] == "observed").sum())
-        n_asm = len(a) - n_ph - n_obs
-        st.write(f"The model runs on {len(a)} listed values. {n_obs} are taken from a published source (for example FAO-56, "
-                 f"FAO-33 or USDA). {n_asm} are stated planning assumptions. {n_ph} are team choices or values still to be "
-                 f"checked against a source, such as the Soil Health Score weights: they are marked Placeholder so that nobody "
-                 f"mistakes them for measurements.")
-        counts = (a.assign(Kind=a["Badge"].map({"observed": "Published source", "placeholder": "Placeholder (team to verify)"}).fillna("Assumption"))
-                  .groupby(["File", "Kind"]).size().unstack(fill_value=0).reset_index())
-        st.dataframe(counts, hide_index=True)
-        st.caption("Every value, with its range and source:")
-        for col in ("Value", "Range", "Unit"):
-            a[col] = a[col].map(lambda v: "" if v is None else str(v))
-        a["Badge"] = a["Badge"].map(badge)
-        st.dataframe(a, hide_index=True)
-    for name in DOCS:
-        with st.expander(name, expanded=(name == "Limitations")):
+    tabs = st.tabs(["Validation", "Assumptions", *DOCS])
+    with tabs[0]:
+        _validation_tab(st, summary, rows)
+    with tabs[1]:
+        _assumptions_tab(st)
+    for tab, name in zip(tabs[2:], DOCS):
+        with tab, st.container(border=True):
             st.markdown(us_only_text(doc_text(name)))
 
 
