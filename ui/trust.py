@@ -303,8 +303,12 @@ def _validation_tab(st, summary, rows) -> None:
         if len(chart):
             st.caption("How well the model followed real yields in the years it never saw, one bar per place and crop. "
                        "Data label: " + badge("estimated"))
-            st.bar_chart(chart, x="Place and crop", y="r", x_label="Held-out correlation r (no unit; 1 = perfect, 0 = no skill)",
-                         y_label="County and crop", horizontal=True, height=max(240, 30 * len(chart)))
+            import altair as alt
+            bars = alt.Chart(chart).mark_bar().encode(
+                x=alt.X("r:Q", title="Held-out correlation r (no unit; 1 = perfect, 0 = no skill)"),
+                y=alt.Y("Place and crop:N", sort=None, title="County and crop", axis=alt.Axis(labelLimit=320)),
+                tooltip=["Place and crop", alt.Tooltip("r:Q", format=".2f")])
+            st.altair_chart(bars.properties(height=max(240, 24 * len(chart))), width="stretch")
     shown = pd.DataFrame(rows).rename(columns={"County": "County or district", "ERS region": "Region"})
     if len(shown):
         with st.container(border=True):

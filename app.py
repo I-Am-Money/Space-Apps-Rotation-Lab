@@ -68,8 +68,9 @@ else:
 
             def notices():
                 """The standing notes for every results page: the disclaimer, the example-farm note and the accuracy check."""
-                st.caption('Modeled estimates for planning. Not a guarantee of yield or profit. This tool supports, and does not replace, '
-                           'your own judgment and local advice.')
+                # the two pages below print the first sentence themselves, under their heading
+                first = '' if page in ('Recommendations', 'What to measure next') else 'Modeled estimates for planning. Not a guarantee of yield or profit. '
+                st.caption(first + 'This tool supports, and does not replace, your own judgment and local advice.')
                 if st.session_state.get('v4_example_farm'):
                     st.caption('Example farm: ' + st.session_state['v4_example_farm'] + '. The weather, soil, yields, prices and costs are real '
                                'records for this place. The farm answers are an example: change them with "Edit farm details".')

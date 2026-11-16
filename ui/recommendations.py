@@ -121,17 +121,17 @@ def plan_numbers(rot: dict, current: dict, currency: str, area_unit: str) -> lis
     wf = "{:,.1f}" if wu == "inches" else "{:,.0f}"
     food = lambda r: _conv(r, area_unit) / 1e6
     return [
-        dict(name="profit", label=f"Average profit ({currency} per {u} a year)", short=f"Average profit per {u} each year",
+        dict(name="profit", label=f"Average profit ({currency} per {u} a year)", short="Average profit",
              plan=f"{_conv(rot['mean_profit'], area_unit):,.0f}", today=f"{_conv(current['mean_profit'], area_unit):,.0f}",
              diff=_signed(_conv(d["mean_profit"], area_unit)), good_up=True, value=money(rot["mean_profit"], currency, area_unit)),
-        dict(name="bad_year", label=f"Profit in a bad year ({currency} per {u})", short=f"Profit in a bad year, per {u}",
+        dict(name="bad_year", label=f"Profit in a bad year ({currency} per {u})", short="Profit in a bad year",
              plan=f"{_conv(rot['worst10_profit'], area_unit):,.0f}", today=f"{_conv(current['worst10_profit'], area_unit):,.0f}",
              diff=_signed(_conv(d["worst10_profit"], area_unit)), good_up=True, value=money(rot["worst10_profit"], currency, area_unit)),
-        dict(name="soil", label="Soil Health Score (0 to 100)", short="Soil Health Score (0 to 100)", plan=f"{rot['soil_score']:.0f}",
+        dict(name="soil", label="Soil Health Score (0 to 100)", short="Soil Health Score", plan=f"{rot['soil_score']:.0f}",
              today=f"{current['soil_score']:.0f}", diff=_signed(d["soil_score"]), good_up=True, value=f"{rot['soil_score']:.0f}"),
-        dict(name="water", label=f"Water the crops use ({wu} a year)", short=f"Water the crops use, {wu} a year", plan=wf.format(wv),
+        dict(name="water", label=f"Water the crops use ({wu} a year)", short="Water the crops use", plan=wf.format(wv),
              today=wf.format(wc), diff=_signed(wd, wf, 0.05 if wu == "inches" else 0.5), good_up=False, value=wf.format(wv)),
-        dict(name="food", label=f"Food grown (million calories per {u})", short=f"Food grown, million calories per {u}",
+        dict(name="food", label=f"Food grown (million calories per {u})", short="Food grown",
              plan=f"{food(rot['calories']):,.1f}", today=f"{food(current['calories']):,.1f}",
              diff=_signed(food(d["calories"]), "{:,.1f}", 0.05), good_up=True, value=f"{food(rot['calories']):,.1f}"),
     ]
@@ -155,10 +155,26 @@ def metric_cards(numbers: list[dict], names: tuple, per_row: int) -> None:
                 col.metric(n["short"], n["value"], n["diff"] + " vs today", delta_color="normal" if n["good_up"] else "inverse", border=True)
 
 
+def summary_row(result: dict, current: dict, currency: str, area_unit: str) -> None:
+    """The three recommendations side by side, one st.metric each: average profit, with the difference from today."""
+    for col, name in zip(st.columns(3), PICK_TITLES):
+        rot = result.get(name)
+        if rot is None:
+            col.metric(PICK_TITLES[name], "No plan fits", "see below", delta_color="off", delta_arrow="off", border=True)
+            continue
+        diff = _signed(_conv(rot["deltas_vs_current"]["mean_profit"], area_unit))
+        if same_plan(rot, current) or diff is None:
+            col.metric(PICK_TITLES[name], money(rot["mean_profit"], currency, area_unit), "same as today", delta_color="off", delta_arrow="off", border=True)
+        else:
+            col.metric(PICK_TITLES[name], money(rot["mean_profit"], currency, area_unit), diff + " vs today", border=True)
+    st.caption(f"Average profit in {currency} per {_unit(area_unit)} each year. The small figure is the difference from what you grow today. "
+               "Data label: " + badge_md("estimated"))
+
+
 def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_unit: str, big: bool, example: bool,
               same_as: str | None = None) -> None:
-    """One recommended plan in a bordered card: its four years, metric cards against today's plan, one plain sentence
-    and the full comparison. The headline card is full width and shows all five measures."""
+    """One recommended plan in a bordered card: its four years, five metric cards against today's plan, one plain
+    sentence and the full comparison (open on the headline card, folded on the others)."""
     with st.container(border=True):
         st.subheader(PICK_TITLES[name])
         if example:
@@ -173,13 +189,13 @@ def pick_card(name: str, rot: dict | None, current: dict, currency: str, area_un
             st.write(f'This is the same plan as "{PICK_TITLES[same_as]}". It wins this category too.')
             return
         numbers = plan_numbers(rot, current, currency, area_unit)
-        if same_plan(rot, current):
-            st.metric(numbers[0]["short"], numbers[0]["value"], border=True)
-        elif big:
-            metric_cards(numbers, ("profit", "bad_year", "soil", "water", "food"), 5)
-        else:
-            metric_cards(numbers, ("profit", "bad_year", "soil"), 3)
-        st.caption("Data label: " + badge_md("estimated"))
+        u, wu = _unit(area_unit), _water(0.0, area_unit)[1]
+        units = f"Profit in {currency} per {u} each year. Soil Health Score out of 100."
+        metric_cards(numbers, ("profit", "bad_year", "soil", "water", "food"), 5)
+        units += f" Water in {wu} a year. Food in million calories per {u}."
+        if not same_plan(rot, current):
+            units += " The small figure under each number is the difference from what you grow today."
+        st.caption(units + " Data label: " + badge_md("estimated"))
         st.write(plain_summary(rot, current, currency, area_unit))
         if not same_plan(rot, current):
             with st.expander("All the numbers beside your plan today", expanded=big):
@@ -196,12 +212,13 @@ def tradeoff_chart(result: dict, currency: str, area_unit: str):
         marker=dict(size=8, opacity=0.45), text=names,
         hovertemplate="%{text}<br>Average profit %{x:,.0f}<br>Soil Health Score %{y:.0f}<extra></extra>"))
     marks = [("Your plan today", result["current_plan_result"], "circle")]
-    for k, sym in (("headline", "star"), ("highest_profit", "diamond"), ("best_soil", "square")):
+    # the star is drawn last and smaller than the square, so it stays visible when one plan wins two categories
+    for k, sym in (("best_soil", "square"), ("highest_profit", "diamond"), ("headline", "star")):
         if result.get(k) is not None:
             marks.append((PICK_TITLES[k], result[k], sym))
     for label, r, sym in marks:
         fig.add_trace(go.Scatter(x=[_conv(r["mean_profit"], area_unit)], y=[r["soil_score"]], mode="markers", name=label,
-                                 marker=dict(symbol=sym, size=17, line=dict(width=2)),
+                                 marker=dict(symbol=sym, size=24 if sym == "square" else 17, line=dict(width=2)),
                                  text=[" > ".join(crop_label(yr[0]) for yr in r["crops"])],
                                  hovertemplate=label + "<br>%{text}<br>Average profit %{x:,.0f}<br>Soil Health Score %{y:.0f}<extra></extra>"))
     fig.update_layout(height=460, margin=dict(l=10, r=10, t=16, b=10), legend=dict(orientation="h", y=-0.22, x=0))
@@ -290,14 +307,13 @@ def render(site, inputs, currency: str = "USD", area_unit: str = "ha", key: str 
             st.write(f"{plan_words(cur)}. It earns {money(cur['mean_profit'], currency, area_unit)} per {_unit(area_unit)} a year "
                      f"on average and {money(cur['worst10_profit'], currency, area_unit)} in a bad year, with a Soil Health Score of {cur['soil_score']:.0f} out of 100. "
                      "Each plan below is compared with this.")
+        summary_row(result, cur, currency, area_unit)
         pick_card("headline", head, cur, currency, area_unit, True, ex)
-        a, b = st.columns(2)
         shown = [("headline", head)]
-        for col, name in ((a, "highest_profit"), (b, "best_soil")):
+        for name in ("highest_profit", "best_soil"):
             pick = result[name]
             twin = next((other for other, r in shown if same_plan(pick, r)), None)
-            with col:
-                pick_card(name, pick, cur, currency, area_unit, False, ex, same_as=twin)
+            pick_card(name, pick, cur, currency, area_unit, False, ex, same_as=twin)
             shown.append((name, pick))
         if result.get("excluded_crops"):
             st.caption("Left out until you enter them: " + ", ".join(f"{crop_label(x['crop'])} (needs your {x['field']})" for x in result["excluded_crops"]) + ".")
