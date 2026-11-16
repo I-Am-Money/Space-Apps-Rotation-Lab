@@ -9,9 +9,16 @@ will strengthen their soil and hold up as it keeps changing, without losing mone
 
 Results are modeled estimates for planning. They are not a guarantee of yield or profit.
 
-`main` runs version 4: any pin on Earth, with US auto-fill. Three example farms on the start screen (Iowa, Nebraska
-and Texas) open a full result in one click. The earlier single-farm India build is still reachable from the start
-screen and is described in `docs/INDIA_DATA.md` and `docs/NASA_DATA.md`.
+This version covers farms in the United States. Type an address or drop a pin, and the app fills in the county,
+soil, yields, prices and costs from USDA records. Three example farms on the start screen (Iowa, Nebraska and Texas)
+open a full result in one click. The code can also load a pin outside the US (NASA weather and SoilGrids soil, with
+every yield, price and cost typed in by hand), but that path is not offered in the app's wording and is not validated.
+The earlier single-farm India build is still in the repo (`ui/legacy_app.py`, described in `docs/INDIA_DATA.md` and
+`docs/NASA_DATA.md`) but is no longer linked from the app.
+
+The five pages in the app are "1. Your farm", "2. Best crop plans", "3. What could change it", "4. What to check
+first" and "Can I trust this?". The code and some older notes call them Farm setup, Recommendations, Tipping points,
+What to measure next and How good is this?.
 
 ## Setup
 
@@ -46,6 +53,8 @@ the public Quick Stats website export; the results in the repo were made that wa
    supply), farm size, and optionally a soil test and field history. Then you drop a pin on the map.
 2. **NASA weather.** Daily NASA POWER weather from 1981 to the latest year at your pin. The climate card
    compares the last 20 years with 1981 to 2000: season rain, rain variability, heat days and rainy-season start.
+   POWER solar radiation starts in 1984, so for 1981 to 1983 crop water demand is worked out from temperature
+   alone (`LIMITATIONS.md` item 9).
 3. **Soil and local data.** In the US, soil comes from USDA SSURGO. County crops, yields (latest 5-year mean),
    prices received and the irrigated share come from USDA NASS (`engine/fetch_nass.py`). If NASS withholds a
    county value, the state average is used and labelled. Operating costs come from USDA ERS for the county's
@@ -64,14 +73,15 @@ the public Quick Stats website export; the results in the repo were made that wa
    plan and a short plain-English explanation.
 7. **Tipping points and what to measure next.** The rainfall, heat or water supply at which the best plan
    changes, and which unknown (water supply, soil water capacity, organic matter) would be most worth measuring.
-8. **How good is this?** (`ui/trust.py`) A hindcast in 14 US counties covering all 9 ERS Farm Resource
+8. **Can I trust this?** (`ui/trust.py`) A hindcast in 14 US counties covering all 9 ERS Farm Resource
    Regions (`config/validation/sites.yaml`):
    modeled against NASS county yields, detrended, with the latest 8 years held out. A small linear correction
    for rain, heat and year is fitted on training years only, and results are shown with and without it
    (`engine/hindcast.py`, `engine/correction.py`). Results from the 2026-11-15 run are mixed: in mostly
    rainfed counties the median held-out r is 0.42 (22 county and crop checks); in mostly irrigated counties it
    is -0.04 (9 checks), so irrigated areas are not validated. One India district is checked against ICRISAT
-   yields the same way. Where there is no local yield data, or the local check did not pass, the app says
+   yields the same way; it is in `config/validation/results.csv`, and the app page shows the US checks only.
+   Where there is no local yield data, or the local check did not pass, the app says
    "Not validated here". See `LIMITATIONS.md` items 21 and 22.
 
 Every value carries a badge: Observed, Estimated, Your input, Assumption, or Placeholder ("team to verify").
@@ -97,9 +107,10 @@ data sources in `DATA_SOURCES.md`.
 
 AI coding assistants wrote most of the code, tests and docs under the team's direction: Claude Code (Anthropic) for
 the engine, validation, recommendations and tipping points, and OpenAI Codex for the app shell, site and data
-fetchers. In the app,
-Claude (`claude-sonnet-5-5`) writes the plain-English explanations. It sees only computed numbers, and a guard
-rejects any reply with a number or crop that is not in the results, falling back to a fixed template. AI made
-up no data. Details are in `AI_USE.md`, and every code file has an AI-use header comment.
+fetchers. In the app, the sentence under each recommendation is a fixed template filled in from that card's
+numbers. When an `ANTHROPIC_API_KEY` is set, a button can also show an explanation written by Claude
+(`claude-sonnet-5-5`). It sees only computed numbers, and a guard rejects any reply with a number or crop that
+is not in the results, falling back to the template. The live app has no key, so it shows the template only. AI
+made up no data. Details are in `AI_USE.md`, and every code file has an AI-use header comment.
 
 NASA data use does not imply NASA endorsement.

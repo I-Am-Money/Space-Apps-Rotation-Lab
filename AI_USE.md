@@ -16,9 +16,10 @@ page says where.
   The team chose what to build, checked the results, set the modeling rules and approved every merge.
 - **Earlier India version (v3).** Claude Code built it. OpenAI Codex later helped with debugging, passing
   inputs through, caching, the irrigation-saving objective, tests and documentation.
-- **Explanations in the app.** Claude (`claude-sonnet-5-5`, via the Anthropic API) writes the short
-  plain-English explanation on each recommendation. It only gets computed numbers and crop names, sent as
-  JSON. A guard pulls every number and crop name out of the reply. If any of them is not in the input
+- **Explanations in the app.** The sentence under each recommendation is a fixed template filled in from that
+  card's numbers. No AI writes it. When an API key is set, a button can also show a short plain-English
+  explanation written by Claude (`claude-sonnet-5-5`, via the Anthropic API). The live app has no key, so it
+  shows the template only. Claude only gets computed numbers and crop names, sent as JSON. A guard pulls every number and crop name out of the reply. If any of them is not in the input
   (allowing for rounding), the reply is thrown away and a fixed template is used instead. With no API key the
   template is always used. Replies are cached by a hash of the input. Code: `engine/explain.py`.
 - **Docs and project text.** Claude Code drafted the README, LIMITATIONS, DATA_SOURCES, this file and the
@@ -62,7 +63,11 @@ validation results come from real NASS county yields and ICRISAT district yields
 Claude Code drafted the slide text, the 30-second video script and the project page text in `submission/` from
 the repo's own results and documents (`config/validation/results.csv`, `LIMITATIONS.md`, `DATA_SOURCES.md`, this
 file). No number in them was written by hand or generated. The team edits, builds the slides, records the video
-and submits. The video and slides use app screenshots only, with no people, voices or AI-generated media.
+and submits. The slides use app screenshots only. In the 30-second video every view of the app is a real screen
+recording. Any farmland shot at the start or end that is not a screen recording was made with an AI video tool
+(Higgsfield) and carries a visible AI-generated watermark for its whole time on screen. Music, if any, is
+AI-generated or absent. There are no people, no voices and no NASA logos or branding anywhere, and no AI tool
+redraws the app's screens or numbers.
 
 ### How these docs are put together
 
