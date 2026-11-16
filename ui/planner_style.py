@@ -89,6 +89,78 @@ def inject() -> None:
     button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible {
       outline: 3px solid #428a75 !important; outline-offset: 3px;
     }
+    /* Livelier pass: same palette, more depth and contrast. Styling only, no layout change. */
+    :root { --rl-deep: #143f34; --rl-bright: #2e8a6b; --rl-gold: #e3a92f; }
+    .stApp {
+      background:
+        radial-gradient(900px 420px at 92% -8%, rgba(46,138,107,.16), rgba(46,138,107,0) 70%),
+        radial-gradient(700px 380px at -6% 14%, rgba(227,169,47,.10), rgba(227,169,47,0) 70%),
+        #f7f9f6;
+    }
+    .st-key-rl_welcome {
+      position: relative; overflow: hidden; border: 0 !important;
+      background: linear-gradient(125deg, var(--rl-deep) 0%, var(--rl-accent) 58%, var(--rl-bright) 100%) !important;
+      box-shadow: 0 22px 48px -22px rgba(20,63,52,.6);
+      animation: rl-rise 480ms ease-out both;
+    }
+    .st-key-rl_welcome::before {
+      content: ""; position: absolute; inset: 0 0 0 52%; pointer-events: none;
+      background: repeating-linear-gradient(112deg, rgba(255,255,255,.08) 0 14px, rgba(255,255,255,0) 14px 38px);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 65%); mask-image: linear-gradient(90deg, transparent, #000 65%);
+    }
+    .st-key-rl_welcome::after {
+      content: ""; position: absolute; right: -70px; top: -80px; width: 260px; height: 260px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(227,169,47,.6), rgba(227,169,47,0) 68%); pointer-events: none;
+    }
+    .st-key-rl_welcome > * { position: relative; z-index: 1; }
+    .st-key-rl_welcome h1, .st-key-rl_welcome h1 * { color: #fff !important; }
+    .st-key-rl_welcome [data-testid="stMarkdownContainer"] p { color: #e4f1e9; font-size: 1.08rem; }
+    .st-key-rl_welcome [data-testid="stCaptionContainer"] p { color: #f4cf78 !important; font-size: .75rem; }
+    .st-key-rl_welcome [data-testid="stButton"] button[kind="primary"] {
+      background: var(--rl-gold); border-color: var(--rl-gold); box-shadow: 0 12px 24px -12px rgba(0,0,0,.6);
+    }
+    .st-key-rl_welcome [data-testid="stButton"] button[kind="primary"]:hover { background: #f0ba45; border-color: #f0ba45; }
+    .st-key-rl_welcome [data-testid="stButton"] button [data-testid="stMarkdownContainer"] p,
+    .st-key-rl_welcome [data-testid="stButton"] button span { color: #1c2f28 !important; font-size: 1rem; font-weight: 700; }
+    [data-testid="stButton"] button[kind="primary"] {
+      background: linear-gradient(180deg, #2b7a62, #1f5c4a); border-color: #1f5c4a;
+      box-shadow: 0 10px 20px -12px rgba(20,63,52,.75);
+      transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+    }
+    [data-testid="stButton"] button[kind="primary"]:hover { transform: translateY(-1px); filter: brightness(1.07); }
+    [class*="st-key-rl_card_"], [class*="st-key-rl_pick_"], [class*="st-key-rl_question_"], .st-key-rl_current {
+      box-shadow: 0 1px 2px rgba(32,52,46,.05), 0 16px 30px -24px rgba(32,52,46,.5);
+    }
+    [class*="st-key-rl_card_demo_"] {
+      border-top: 4px solid var(--rl-accent) !important;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+    .st-key-rl_card_demo_1 { border-top-color: var(--rl-gold) !important; }
+    .st-key-rl_card_demo_2 { border-top-color: var(--rl-bright) !important; }
+    [class*="st-key-rl_card_demo_"]:hover {
+      transform: translateY(-3px); box-shadow: 0 2px 4px rgba(32,52,46,.06), 0 24px 38px -24px rgba(20,63,52,.65);
+    }
+    [class*="st-key-rl_card_demo_"] h3 { color: var(--rl-deep); }
+    .st-key-rl_headline {
+      border-top: 5px solid var(--rl-accent) !important;
+      background: linear-gradient(180deg, #e9f5ec 0%, #ffffff 46%) !important;
+      box-shadow: 0 2px 4px rgba(32,52,46,.06), 0 28px 46px -30px rgba(20,63,52,.65);
+    }
+    [data-testid="stMetric"] { background: #fff; }
+    [data-testid="stMetricValue"] { color: var(--rl-deep); }
+    .st-key-rl_headline [data-testid="stMetric"] { border-color: #b9d4c1; }
+    .st-key-rl_page_intro [data-testid="stCaptionContainer"]:first-child p { color: var(--rl-bright); }
+    .st-key-rl_page_intro h2 { font-size: 2.3rem; }
+    .st-key-rl_page_intro h2::after {
+      content: ""; display: block; width: 72px; height: 5px; border-radius: 5px; margin-top: .7rem;
+      background: linear-gradient(90deg, var(--rl-accent), var(--rl-gold));
+    }
+    [data-testid="stSidebar"] { background: linear-gradient(180deg, #e6f0e8 0%, #f3f6f1 62%); }
+    .st-key-rl_navigation [role="radiogroup"] label:has(input:checked) {
+      background: #cfe5d6; box-shadow: inset 4px 0 var(--rl-accent);
+    }
+    [data-testid="stTabs"] button[aria-selected="true"] p { color: var(--rl-accent); }
+    @keyframes rl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
     @media (max-width: 760px) {
       [data-testid="stMainBlockContainer"] { padding: 2rem 1rem 3rem; }
       .st-key-rl_welcome { padding: 1.5rem !important; }
@@ -99,7 +171,7 @@ def inject() -> None:
       [data-testid="stMarkdownContainer"] td, [data-testid="stMarkdownContainer"] th { padding: .5rem; }
     }
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
+      *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
     }
     </style>""")
 
