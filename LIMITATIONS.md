@@ -5,7 +5,8 @@ forecast. These limits are shown in the app and listed here.
 
 ## Out of scope in this version (A10)
 
-1. Orchards and tree crops ("not supported yet"). Alaska and Hawaii are not supported in this version.
+1. Orchards and tree crops ("not supported yet"). Alaska and Hawaii are not supported in this version. The app
+   covers farms in the United States. A pin elsewhere gets no automatic yields, prices or costs and no validation.
 2. Intercropping.
 3. Field-level validation. Validation compares against county averages, not single fields.
 4. Measured soil carbon. The Soil Health Score is a rule-based score, not a soil test.
@@ -17,7 +18,9 @@ forecast. These limits are shown in the app and listed here.
 ## Model and data limits (v4)
 
 9. **Weather is a grid estimate.** NASA POWER is about a 0.5 degree grid, not a field station. Solar
-   radiation starts in 1984, so the usable record is 1984 to 2025 and no values are invented for 1981 to 1983.
+   radiation starts in 1984. The app still uses the weather years 1981 to 2025: for 1981 to 1983 crop water demand
+   (ET0) is worked out from temperature alone with the Hargreaves equation, so no made-up solar value drives the
+   water balance. Those three years are therefore a little rougher than the rest.
 10. **Climate shift settings are what-ifs.** "Recent" and "Continuing trend" reweight or shift real weather
     years. They are not climate projections.
 11. **Soil Health Score.** The NRCS principles (cover, living roots, diversity, minimal disturbance) are real.
@@ -39,9 +42,10 @@ forecast. These limits are shown in the app and listed here.
 14. **Bias correction.** The linear correction (season rain, heat days, year) is fitted per county and crop on
     training years only, and only with at least 10 training years. It can soak up trend and bias, but it is a
     statistical fix, not crop science, and it may not carry over to years unlike the training years.
-15. **Explanations.** Claude writes the explanation text from computed numbers only. The guard checks numbers
+15. **Explanations.** The sentence under each recommendation is a fixed template. When an API key is set, a
+    button can also show an explanation that Claude writes from computed numbers only. The guard checks numbers
     and crop names, not wording. A reply that passes the guard can still word things loosely. Without an API key
-    the fixed template is used.
+    only the fixed template is used, and the live app has no key.
 
 ## US data limits (Feature 4)
 
@@ -65,7 +69,7 @@ forecast. These limits are shown in the app and listed here.
 
 21. **US validation results (run 2026-11-15) are mixed.** The hindcast ran on real USDA NASS county yields for
     all 14 validation counties: 31 county and crop pairs gave results, and Sumner County, Kansas sorghum did not
-    (17 overlapping years, 20 needed). Numbers are in `config/validation/results.csv` and on the "How good is
+    (17 overlapping years, 20 needed). Numbers are in `config/validation/results.csv` and on the "Can I trust
     this?" page, exactly as they came out.
     - Mostly rainfed counties (22 pairs): held-out r runs from -0.43 to 0.87, median 0.42. It is 0.4 or better
       in 12 pairs and below zero in 7. With the correction the median is 0.57 and 2 pairs are below zero.
@@ -93,10 +97,10 @@ forecast. These limits are shown in the app and listed here.
 
 ## Trust page and India check
 
-23. **Trust page data path.** The "How good is this?" page reads the validation table through
+23. **Trust page data path.** The "Can I trust this?" page reads the validation table through
     `api.validation_summary()`, which returns the saved `config/validation/results.csv`. The app never re-runs
     the hindcast or downloads yields while a farmer is using it, so the table is as of the last run (2026-11-15).
-24. **India validation pack: one district.** The only India check is Nalgonda district, Telangana (ICRISAT/TCI
+24. **India validation pack: one district (in the repo, not shown in the app).** The only India check is Nalgonda district, Telangana (ICRISAT/TCI
     District Level Database, which ends in 2017). It covers jowar, bajra and pigeon pea, rainfed, with the team's
     yield function. Training years are 1981 to 2009, and the held-out years are 2010 to 2017. Results are mixed
     and are shown as they came out (`config/validation/results.csv`). Held-out r ranges from 0.34 to 0.50 without
@@ -134,7 +138,7 @@ forecast. These limits are shown in the app and listed here.
 
 ## Earlier India version (v3, Telangana)
 
-These apply to the earlier India build, which is still reachable from the start screen.
+These apply to the earlier India build. Its code is still in the repo (`ui/legacy_app.py`), but it is no longer linked from the app.
 
 1. **Planning estimates.** The app supports farmer and local-expert judgment and does not guarantee yield or profit. It is not a forecast.
 2. **Scope.** Nalgonda, kharif, one crop per year over four years. No rabi, intercropping, pest model, varietal model or market-risk model.

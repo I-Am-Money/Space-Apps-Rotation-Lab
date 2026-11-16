@@ -21,7 +21,9 @@ the Local Lead decides, the deck uses **the team name only** (Build Spec v4 A9),
 
 ## Rules for the deck and project page
 
-- No faces, photos, voices or video of people. Screenshots of the app only.
+- No faces, photos, voices or video of people. The app is shown as screenshots or real screen recordings only.
+  An AI-generated farmland shot in the video must carry a visible AI-generated watermark and be disclosed in the
+  portal's AI section.
 - No village name. No emails.
 - Every number on a slide comes from the app or `config/validation/results.csv`. Anything unverified is marked "team to verify".
 - Nobody on Claude Code submits anything to the Space Apps portal. The team clicks Submit.
@@ -35,8 +37,9 @@ Written and in this folder:
 
 Still for the team to do (none of it can be done from the repo):
 
-1. Fill in the [square bracket] lines: team name, the exact challenge title from the portal, the hosted app
-   URL, the video and slide links.
+1. Fill in the [square bracket] lines that are left: the video and slide links. The team name is MACS, the
+   challenge title on the portal is "Field Shift: Adapting Farms with NASA Data", and the hosted app is
+   https://space-apps-rotation-lab-production.up.railway.app.
 2. Decide the member-names question above with the Local Lead.
 3. Take new screenshots from the current app. `assets/screens/` still shows the earlier India build.
 4. Build the slides (7 or fewer) and record the video (30 seconds or less, screen and captions only, no voices).
