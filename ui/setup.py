@@ -1,5 +1,5 @@
 # TODO: final mobile visual pass and real screenshots remain pending; zones and unavailable source data stay explicitly labeled.
-# AI use: written with OpenAI Codex under the team's direction.
+# AI use: written with OpenAI Codex under the team's direction. See AI_USE.md.
 """Person 4's v4 UI. All scientific operations use engine.api exclusively."""
 from pathlib import Path
 import logging

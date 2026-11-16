@@ -22,7 +22,7 @@ the Local Lead decides, the deck uses **the team name only** (Build Spec v4 A9),
 ## Rules for the deck and project page
 
 - No faces, photos, voices or video of people. The app is shown as screenshots or real screen recordings only.
-  An AI-generated farmland shot in the video must carry a visible AI-generated watermark and be disclosed in the
+  The Higgsfield-generated farmland shots in the video must carry a visible "SI-generated" label and be disclosed in the
   portal's AI section.
 - No village name. No emails.
 - Every number on a slide comes from the app or `config/validation/results.csv`. Anything unverified is marked "team to verify".

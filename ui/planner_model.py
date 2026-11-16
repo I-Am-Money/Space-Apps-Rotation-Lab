@@ -1,4 +1,4 @@
-# AI use: written with OpenAI Codex under the team's direction.
+# AI use: written with OpenAI Codex under the team's direction. See AI_USE.md.
 """Display-only helpers for the v4 public engine contract; no model calculations."""
 from dataclasses import fields, is_dataclass
 import math

@@ -1,4 +1,4 @@
-# AI use: written with OpenAI Codex under the team's direction. See AI_USE.md.
+# AI use: written with AI coding assistants (Claude Code and OpenAI Codex) under the team's direction. See AI_USE.md.
 """Presentation for the global planner; independent of the legacy farm theme.
 
 Use public Streamlit container keys and semantic test IDs, never generated CSS

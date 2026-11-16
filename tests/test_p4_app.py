@@ -1,4 +1,4 @@
-# AI use: Feature 1 app-shell tests revised for v5 page ownership. Test data is explicitly EXAMPLE.
+# AI use: Feature 1 app-shell tests written with AI coding assistants (OpenAI Codex and Claude Code) under the team's direction. Test data is explicitly EXAMPLE. See AI_USE.md.
 from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path

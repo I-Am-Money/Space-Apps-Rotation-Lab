@@ -93,9 +93,9 @@ Visual: [screenshot: validation tables and site map on the "Can I trust this?" p
 - **NASA data:** POWER daily weather (drives the model, the climate card and the validation). GIBS map layers
   (SMAP root-zone soil moisture, MODIS vegetation index) for map context only.
 - **Other data:** USDA NASS, ERS, NRCS soil and FoodData Central; ISRIC SoilGrids; FAO crop parameters.
-- **AI use:** AI coding assistants (Claude Code and OpenAI Codex) wrote most of the code under the team's
-  direction. In the app, an optional Claude explanation is checked number by number against the results.
-  AI made up no data.
+- **AI use:** substantially AI-generated code, tests and docs (Claude Code and OpenAI Codex), directed and
+  reviewed by the team. The optional Claude explanation in the app is checked number by number. AI made up no
+  data. Full disclosure: `AI_USE.md`.
 - **Limits:** modeled estimates for planning, not a guarantee of yield or profit. Prices are fixed. No
   flooding, pests or orchards. US farms only. Many settings are still marked "team to verify".
 - **Next:** field-level validation, irrigated crops, field zones, measured soil carbon, price risk.
@@ -135,7 +135,7 @@ Limit: 30 seconds. A longer video makes the project ineligible for Global Judgin
 
 Every view of the app is a real screen recording. **No voice-over, no webcam, no people.** The guide forbids
 audio and likeness of anyone under 18, so the words go on screen as captions. A short farmland shot at the start
-or end may be AI-generated (Higgsfield); it must carry a visible AI-generated watermark for its whole time on
+or end is AI-generated (Higgsfield); it must carry a visible "SI-generated" label for its whole time on
 screen, show no people and no NASA branding, and never redraw the app. Music is optional; use only music the team
 has the right to use, or none. No AI-generated music is used.
 
