@@ -122,8 +122,8 @@ def stamp(value=None, badges=None):
     if api.is_example(value) or contains_example(value) or contains_example(badges):
         st.error('EXAMPLE DATA · Demonstration output; do not use for decisions.')
     asof = record(value).get('data_as_of') or st.session_state.get('v4_asof')
-    from ui.components import badge
-    st.markdown(' '.join(badge(label) for label in labels), unsafe_allow_html=True)
+    from ui.components import badge_md
+    st.markdown(' '.join(badge_md(label) for label in labels))
     st.caption('Data as of ' + str(asof or 'not supplied by engine'))
     for note in dict.fromkeys(n for n in (record(value).get('notes') or []) if isinstance(n, str)):   # each note once
         if 'unavailable' in note.lower() or 'unreachable' in note.lower():
@@ -134,29 +134,27 @@ def stamp(value=None, badges=None):
 
 
 def style():
-    """One shared look for every page: tokens and components live in ui/theme.py."""
-    from ui import theme
-    theme.inject_v5()
+    """Kept so older callers still work. The pages use built-in Streamlit components only, so there is nothing to inject."""
 
 
 def start():
-    st.markdown('<div class="rl-brand">RotationLab</div>', unsafe_allow_html=True)
     st.title('Healthier soil. A more resilient farm.')
     st.write('Tell us where you farm in the United States and what you grow. RotationLab tests four-year crop plans against decades '
              'of NASA weather records for your location, then shows which plan is best for your soil without earning you less.')
     if st.button('Plan my farm', type='primary'):
         st.session_state['v4_screen'] = 'farm'
         st.rerun()
-    st.subheader('Or see it on an example farm')
-    st.caption('One click: real NASA weather and USDA records for the place, with example answers you can change afterwards.')
     chosen = None
-    for col, preset in zip(st.columns(3), demo_presets()):
-        with col:
-            with st.container(border=True):
-                st.write(f"**{preset['label']}**")
-                st.caption('Example farm: ' + preset_summary(preset))
-                if st.button('Explore ' + preset['label'].split(' · ')[-1], use_container_width=True):
-                    chosen = preset
+    with st.container(border=True):
+        st.subheader('Or see it on an example farm')
+        st.caption('One click: real NASA weather and USDA records for the place, with example answers you can change afterwards.')
+        for col, preset in zip(st.columns(3), demo_presets()):
+            with col:
+                with st.container(border=True):
+                    st.write(f"**{preset['label']}**")
+                    st.caption('Example farm: ' + preset_summary(preset))
+                    if st.button('Explore ' + preset['label'].split(' · ')[-1], use_container_width=True):
+                        chosen = preset
     if chosen:
         open_preset(chosen)
         st.rerun()
@@ -178,8 +176,7 @@ def location_map():
         lat = st.number_input('Latitude', -90., 90., value=st.session_state.get('v4_lat', 42.03), key='pin_lat')
         lon = st.number_input('Longitude', -180., 180., value=st.session_state.get('v4_lon', -93.62), key='pin_lon')
     m = folium.Map(location=[lat, lon], zoom_start=6, tiles='OpenStreetMap')
-    folium.CircleMarker([lat, lon], radius=11, color='#12303a', weight=3, fill=True, fill_color='#1d6f78', fill_opacity=.9,
-                        tooltip='Your farm').add_to(m)
+    folium.CircleMarker([lat, lon], radius=11, weight=3, fill=True, fill_opacity=.9, tooltip='Your farm').add_to(m)
     # Only capability-verified layer metadata supplied through the public API is accepted.
     site = st.session_state.get('v4_site')
     layers = record(site).get('gibs_layers') or []
@@ -230,29 +227,31 @@ def location_map():
 def farm():
     st.title('Tell us about your farm')
     st.write('Start with where you farm. Then tell us what you grow, how big the farm is and where your water comes from.')
-    st.subheader('1. Where is your farm?')
-    saved = st.session_state.get('_v4_farm_widgets', {})
-    for name, value in saved.items():
-        st.session_state.setdefault(name, value)
-    autofill.render()
-    lat, lon = location_map()
-    if st.button('Load this location', type='primary') or st.session_state.pop('_v4_autoload', False):
-        if missing_api():
-            st.warning('Location lookup is waiting for Person 1’s v4 engine/api.py. No global results have been calculated.')
-        else:
-            try:
-                with st.status('Loading location data', expanded=True) as status:
-                    st.write('Getting NASA weather records and soil data for this spot…')
-                    site = load_site(lat, lon)
-                    if st.session_state.get('v4_location') != (lat, lon):
-                        for name in st.session_state.get('_v4_farm_widgets', {}):
-                            st.session_state.pop(name, None)
-                        st.session_state.pop('_v4_farm_widgets', None)
-                    st.session_state.update(v4_site=site, v4_location=(lat, lon), v4_asof=record(site).get('data_as_of'))
-                    status.update(label='Location data loaded', state='complete')
-            except Exception:
-                logging.exception('Location lookup failed')
-                st.error('Could not load this location. Check the coordinates and try again.')
+    step1 = st.container(border=True)
+    with step1:
+        st.subheader('1. Where is your farm?')
+        saved = st.session_state.get('_v4_farm_widgets', {})
+        for name, value in saved.items():
+            st.session_state.setdefault(name, value)
+        autofill.render()
+        lat, lon = location_map()
+        if st.button('Load this location', type='primary') or st.session_state.pop('_v4_autoload', False):
+            if missing_api():
+                st.warning('Location lookup is waiting for Person 1’s v4 engine/api.py. No global results have been calculated.')
+            else:
+                try:
+                    with st.status('Loading location data', expanded=True) as status:
+                        st.write('Getting NASA weather records and soil data for this spot…')
+                        site = load_site(lat, lon)
+                        if st.session_state.get('v4_location') != (lat, lon):
+                            for name in st.session_state.get('_v4_farm_widgets', {}):
+                                st.session_state.pop(name, None)
+                            st.session_state.pop('_v4_farm_widgets', None)
+                        st.session_state.update(v4_site=site, v4_location=(lat, lon), v4_asof=record(site).get('data_as_of'))
+                        status.update(label='Location data loaded', state='complete')
+                except Exception:
+                    logging.exception('Location lookup failed')
+                    st.error('Could not load this location. Check the coordinates and try again.')
     site = st.session_state.get('v4_site')
     if site is None:
         st.info('Put the pin on your field and press "Load this location". The rest of the questions appear after that.')
@@ -260,75 +259,80 @@ def farm():
     if st.session_state.get('v4_location') != (lat, lon):
         st.warning('You moved the pin. Press "Load this location" again to use the new spot.')
         return
-    stamp(site, record(site).get('badges'))
-    st.subheader('2. What do you grow now?')
-    guess = getattr(site, 'currency', None) or (currency(site) if currency(site) != 'local currency' else '')
-    current_currency = st.text_input('Currency for prices and profit (three letters, such as USD)', value=guess, key='v4_currency',
-                                     help='A label only. Enter every price and cost in this same currency. Nothing is converted.').strip().upper()
-    site.currency = current_currency or None
-    if getattr(site, 'us_defaults', None) is not None and current_currency not in ('', 'USD'):
-        st.info('USDA prices and costs are in USD. Enter every price and cost in your selected currency; no automatic exchange conversion is available.')
-    # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
-    crops = list(record(record(site).get('us_defaults')).get('crops') or [])
-    if crops:
-        found = st.session_state.get('v4_cdl_plan') or []
-        blank = {i for i, c in enumerate(found) if not c}                  # years the satellite record could not name as a crop
-        for i, c in enumerate(found):
-            if c in crops:
-                st.session_state.setdefault(f'v4_crop{i}', c)
-        st.caption('Your usual four-year rotation, one crop a year, oldest first. If you used the address lookup, these are the '
-                   'last four years from the satellite record.')
-        plan = []
-        for i, col in enumerate(st.columns(4)):
-            if i in blank and f'v4_crop{i}' not in st.session_state:
-                plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=farmer_crop_name, index=None, placeholder='Choose a crop'))
-            else:
-                plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=farmer_crop_name))
-        plan = [c or '' for c in plan]
-        if blank:
-            st.caption('Left empty on purpose: ' + ', '.join(f'Year {i+1}' for i in sorted(blank)) + '. The satellite record shows a crop this tool '
-                       'does not plan there (for example alfalfa or pasture). Choose the crop you want counted for that year.')
-    else:
-        st.caption('Type the crop you grow in each of four years, for example corn, soybeans, wheat.')
-        for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):       # keep the crop history the farmer confirmed
-            if c:
-                st.session_state.setdefault(f'v4_crop_text{i}', c)
-        plan = [col.text_input(f'Year {i+1}', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
-    st.subheader('3. Your farm and its water')
-    acres = st.number_input('How big is your farm? (acres)', min_value=0., value=0., key='v4_farm_acres')
-    mode = st.radio('Where does the water for your crops come from?', ['rain', 'irrigated'],
-                    index=int(float(record(record(site).get('us_defaults')).get('irrigated_share') or 0) > .5),
-                    format_func=lambda x: 'Rain only' if x == 'rain' else 'Rain plus irrigation', horizontal=True, key='v4_water_mode')
-    source, normal, dry = '', 0., 0.
-    if mode == 'irrigated':
-        source = st.text_input('Where does the irrigation water come from?', placeholder='Well, canal, reservoir…', key='v4_water_source')
-        normal = st.number_input('Irrigation water you can count on in a normal year (mm per season)', min_value=0., value=None, key='v4_normal_mm')
-        dry = st.number_input('Irrigation water you can count on in a dry year (mm per season)', min_value=0., value=None, key='v4_dry_mm')
-    overrides = {}
-    has_defaults = bool(record(record(site).get('us_defaults')).get('crops'))
-    with st.expander('Your own yields, prices and costs' + (' (optional)' if has_defaults else ' (needed here)'), expanded=not has_defaults):
-        st.caption('Leave a box empty to use the official county or regional figure where one exists. '
-                   'Yield in kg per hectare, price per tonne, cost per hectare.' if has_defaults else
-                   'There are no official figures for this location, so enter your own for each crop. '
-                   'Yield in kg per hectare, price per tonne, cost per hectare.')
-        words = {'yield': 'Yield', 'price': 'Price', 'cost': 'Cost'}
-        for crop in sorted(set(plan) - {''}):
-            st.markdown(f'**{farmer_crop_name(crop)}**')
-            cols = st.columns(3)
-            vals = [cols[i].number_input(f'{words[field]} · {farmer_crop_name(crop)}', min_value=0., value=None, key=f'v4_{crop}_{field}')
-                    for i, field in enumerate(('yield', 'price', 'cost'))]
-            overrides[crop] = {field: v for field, v in zip(('yield', 'price', 'cost'), vals) if v is not None}
-    soil, history = None, None
-    with st.expander('Soil test results (optional)'):
-        if st.checkbox('Add a soil test', key='v4_add_soil'):
-            st.caption('Recorded for your reference. These measurements do not change simulated water capacity or yield; a verified relation is not available yet.')
-            soil = dict(organic_matter_pct=st.number_input('Organic matter (%)', 0., 100., value=None, key='v4_organic_matter'),
-                        ph=st.number_input('pH', 0., 14., value=None, key='v4_ph'), texture=st.text_input('Texture', key='v4_texture'))
-    with st.expander('How the field has been farmed (optional)'):
-        if st.checkbox('Add field history', key='v4_add_history'):
-            history = dict(tillage=st.selectbox('Tillage', ['No till', 'Reduced', 'Conventional'], key='v4_tillage'),
-                           cover_crops=st.checkbox('Uses cover crops', key='v4_cover_crops'), erosion=st.checkbox('Erosion observed', key='v4_erosion'),
-                           waterlogging=st.checkbox('Waterlogging observed', key='v4_waterlogging'), salinity=st.checkbox('Salinity observed', key='v4_salinity'))
+    with step1:
+        stamp(site, record(site).get('badges'))
+    step2 = st.container(border=True)
+    with step2:
+        st.subheader('2. What do you grow now?')
+        guess = getattr(site, 'currency', None) or (currency(site) if currency(site) != 'local currency' else '')
+        current_currency = st.text_input('Currency for prices and profit (three letters, such as USD)', value=guess, key='v4_currency',
+                                         help='A label only. Enter every price and cost in this same currency. Nothing is converted.').strip().upper()
+        site.currency = current_currency or None
+        if getattr(site, 'us_defaults', None) is not None and current_currency not in ('', 'USD'):
+            st.info('USDA prices and costs are in USD. Enter every price and cost in your selected currency; no automatic exchange conversion is available.')
+        # Candidate filtering belongs to the engine. Current crops use the county defaults when supplied.
+        crops = list(record(record(site).get('us_defaults')).get('crops') or [])
+        if crops:
+            found = st.session_state.get('v4_cdl_plan') or []
+            blank = {i for i, c in enumerate(found) if not c}                  # years the satellite record could not name as a crop
+            for i, c in enumerate(found):
+                if c in crops:
+                    st.session_state.setdefault(f'v4_crop{i}', c)
+            st.caption('Your usual four-year rotation, one crop a year, oldest first. If you used the address lookup, these are the '
+                       'last four years from the satellite record.')
+            plan = []
+            for i, col in enumerate(st.columns(4)):
+                if i in blank and f'v4_crop{i}' not in st.session_state:
+                    plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=farmer_crop_name, index=None, placeholder='Choose a crop'))
+                else:
+                    plan.append(col.selectbox(f'Year {i+1}', crops, key=f'v4_crop{i}', format_func=farmer_crop_name))
+            plan = [c or '' for c in plan]
+            if blank:
+                st.caption('Left empty on purpose: ' + ', '.join(f'Year {i+1}' for i in sorted(blank)) + '. The satellite record shows a crop this tool '
+                           'does not plan there (for example alfalfa or pasture). Choose the crop you want counted for that year.')
+        else:
+            st.caption('Type the crop you grow in each of four years, for example corn, soybeans, wheat.')
+            for i, c in enumerate(st.session_state.get('v4_cdl_plan') or []):       # keep the crop history the farmer confirmed
+                if c:
+                    st.session_state.setdefault(f'v4_crop_text{i}', c)
+            plan = [col.text_input(f'Year {i+1}', key=f'v4_crop_text{i}').strip() for i, col in enumerate(st.columns(4))]
+    step3 = st.container(border=True)
+    with step3:
+        st.subheader('3. Your farm and its water')
+        acres = st.number_input('How big is your farm? (acres)', min_value=0., value=0., key='v4_farm_acres')
+        mode = st.radio('Where does the water for your crops come from?', ['rain', 'irrigated'],
+                        index=int(float(record(record(site).get('us_defaults')).get('irrigated_share') or 0) > .5),
+                        format_func=lambda x: 'Rain only' if x == 'rain' else 'Rain plus irrigation', horizontal=True, key='v4_water_mode')
+        source, normal, dry = '', 0., 0.
+        if mode == 'irrigated':
+            source = st.text_input('Where does the irrigation water come from?', placeholder='Well, canal, reservoir…', key='v4_water_source')
+            normal = st.number_input('Irrigation water you can count on in a normal year (mm per season)', min_value=0., value=None, key='v4_normal_mm')
+            dry = st.number_input('Irrigation water you can count on in a dry year (mm per season)', min_value=0., value=None, key='v4_dry_mm')
+        overrides = {}
+        has_defaults = bool(record(record(site).get('us_defaults')).get('crops'))
+        with st.expander('Your own yields, prices and costs' + (' (optional)' if has_defaults else ' (needed here)'), expanded=not has_defaults):
+            st.caption('Leave a box empty to use the official county or regional figure where one exists. '
+                       'Yield in kg per hectare, price per tonne, cost per hectare.' if has_defaults else
+                       'There are no official figures for this location, so enter your own for each crop. '
+                       'Yield in kg per hectare, price per tonne, cost per hectare.')
+            words = {'yield': 'Yield', 'price': 'Price', 'cost': 'Cost'}
+            for crop in sorted(set(plan) - {''}):
+                st.markdown(f'**{farmer_crop_name(crop)}**')
+                cols = st.columns(3)
+                vals = [cols[i].number_input(f'{words[field]} · {farmer_crop_name(crop)}', min_value=0., value=None, key=f'v4_{crop}_{field}')
+                        for i, field in enumerate(('yield', 'price', 'cost'))]
+                overrides[crop] = {field: v for field, v in zip(('yield', 'price', 'cost'), vals) if v is not None}
+        soil, history = None, None
+        with st.expander('Soil test results (optional)'):
+            if st.checkbox('Add a soil test', key='v4_add_soil'):
+                st.caption('Recorded for your reference. These measurements do not change simulated water capacity or yield; a verified relation is not available yet.')
+                soil = dict(organic_matter_pct=st.number_input('Organic matter (%)', 0., 100., value=None, key='v4_organic_matter'),
+                            ph=st.number_input('pH', 0., 14., value=None, key='v4_ph'), texture=st.text_input('Texture', key='v4_texture'))
+        with st.expander('How the field has been farmed (optional)'):
+            if st.checkbox('Add field history', key='v4_add_history'):
+                history = dict(tillage=st.selectbox('Tillage', ['No till', 'Reduced', 'Conventional'], key='v4_tillage'),
+                               cover_crops=st.checkbox('Uses cover crops', key='v4_cover_crops'), erosion=st.checkbox('Erosion observed', key='v4_erosion'),
+                               waterlogging=st.checkbox('Waterlogging observed', key='v4_waterlogging'), salinity=st.checkbox('Salinity observed', key='v4_salinity'))
     st.caption('Your answers stay in this browser session. Nothing is saved.')
     st.session_state['_v4_farm_widgets'] = {
         name: st.session_state[name] for name in st.session_state
@@ -392,6 +396,11 @@ def climate_rows(trend):
 
 
 def climate_card(site):
+    with st.container(border=True):
+        _climate_card(site)
+
+
+def _climate_card(site):
     trend = record(record(site).get('climate_trend'))
     st.subheader('How your climate is changing')
     if not trend:
@@ -413,7 +422,6 @@ def climate_card(site):
 
 
 def render():
-    style()
     if st.session_state.get('v4_screen', 'start') == 'start':
         start()
     else:

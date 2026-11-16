@@ -36,6 +36,17 @@ def badge(kind: str) -> str:
     return f'<span class="rl-badge {cls}" title="{html.escape(tip)}"{style}>{label}</span>'
 
 
+_BADGE_COLORS = {'Observed': 'green', 'Estimated': 'blue', 'Your input': 'violet', 'Assumption': 'gray', 'EXAMPLE DATA': 'red'}
+
+
+def badge_md(kind: str) -> str:
+    """The badge() label as built-in Streamlit markdown (a ':color-badge[...]' pill), so pages can show the shared
+    data label with st.markdown or st.caption and no HTML. The wording always comes from badge()."""
+    import re
+    text = html.unescape(re.sub(r'<[^>]+>', '', badge(kind))).strip()
+    return f":{_BADGE_COLORS.get(text, 'gray')}-badge[{text}]"
+
+
 def md(s: str) -> None:
     st.markdown(s, unsafe_allow_html=True)
 

@@ -3,7 +3,7 @@
 
     render(site=None, inputs=None, sliders=None, result=None)
 
-Plain Streamlit only: default theme, no CSS. One color per plan across the map and the charts (_plan_colors). Data labels go through badge() from
+Built-in Streamlit only: no CSS and no HTML. The map and the three what-if charts each have their own tab. One color per plan across the map and the charts (_plan_colors). Data labels go through badge() from
 ui/components.py (see _badge).
 
 The page shows numbers from engine/tipping.py and computes nothing itself except display formatting.
@@ -22,24 +22,21 @@ _MODES = {"historical": "Historical", "recent": "Recent (last 20 years count dou
 
 
 def _badge(kind: str) -> str:
-    """A data label from the shared badge() in ui/components.py (a small HTML label with a hover note). If that
-    cannot be loaded, the same word in code style."""
+    """A data label: the wording of the shared badge() in ui/components.py, drawn as a built-in Streamlit badge.
+    If that cannot be loaded, the same word in code style."""
     try:
-        from ui.components import badge as shared
-        out = shared(kind)
-        if isinstance(out, str) and out:
-            return f"Data label: {out}"
+        from ui.components import badge_md
+        return f"Data label: {badge_md(kind)}"
     except Exception:
-        pass
-    return f"Data label: `{_WORDS.get(kind, str(kind))}`"
+        return f"Data label: `{_WORDS.get(kind, str(kind))}`"
 
 
 def _md(text: str) -> None:
-    st.markdown(text, unsafe_allow_html=True)        # a shared badge() may return a small HTML label
+    st.markdown(text)
 
 
 def _cap(text: str) -> None:
-    st.caption(text, unsafe_allow_html=True)
+    st.caption(text)
 
 
 def _get(obj, key, default=None):
@@ -227,24 +224,32 @@ def render(site=None, inputs=None, sliders=None, result=None) -> None:
     if _get(result, "example"):
         st.error("EXAMPLE DATA. These tipping points are placeholder values, not computed for this farm.")
 
-    for line in result.get("headlines", []):
-        st.markdown(f"- {line}")
     climate = result.get("climate") or {}
-    if climate:
-        _cap(f"Climate setting: **{_MODES.get(climate.get('mode'), climate.get('label', ''))}**. {climate.get('text', '')} "
-                   f"{_badge(climate.get('badge', 'assumption'))}")
+    if result.get("headlines") or climate:
+        with st.container(border=True):              # the answer first, in one box
+            for line in result.get("headlines", []):
+                st.markdown(f"- {line}")
+            if climate:
+                _cap(f"Climate setting: **{_MODES.get(climate.get('mode'), climate.get('label', ''))}**. {climate.get('text', '')} "
+                           f"{_badge(climate.get('badge', 'assumption'))}")
 
     colors = _plan_colors(result)
-    _show_map(result["map_2d"], colors)
     money = result["metric"]["name"] == "profit"
     unit, scale = _area()
     what = f"average profit per {unit} per year, in the currency of your prices" if money else "share of the best possible yield"
-    _show_curve("If rainfall changes", result["rainfall_curve"],
-                f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale, colors)
-    _show_curve("If your water supply changes", result["water_curve"],
-                f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale, colors)
-    _show_curve("If it gets hotter", result["heat_curve"],
-                f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale, colors)
+    # one what-if per tab, one chart in each
+    t_map, t_rain, t_water, t_heat = st.tabs(["Rainfall and water map", "Rainfall", "Water supply", "Heat"])
+    with t_map, st.container(border=True):
+        _show_map(result["map_2d"], colors)
+    with t_rain, st.container(border=True):
+        _show_curve("If rainfall changes", result["rainfall_curve"],
+                    f"Every day's rain is multiplied by the value on the bottom axis. The chart shows {what}.", lambda v: f"{v:.2f}x rain", unit, scale, colors)
+    with t_water, st.container(border=True):
+        _show_curve("If your water supply changes", result["water_curve"],
+                    f"Irrigation water available in a year. The chart shows {what}.", lambda v: f"{v:.0f} mm", unit, scale, colors)
+    with t_heat, st.container(border=True):
+        _show_curve("If it gets hotter", result["heat_curve"],
+                    f"Degrees added to every day's maximum temperature. The chart shows {what}.", lambda v: f"+{v:.1f} degC", unit, scale, colors)
 
     with st.expander("How this was worked out"):
         method = result.get("method") or {}
